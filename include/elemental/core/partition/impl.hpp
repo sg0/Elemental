@@ -16,9 +16,8 @@ namespace elem {
 #define M  Matrix<T>
 #define DM DistMatrix<T,U,V>
 
-//
-// PartitionUp
-//
+// Partition from the bottom up
+// ============================
 
 template<typename T>
 inline void
@@ -60,9 +59,8 @@ LockedPartitionUp
     LockedPartitionDown( A, AT, AB, A.Height()-heightAB );
 }
 
-//
-// PartitionDown
-//
+// Partition from the top down
+// ===========================
 
 template<typename T>
 inline void
@@ -73,8 +71,8 @@ PartitionDown
     DEBUG_ONLY(CallStackEntry cse("PartitionDown"))
     heightAT = Max(Min(heightAT,A.Height()),0);
     const Int heightAB = A.Height()-heightAT;
-    View( AT, A, 0,        0, heightAT, A.Width() );
-    View( AB, A, heightAT, 0, heightAB, A.Width() );
+    View( AT, A, IndPair(0,       0), DimPair(heightAT,A.Width()) );
+    View( AB, A, IndPair(heightAT,0), DimPair(heightAB,A.Width()) );
 }
 
 template<typename T, Distribution U, Distribution V>
@@ -86,8 +84,8 @@ PartitionDown
     DEBUG_ONLY(CallStackEntry cse("PartitionDown"))
     heightAT = Max(Min(heightAT,A.Height()),0);
     const Int heightAB = A.Height()-heightAT;
-    View( AT, A, 0,        0, heightAT, A.Width() );
-    View( AB, A, heightAT, 0, heightAB, A.Width() );
+    View( AT, A, IndPair(0,       0), DimPair(heightAT,A.Width()) );
+    View( AB, A, IndPair(heightAT,0), DimPair(heightAB,A.Width()) );
 }
 
 template<typename T>
@@ -99,8 +97,8 @@ LockedPartitionDown
     DEBUG_ONLY(CallStackEntry cse("LockedPartitionDown"))
     heightAT = Max(Min(heightAT,A.Height()),0);
     const Int heightAB = A.Height()-heightAT;
-    LockedView( AT, A, 0,        0, heightAT, A.Width() );
-    LockedView( AB, A, heightAT, 0, heightAB, A.Width() );
+    LockedView( AT, A, IndPair(0,       0), DimPair(heightAT,A.Width()) );
+    LockedView( AB, A, IndPair(heightAT,0), DimPair(heightAB,A.Width()) );
 }
 
 template<typename T, Distribution U, Distribution V>
@@ -112,13 +110,12 @@ LockedPartitionDown
     DEBUG_ONLY(CallStackEntry cse("LockedPartitionDown"))
     heightAT = Max(Min(heightAT,A.Height()),0);
     const Int heightAB = A.Height()-heightAT;
-    LockedView( AT, A, 0,        0, heightAT, A.Width() );
-    LockedView( AB, A, heightAT, 0, heightAB, A.Width() );
+    LockedView( AT, A, IndPair(0,       0), DimPair(heightAT,A.Width()) );
+    LockedView( AB, A, IndPair(heightAT,0), DimPair(heightAB,A.Width()) );
 }
 
-//
-// PartitionLeft
-//
+// Partition leftward starting from the right side
+// ===============================================
 
 template<typename T>
 inline void
@@ -152,9 +149,8 @@ LockedPartitionLeft( const DM& A, DM& AL, DM& AR, Int widthAR )
     LockedPartitionRight( A, AL, AR, A.Width()-widthAR );
 }
 
-//
-// PartitionRight
-//
+// Partition rightward starting from the left side
+// ===============================================
 
 template<typename T>
 inline void
@@ -163,8 +159,8 @@ PartitionRight( M& A, M& AL, M& AR, Int widthAL )
     DEBUG_ONLY(CallStackEntry cse("PartitionRight"))
     widthAL = Max(Min(widthAL,A.Width()),0);
     const Int widthAR = A.Width()-widthAL;
-    View( AL, A, 0, 0,       A.Height(), widthAL );
-    View( AR, A, 0, widthAL, A.Height(), widthAR );
+    View( AL, A, IndPair(0,0      ), DimPair(A.Height(),widthAL) );
+    View( AR, A, IndPair(0,widthAL), DimPair(A.Height(),widthAR) );
 }
 
 template<typename T, Distribution U, Distribution V>
@@ -174,8 +170,8 @@ PartitionRight( DM& A, DM& AL, DM& AR, Int widthAL )
     DEBUG_ONLY(CallStackEntry cse("PartitionRight"))
     widthAL = Max(Min(widthAL,A.Width()),0);
     const Int widthAR = A.Width()-widthAL;
-    View( AL, A, 0, 0,       A.Height(), widthAL );
-    View( AR, A, 0, widthAL, A.Height(), widthAR );
+    View( AL, A, IndPair(0,0      ), DimPair(A.Height(),widthAL) );
+    View( AR, A, IndPair(0,widthAL), DimPair(A.Height(),widthAR) );
 }
 
 template<typename T>
@@ -185,8 +181,8 @@ LockedPartitionRight( const M& A, M& AL, M& AR, Int widthAL )
     DEBUG_ONLY(CallStackEntry cse("LockedPartitionRight"))
     widthAL = Max(Min(widthAL,A.Width()),0);
     const Int widthAR = A.Width()-widthAL;
-    LockedView( AL, A, 0, 0,       A.Height(), widthAL );
-    LockedView( AR, A, 0, widthAL, A.Height(), widthAR );
+    LockedView( AL, A, IndPair(0,0      ), DimPair(A.Height(),widthAL) );
+    LockedView( AR, A, IndPair(0,widthAL), DimPair(A.Height(),widthAR) );
 }
 
 template<typename T, Distribution U, Distribution V>
@@ -196,13 +192,12 @@ LockedPartitionRight( const DM& A, DM& AL, DM& AR, Int widthAL )
     DEBUG_ONLY(CallStackEntry cse("LockedPartitionRight"))
     widthAL = Max(Min(widthAL,A.Width()),0);
     const Int widthAR = A.Width()-widthAL;
-    LockedView( AL, A, 0, 0,       A.Height(), widthAL );
-    LockedView( AR, A, 0, widthAL, A.Height(), widthAR );
+    LockedView( AL, A, IndPair(0,0      ), DimPair(A.Height(),widthAL) );
+    LockedView( AR, A, IndPair(0,widthAL), DimPair(A.Height(),widthAR) );
 }
 
-//
-// PartitionUpDiagonal
-//
+// Partition up the main diagonal
+// ==============================
 
 template<typename T>
 inline void
@@ -244,9 +239,8 @@ LockedPartitionUpDiagonal
     LockedPartitionUpOffsetDiagonal( 0, A, ATL, ATR, ABL, ABR, diagDist );
 }
 
-//
-// PartitionUpOffsetDiagonal
-//
+// Partition up an arbitrary diagonal
+// ==================================
 
 template<typename T>
 inline void
@@ -296,9 +290,8 @@ LockedPartitionUpOffsetDiagonal
     ( offset, A, ATL, ATR, ABL, ABR, A.DiagonalLength(offset)-diagDist );
 }
 
-//
-// PartitionDownDiagonal
-//
+// Partition down the main diagonal
+// ================================
 
 template<typename T>
 inline void
@@ -340,9 +333,8 @@ LockedPartitionDownDiagonal
     LockedPartitionDownOffsetDiagonal( 0, A, ATL, ATR, ABL, ABR, diagDist );
 }
 
-//
-// PartitionDownOffsetDiagonal
-//
+// Partition down an arbitrary diagonal
+// ====================================
 
 template<typename T>
 inline void
@@ -359,10 +351,10 @@ PartitionDownOffsetDiagonal
     
     const Int mCut = ( offset<=0 ? -offset+diagDist : diagDist );
     const Int nCut = ( offset<=0 ? diagDist : offset+diagDist );
-    View( ATL, A, 0,    0,    mCut,   nCut   );
-    View( ATR, A, 0,    nCut, mCut,   n-nCut );
-    View( ABL, A, mCut, 0,    m-mCut, nCut   );
-    View( ABR, A, mCut, nCut, m-mCut, n-nCut );
+    View( ATL, A, IndPair(0,   0   ), DimPair(mCut,  nCut  ) );
+    View( ATR, A, IndPair(0,   nCut), DimPair(mCut,  n-nCut) );
+    View( ABL, A, IndPair(mCut,0   ), DimPair(m-mCut,nCut  ) );
+    View( ABR, A, IndPair(mCut,nCut), DimPair(m-mCut,n-nCut) );
 }
 
 template<typename T, Distribution U, Distribution V>
@@ -380,10 +372,10 @@ PartitionDownOffsetDiagonal
 
     const Int mCut = ( offset<=0 ? -offset+diagDist : diagDist );
     const Int nCut = ( offset<=0 ? diagDist : offset+diagDist );
-    View( ATL, A, 0,    0,    mCut,   nCut   );
-    View( ATR, A, 0,    nCut, mCut,   n-nCut );
-    View( ABL, A, mCut, 0,    m-mCut, nCut   );
-    View( ABR, A, mCut, nCut, m-mCut, n-nCut );
+    View( ATL, A, IndPair(0,   0   ), DimPair(mCut,  nCut  ) );
+    View( ATR, A, IndPair(0,   nCut), DimPair(mCut,  n-nCut) );
+    View( ABL, A, IndPair(mCut,0   ), DimPair(m-mCut,nCut  ) );
+    View( ABR, A, IndPair(mCut,nCut), DimPair(m-mCut,n-nCut) );
 }
 
 template<typename T>
@@ -401,10 +393,10 @@ LockedPartitionDownOffsetDiagonal
     
     const Int mCut = ( offset<=0 ? -offset+diagDist : diagDist );
     const Int nCut = ( offset<=0 ? diagDist : offset+diagDist );
-    LockedView( ATL, A, 0,    0,    mCut,   nCut   );
-    LockedView( ATR, A, 0,    nCut, mCut,   n-nCut );
-    LockedView( ABL, A, mCut, 0,    m-mCut, nCut   );
-    LockedView( ABR, A, mCut, nCut, m-mCut, n-nCut );
+    LockedView( ATL, A, IndPair(0,   0   ), DimPair(mCut,  nCut  ) );
+    LockedView( ATR, A, IndPair(0,   nCut), DimPair(mCut,  n-nCut) );
+    LockedView( ABL, A, IndPair(mCut,0   ), DimPair(m-mCut,nCut  ) );
+    LockedView( ABR, A, IndPair(mCut,nCut), DimPair(m-mCut,n-nCut) );
 }
 
 template<typename T, Distribution U, Distribution V>
@@ -422,10 +414,10 @@ LockedPartitionDownOffsetDiagonal
     
     const Int mCut = ( offset<=0 ? -offset+diagDist : diagDist );
     const Int nCut = ( offset<=0 ? diagDist : offset+diagDist );
-    LockedView( ATL, A, 0,    0,    mCut,   nCut   );
-    LockedView( ATR, A, 0,    nCut, mCut,   n-nCut );
-    LockedView( ABL, A, mCut, 0,    m-mCut, nCut   );
-    LockedView( ABR, A, mCut, nCut, m-mCut, n-nCut );
+    LockedView( ATL, A, IndPair(0,   0   ), DimPair(mCut,  nCut  ) );
+    LockedView( ATR, A, IndPair(0,   nCut), DimPair(mCut,  n-nCut) );
+    LockedView( ABL, A, IndPair(mCut,0   ), DimPair(m-mCut,nCut  ) );
+    LockedView( ABR, A, IndPair(mCut,nCut), DimPair(m-mCut,n-nCut) );
 }
 
 #undef DM

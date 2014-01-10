@@ -23,20 +23,20 @@ DM<T>::DistMatrix( const elem::Grid& g )
 template<typename T>
 DM<T>::DistMatrix( Int height, Int width, const elem::Grid& g )
 : ADM<T>(g)
-{ this->SetShifts(); this->ResizeTo(height,width); }
+{ this->SetShifts(); this->Resize(height,width); }
 
 template<typename T>
 DM<T>::DistMatrix
 ( Int height, Int width, Int colAlign, Int rowAlign, const elem::Grid& g )
 : ADM<T>(g)
-{ this->Align(colAlign,rowAlign); this->ResizeTo(height,width); }
+{ this->Align(colAlign,rowAlign); this->Resize(height,width); }
 
 template<typename T>
 DM<T>::DistMatrix
 ( Int height, Int width,
   Int colAlign, Int rowAlign, Int ldim, const elem::Grid& g )
 : ADM<T>(g)
-{ this->Align(colAlign,rowAlign); this->ResizeTo(height,width,ldim); }
+{ this->Align(colAlign,rowAlign); this->Resize(height,width,ldim); }
 
 template<typename T>
 DM<T>::DistMatrix
@@ -280,7 +280,7 @@ DM<T>::GetDiagonalHelper
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC]::GetDiagonalHelper([MD,* ])");
         if( d.Viewing() )
-            this->AssertSameGrid( d.Grid() );
+            this->CheckSame( d.Grid() );
         if( ( d.Viewing() || d.ColConstrained() ) &&
             !d.AlignedWithDiagonal( *this, offset ) )
             LogicError("d must be aligned with the 'offset' diagonal");
@@ -292,7 +292,7 @@ DM<T>::GetDiagonalHelper
         if( !d.ColConstrained() )
             d.AlignWithDiagonal( *this, offset );
     }
-    d.ResizeTo( this->DiagonalLength(offset), 1 );
+    d.Resize( this->DiagonalLength(offset), 1 );
 
     if( d.Participating() )
     {
@@ -329,7 +329,7 @@ DM<T>::GetDiagonalHelper
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC]::GetDiagonal([* ,MD])");
         if( d.Viewing() )
-            this->AssertSameGrid( d.Grid() );
+            this->CheckSame( d.Grid() );
         if( ( d.Viewing() && d.RowConstrained() ) &&
             !d.AlignedWithDiagonal( *this, offset ) )
             LogicError("d must be aligned with the 'offset' diagonal");
@@ -341,7 +341,7 @@ DM<T>::GetDiagonalHelper
         if( !d.RowConstrained() )
             d.AlignWithDiagonal( *this, offset );
     }
-    d.ResizeTo( 1, this->DiagonalLength(offset) );
+    d.Resize( 1, this->DiagonalLength(offset) );
 
     if( d.Participating() )
     {
@@ -459,7 +459,7 @@ DM<T>::SetDiagonalHelper
 {
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC]::SetDiagonal([MD,* ])");
-        this->AssertSameGrid( d.Grid() );
+        this->CheckSame( d.Grid() );
         if( d.Width() != 1 )
             LogicError("d must be a column vector");
         const Int diagLength = this->DiagonalLength(offset);
@@ -507,7 +507,7 @@ DM<T>::SetDiagonalHelper
 {
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC]::SetDiagonal([* ,MD])");
-        this->AssertSameGrid( d.Grid() );
+        this->CheckSame( d.Grid() );
         if( d.Height() != 1 )
             LogicError("d must be a row vector");
         const Int diagLength = this->DiagonalLength(offset);
@@ -617,10 +617,10 @@ DM<T>::operator=( const DistMatrix<T,MC,MR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC] = [MC,MR]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -888,7 +888,7 @@ DM<T>::operator=( const DM<T>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC] = [MR,MC]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
     this->AlignAndResize
@@ -974,7 +974,7 @@ DM<T>::operator=( const DistMatrix<T,MR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC] = [MR,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
     this->AlignColsAndResize( A.ColAlign(), A.Height(), A.Width() );
@@ -1067,7 +1067,7 @@ DM<T>::operator=( const DistMatrix<T,STAR,MC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC] = [* ,MC]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
     this->AlignRowsAndResize( A.RowAlign(), A.Height(), A.Width() );
@@ -1337,7 +1337,7 @@ DM<T>::operator=( const DistMatrix<T,VR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC] = [VR,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
     this->AlignColsAndResize
@@ -1515,9 +1515,9 @@ DM<T>::operator=( const DistMatrix<T,STAR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC] = [* ,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
 
     const elem::Grid& g = this->Grid();
     const Int r = g.Height();
@@ -1551,7 +1551,7 @@ DM<T>::operator=( const DistMatrix<T,CIRC,CIRC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC] = [o ,o ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Grid& g = A.Grid();
     const Int m = A.Height();
@@ -1559,7 +1559,7 @@ DM<T>::operator=( const DistMatrix<T,CIRC,CIRC>& A )
     const Int colStride = this->ColStride();
     const Int rowStride = this->RowStride();
     const Int p = g.Size();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
 
     const Int colAlign = this->ColAlign();
     const Int rowAlign = this->RowAlign();
@@ -1637,7 +1637,7 @@ DM<T>::SumScatterFrom( const DistMatrix<T,MR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC]::SumScatterFrom([MR,* ])");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
     this->AlignColsAndResize( A.ColAlign(), A.Height(), A.Width() );
@@ -1849,7 +1849,7 @@ DM<T>::SumScatterFrom( const DistMatrix<T,STAR,MC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC]::SumScatterFrom([* ,MC])");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
 #ifdef VECTOR_WARNINGS
@@ -2001,10 +2001,10 @@ DM<T>::SumScatterFrom( const DistMatrix<T,STAR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC]::SumScatterFrom([* ,* ])");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return;
 
@@ -2072,8 +2072,8 @@ DM<T>::SumScatterUpdate( T alpha, const DistMatrix<T,MR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC]::SumScatterUpdate([MR,* ])");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
-        this->AssertSameSize( A.Height(), A.Width() ); 
+        this->CheckSame( A.Grid() );
+        this->CheckSame( A.Height(), A.Width() ); 
     )
     const elem::Grid& g = this->Grid();
     if( !this->Participating() )
@@ -2285,8 +2285,8 @@ DM<T>::SumScatterUpdate( T alpha, const DistMatrix<T,STAR,MC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC]::SumScatterUpdate([* ,MC])");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
-        this->AssertSameSize( A.Height(), A.Width() );
+        this->CheckSame( A.Grid() );
+        this->CheckSame( A.Height(), A.Width() );
     )
     const elem::Grid& g = this->Grid();
     if( !this->Participating() )
@@ -2439,10 +2439,10 @@ DM<T>::SumScatterUpdate( T alpha, const DistMatrix<T,STAR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MR,MC]::SumScatterUpdate([* ,* ])");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return;
 

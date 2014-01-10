@@ -23,12 +23,12 @@ DM<T>::DistMatrix( const elem::Grid& g )
 template<typename T>
 DM<T>::DistMatrix( Int height, Int width, const elem::Grid& g )
 : ADM<T>(g)
-{ this->ResizeTo(height,width); }
+{ this->Resize(height,width); }
 
 template<typename T>
 DM<T>::DistMatrix( Int height, Int width, Int ldim, const elem::Grid& g )
 : ADM<T>(g)
-{ this->ResizeTo(height,width,ldim); }
+{ this->Resize(height,width,ldim); }
 
 template<typename T>
 DM<T>::DistMatrix
@@ -174,13 +174,13 @@ DM<T>::GetDiagonalHelper
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ]::GetDiagonalHelper");
         if( d.Viewing() )
-            this->AssertSameGrid( d.Grid() );
+            this->CheckSame( d.Grid() );
     )
     const elem::Grid& g = this->Grid();
     if( !d.Viewing() )
         d.SetGrid( g );
     const Int diagLength = this->DiagonalLength(offset);
-    d.ResizeTo( diagLength, 1 );
+    d.Resize( diagLength, 1 );
     if( !d.Participating() )
         return;
 
@@ -260,7 +260,7 @@ DM<T>::SetDiagonalHelper
 {
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ]::SetDiagonalHelper");
-        this->AssertSameGrid( d.Grid() );
+        this->CheckSame( d.Grid() );
         if( d.Height() != 1 && d.Width() != 1 )
             LogicError("d must be a vector");
     )
@@ -333,10 +333,10 @@ DM<T>::operator=( const DistMatrix<T,MC,MR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ] = [MC,MR]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -406,10 +406,10 @@ DM<T>::operator=( const DistMatrix<T,MC,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ] = [MC,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -467,10 +467,10 @@ DM<T>::operator=( const DistMatrix<T,STAR,MR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ] = [* ,MR]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -524,10 +524,10 @@ DM<T>::operator=( const DistMatrix<T,MD,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ] = [MD,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -597,10 +597,10 @@ DM<T>::operator=( const DistMatrix<T,STAR,MD>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ] = [* ,MD]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -667,10 +667,10 @@ DM<T>::operator=( const DistMatrix<T,MR,MC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ] = [MR,MC]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -740,10 +740,10 @@ DM<T>::operator=( const DistMatrix<T,MR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ] = [MR,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -801,10 +801,10 @@ DM<T>::operator=( const DistMatrix<T,STAR,MC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ] = [* ,MC]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -858,10 +858,10 @@ DM<T>::operator=( const DistMatrix<T,VC,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ] = [VC,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -919,10 +919,10 @@ DM<T>::operator=( const DistMatrix<T,STAR,VC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ] = [* ,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -976,10 +976,10 @@ DM<T>::operator=( const DistMatrix<T,VR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ] = [VR,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -1037,10 +1037,10 @@ DM<T>::operator=( const DistMatrix<T,STAR,VR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,* ] = [* ,VR]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -1095,7 +1095,7 @@ DM<T>::operator=( const DM<T>& A )
         CallStackEntry cse("[* ,* ] = [* ,* ]");
         this->AssertNotLocked();
     )
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
 
     if( this->Grid() == A.Grid() )
     {
@@ -1174,7 +1174,7 @@ DM<T>::operator=( const DistMatrix<T,CIRC,CIRC>& A )
     const Grid& g = A.Grid();
     const Int m = A.Height(); 
     const Int n = A.Width();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
 
     if( this->Participating() )
     {

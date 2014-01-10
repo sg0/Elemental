@@ -27,6 +27,131 @@ typedef unsigned Unsigned;
 typedef Complex<float>  scomplex; 
 typedef Complex<double> dcomplex;
 
+struct BoolPair
+{
+    bool x, y;
+    BoolPair( const BoolPair& bools ) : x(bools.x), y(bools.y) { }
+    BoolPair( Int x_=0, Int y_=0 ) : x(x_), y(y_) { }
+};
+inline bool operator==( const BoolPair& a, const BoolPair& b )
+{ return memcmp(&a,&b,sizeof(BoolPair))==0; }
+inline bool operator!=( const BoolPair& a, const BoolPair& b )
+{ return !operator==(a,b); }
+inline BoolPair Transpose( const BoolPair& a )
+{ return BoolPair(a.y,a.x); }
+
+struct IndPair 
+{ 
+    Int i, j; 
+    IndPair( const IndPair& inds ) : i(inds.i), j(inds.j) { }
+    IndPair( Int i_=0, Int j_=0 ) : i(i_), j(j_) { }
+};
+inline bool operator==( const IndPair& a, const IndPair& b )
+{ return memcmp(&a,&b,sizeof(IndPair))==0; }
+inline bool operator!=( const IndPair& a, const IndPair& b )
+{ return !operator==(a,b); }
+inline IndPair Transpose( const IndPair& a )
+{ return IndPair(a.j,a.i); }
+
+struct DimPair 
+{ 
+    Int m, n; 
+
+    DimPair( const DimPair& dims ) : m(dims.m), n(dims.n) { }
+    DimPair( Int m_=0, Int n_=0 ) : m(m_), n(n_) { }
+};
+inline bool operator==( const DimPair& a, const DimPair& b )
+{ return memcmp(&a,&b,sizeof(DimPair))==0; }
+inline bool operator!=( const DimPair& a, const DimPair& b )
+{ return !operator==(a,b); }
+inline DimPair Transpose( const DimPair& a )
+{ return DimPair(a.n,a.m); }
+
+struct Layout
+{
+    DimPair dims;
+    Int ldim;
+
+    Layout( const Layout& layout ) 
+    : dims(layout.dims), ldim(layout.ldim) { }
+    Layout( const DimPair& dims_, Int ldim_ ) 
+    : dims(dims_), ldim(ldim_) { }
+    Layout( Int height, Int width, Int ldim_ ) 
+    : dims(height,width), ldim(ldim_) { }
+
+    Int Height() const { return dims.m; }
+    Int Width() const { return dims.n; }
+    Int LDim() const { return ldim; }
+    DimPair Dimensions() const { return dims; }
+};
+inline bool operator==( const Layout& a, const Layout& b )
+{ return memcmp(&a,&b,sizeof(Layout))==0; }
+inline bool operator!=( const Layout& a, const Layout& b )
+{ return !operator==(a,b); }
+
+template<typename T>
+struct FlatMatrix
+{
+    elem::Layout layout;
+    T* buffer;
+
+    FlatMatrix( const FlatMatrix<T>& fm ) 
+    : layout(fm.layout), buffer(fm.buffer) { }
+    FlatMatrix( const elem::Layout& layout_, T* buffer_ ) 
+    : layout(layout_), buffer(buffer_) { }
+    FlatMatrix( const DimPair& dims, Int ldim, T* buffer_ )
+    : layout(dims,ldim), buffer(buffer_) { }
+    FlatMatrix( Int height, Int width, Int ldim, T* buffer_ )
+    : layout(height,width,ldim), buffer(buffer_) { }
+
+    Int Height() const { return layout.Height(); }
+    Int Width() const { return layout.Width(); }
+    Int LDim() const { return layout.LDim(); }
+    const elem::Layout& Layout() const { return layout; }
+    DimPair Dimensions() const { return layout.Dimensions(); }
+    T* Buffer() { return buffer; }
+    const T* Buffer() const { return buffer; }
+};
+template<typename T>
+inline bool operator==( const FlatMatrix<T>& a, const FlatMatrix<T>& b )
+{ return memcmp(&a,&b,sizeof(FlatMatrix<T>))==0; }
+template<typename T>
+inline bool operator!=( const FlatMatrix<T>& a, const FlatMatrix<T>& b )
+{ return !operator==(a,b); }
+
+template<typename T>
+struct LockedFlatMatrix
+{
+    elem::Layout layout;
+    const T* buffer;
+
+    LockedFlatMatrix( const FlatMatrix<T>& fm ) 
+    : layout(fm.layout), buffer(fm.buffer) { }
+    LockedFlatMatrix( const LockedFlatMatrix<T>& fm ) 
+    : layout(fm.layout), buffer(fm.buffer) { }
+    LockedFlatMatrix( const elem::Layout& layout_, const T* buffer_ ) 
+    : layout(layout_), buffer(buffer_) { }
+    LockedFlatMatrix( const DimPair& dims, Int ldim, const T* buffer_ )
+    : layout(dims,ldim), buffer(buffer_) { }
+    LockedFlatMatrix( Int height, Int width, Int ldim, const T* buffer_ )
+    : layout(height,width,ldim), buffer(buffer_) { }
+
+    Int Height() const { return layout.Height(); }
+    Int Width() const { return layout.Width(); }
+    Int LDim() const { return layout.LDim(); }
+    const elem::Layout& Layout() const { return layout; }
+    DimPair Dimensions() const { return layout.Dimensions(); }
+    const T* Buffer() const { return buffer; }
+};
+template<typename T>
+inline bool operator==
+( const LockedFlatMatrix<T>& a, const LockedFlatMatrix<T>& b )
+{ return memcmp(&a,&b,sizeof(LockedFlatMatrix<T>))==0; }
+template<typename T>
+inline bool operator!=
+( const LockedFlatMatrix<T>& a, const LockedFlatMatrix<T>& b )
+{ return !operator==(a,b); }
+
 template<typename Real>
 struct ValueInt
 {

@@ -23,19 +23,19 @@ DM<T>::DistMatrix( const elem::Grid& g )
 template<typename T>
 DM<T>::DistMatrix( Int height, Int width, const elem::Grid& g )
 : ADM<T>(g)
-{ this->SetShifts(); this->ResizeTo(height,width); }
+{ this->SetShifts(); this->Resize(height,width); }
 
 template<typename T>
 DM<T>::DistMatrix
 ( Int height, Int width, Int rowAlign, const elem::Grid& g )
 : ADM<T>(g)
-{ this->Align(0,rowAlign); this->ResizeTo(height,width); }
+{ this->Align(0,rowAlign); this->Resize(height,width); }
 
 template<typename T>
 DM<T>::DistMatrix
 ( Int height, Int width, Int rowAlign, Int ldim, const elem::Grid& g )
 : ADM<T>(g)
-{ this->Align(0,rowAlign); this->ResizeTo(height,width,ldim); }
+{ this->Align(0,rowAlign); this->Resize(height,width,ldim); }
 
 template<typename T>
 DM<T>::DistMatrix
@@ -327,7 +327,7 @@ DM<T>::operator=( const DistMatrix<T,MR,MC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,VC] = [MR,MC]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
     this->AlignRowsAndResize( A.RowAlign(), A.Height(), A.Width() );
@@ -500,7 +500,7 @@ DM<T>::operator=( const DistMatrix<T,STAR,MC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,VC] = [* ,MC]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
     this->AlignRowsAndResize( A.RowAlign(), A.Height(), A.Width() );
@@ -616,7 +616,7 @@ DM<T>::operator=( const DM<T>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,VC] = [* ,VC]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid(); 
     this->AlignRowsAndResize( A.RowAlign(), A.Height(), A.Width() );
@@ -701,10 +701,10 @@ DM<T>::operator=( const DistMatrix<T,STAR,VR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,VC] = [* ,VR]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
     
@@ -772,10 +772,10 @@ DM<T>::operator=( const DistMatrix<T,STAR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,VC] = [* ,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Grid& g = this->Grid();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( !this->Participating() )
         return *this;
 
@@ -807,13 +807,13 @@ DM<T>::operator=( const DistMatrix<T,CIRC,CIRC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[VC,* ] = [o ,o ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Grid& g = A.Grid();
     const Int m = A.Height();
     const Int n = A.Width();
     const Int p = g.Size();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
 
     const Int rowAlign = this->RowAlign();
     const Int nLocal = this->LocalWidth();
@@ -877,7 +877,7 @@ DM<T>::SumScatterFrom( const DistMatrix<T,STAR,MC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[* ,VC]::SumScatterFrom( [* ,MC] )");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
     this->AlignRowsAndResize( A.RowAlign(), A.Height(), A.Width() );
@@ -952,8 +952,8 @@ DM<T>::SumScatterUpdate
     DEBUG_ONLY(
         CallStackEntry cse("[* ,VC]::SumScatterUpdate( [* ,MC] )");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
-        this->AssertSameSize( A.Height(), A.Width() );
+        this->CheckSame( A.Grid() );
+        this->CheckSame( A.Height(), A.Width() );
     )
     const elem::Grid& g = this->Grid();
     if( !this->Participating() )

@@ -23,14 +23,14 @@ DM<T>::DistMatrix( const elem::Grid& g )
 template<typename T>
 DM<T>::DistMatrix( Int height, Int width, const elem::Grid& g )
 : ADM<T>(g)
-{ this->SetShifts(); this->ResizeTo(height,width); }
+{ this->SetShifts(); this->Resize(height,width); }
 
 template<typename T>
 DM<T>::DistMatrix( Int height, Int width, Int colAlign, const elem::Grid& g )
 : ADM<T>(g)
 { 
     this->Align( colAlign, 0 );
-    this->ResizeTo( height, width );
+    this->Resize( height, width );
 }
 
 template<typename T>
@@ -39,7 +39,7 @@ DM<T>::DistMatrix
 : ADM<T>(g)
 { 
     this->Align( colAlign, 0 );
-    this->ResizeTo( height, width, ldim );
+    this->Resize( height, width, ldim );
 }
 
 template<typename T>
@@ -276,7 +276,7 @@ DM<T>::GetDiagonalHelper
     DEBUG_ONLY(
         CallStackEntry cse("[MC,* ]::GetDiagonalHelper");
         if( d.Viewing() )
-            this->AssertSameGrid( d.Grid() );
+            this->CheckSame( d.Grid() );
         if( (d.Viewing() || d.ColConstrained() ) &&
             !d.AlignedWithDiagonal( *this, offset ) )
             LogicError("d must be aligned with the 'offset' diagonal");
@@ -289,7 +289,7 @@ DM<T>::GetDiagonalHelper
             d.AlignWithDiagonal( *this, offset );
     }
     const Int diagLength = this->DiagonalLength(offset);
-    d.ResizeTo( diagLength, 1 );
+    d.Resize( diagLength, 1 );
     if( !this->Participating() )
         return;
 
@@ -322,7 +322,7 @@ DM<T>::GetDiagonalHelper
     DEBUG_ONLY(
         CallStackEntry cse("[MC,* ]::GetDiagonalHelper");
         if( d.Viewing() )
-            this->AssertSameGrid( d.Grid() );
+            this->CheckSame( d.Grid() );
         if( ( d.Viewing() || d.RowConstrained() ) &&
             !d.AlignedWithDiagonal( *this, offset ) )
             LogicError("d must be aligned with the 'offset' diagonal");
@@ -335,7 +335,7 @@ DM<T>::GetDiagonalHelper
             d.AlignWithDiagonal( *this, offset );
     }
     const Int diagLength = this->DiagonalLength(offset);
-    d.ResizeTo( 1, diagLength );
+    d.Resize( 1, diagLength );
     if( !this->Participating() )
         return;
 
@@ -449,7 +449,7 @@ DM<T>::SetDiagonalHelper
 {
     DEBUG_ONLY(
         CallStackEntry cse("[MC,* ]::SetDiagonalHelper");
-        this->AssertSameGrid( d.Grid() );
+        this->CheckSame( d.Grid() );
         if( d.Width() != 1 )
             LogicError("d must be a column vector");
         const Int diagLength = this->DiagonalLength(offset);
@@ -494,7 +494,7 @@ DM<T>::SetDiagonalHelper
 {
     DEBUG_ONLY(
         CallStackEntry cse("[MC,* ]::SetDiagonalHelper");
-        this->AssertSameGrid( d.Grid() );
+        this->CheckSame( d.Grid() );
         if( d.Height() != 1 )
             LogicError("d must be a row vector");
         const Int diagLength = this->DiagonalLength(offset);
@@ -646,7 +646,7 @@ DM<T>::operator=( const DistMatrix<T,MC,MR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MC,* ] = [MC,MR]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
     this->AlignColsAndResize( A.ColAlign(), A.Height(), A.Width() );
@@ -823,7 +823,7 @@ DM<T>::operator=( const DM<T>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MC,* ] = [MC,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
     this->AlignColsAndResize( A.ColAlign(), A.Height(), A.Width() );
@@ -986,7 +986,7 @@ DM<T>::operator=( const DistMatrix<T,VC,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MC,* ] = [VC,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const elem::Grid& g = this->Grid();
 #ifdef VECTOR_WARNINGS
@@ -1189,9 +1189,9 @@ DM<T>::operator=( const DistMatrix<T,STAR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[MC,* ] = [* ,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
 
     const Int r = this->Grid().Height(); 
     const Int colShift = this->ColShift();

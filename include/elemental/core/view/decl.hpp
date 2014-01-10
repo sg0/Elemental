@@ -12,9 +12,8 @@
 
 namespace elem {
 
-//
-// Viewing a full matrix
-//
+// View a full matrix
+// ==================
 
 template<typename T>
 void View( Matrix<T>& A, Matrix<T>& B );
@@ -34,139 +33,114 @@ void LockedView( DistMatrix<T,U,V>& A, const DistMatrix<T,U,V>& B );
 template<typename T,Distribution U,Distribution V>
 DistMatrix<T,U,V> LockedView( const DistMatrix<T,U,V>& B );
 
-//
-// Viewing a submatrix from (i,j) to (i+height,j+width)
-//
+// View a submatrix of the specified size starting at the specified coordinate
+// ===========================================================================
 
 template<typename T>
-void View( Matrix<T>& A, Matrix<T>& B, Int i, Int j, Int height, Int width );
+void View( Matrix<T>& A, Matrix<T>& B, IndPair indPair, DimPair dimPair );
 template<typename T>
-Matrix<T> View( Matrix<T>& B, Int i, Int j, Int height, Int width );
+Matrix<T> View( Matrix<T>& B, IndPair indPair, DimPair dimPair );
 template<typename T,Distribution U,Distribution V>
 void View
-( DistMatrix<T,U,V>& A, DistMatrix<T,U,V>& B,
-  Int i, Int j, Int height, Int width );
+( DistMatrix<T,U,V>& A, DistMatrix<T,U,V>& B, 
+  IndPair indPair, DimPair dimPair );
 template<typename T,Distribution U,Distribution V>
 DistMatrix<T,U,V> View
-( DistMatrix<T,U,V>& B, Int i, Int j, Int height, Int width );
+( DistMatrix<T,U,V>& B, IndPair indPair, DimPair dimPair );
 
 template<typename T>
 void LockedView
-( Matrix<T>& A, const Matrix<T>& B,
-  Int i, Int j, Int height, Int width );
+( Matrix<T>& A, const Matrix<T>& B, IndPair indPair, DimPair dimPair );
 template<typename T>
-Matrix<T> LockedView( const Matrix<T>& B, Int i, Int j, Int height, Int width );
+Matrix<T> LockedView( const Matrix<T>& B, IndPair indPair, DimPair dimPair );
 template<typename T,Distribution U,Distribution V>
 void LockedView
 ( DistMatrix<T,U,V>& A, const DistMatrix<T,U,V>& B,
-  Int i, Int j, Int height, Int width );
+  IndPair indPair, DimPair dimPair );
 template<typename T,Distribution U,Distribution V>
 DistMatrix<T,U,V> LockedView
-( const DistMatrix<T,U,V>& B, Int i, Int j, Int height, Int width );
+( const DistMatrix<T,U,V>& B, IndPair indPair, DimPair dimPair );
 
-//
-// Viewing a submatrix [iBeg:iEnd),[jBeg:jEnd)
-//
-
-template<typename T>
-void ViewRange
-( Matrix<T>& A, Matrix<T>& B, Int iBeg, Int jBeg, Int iEnd, Int jEnd );
-template<typename T>
-Matrix<T> ViewRange
-( Matrix<T>& B, Int iBeg, Int jBeg, Int iEnd, Int jEnd );
-template<typename T,Distribution U,Distribution V>
-void ViewRange
-( DistMatrix<T,U,V>& A, DistMatrix<T,U,V>& B,
-  Int iBeg, Int jBeg, Int iEnd, Int jEnd );
-template<typename T,Distribution U,Distribution V>
-DistMatrix<T,U,V> ViewRange
-( DistMatrix<T,U,V>& B, Int iBeg, Int jBeg, Int iEnd, Int jEnd );
+// View a submatrix [iBeg:iEnd),[jBeg:jEnd)
+// ========================================
 
 template<typename T>
-void LockedViewRange
-( Matrix<T>& A, const Matrix<T>& B, Int iBeg, Int jBeg, Int iEnd, Int jEnd );
+void View( Matrix<T>& A, Matrix<T>& B, IndPair begPair, IndPair endPair );
 template<typename T>
-Matrix<T> LockedViewRange
-( const Matrix<T>& B, Int iBeg, Int jBeg, Int iEnd, Int jEnd );
+Matrix<T> View( Matrix<T>& B, IndPair begPair, IndPair endPair );
 template<typename T,Distribution U,Distribution V>
-void LockedViewRange
+void View
+( DistMatrix<T,U,V>& A, DistMatrix<T,U,V>& B, 
+  IndPair begPair, IndPair endPair );
+template<typename T,Distribution U,Distribution V>
+DistMatrix<T,U,V> View
+( DistMatrix<T,U,V>& B, IndPair begPair, IndPair endPair );
+
+template<typename T>
+void LockedView
+( Matrix<T>& A, const Matrix<T>& B, IndPair begPair, IndPair endPair );
+template<typename T>
+Matrix<T> LockedView( const Matrix<T>& B, IndPair begPair, IndPair endPair );
+template<typename T,Distribution U,Distribution V>
+void LockedView
 ( DistMatrix<T,U,V>& A, const DistMatrix<T,U,V>& B,
-  Int iBeg, Int jBeg, Int iEnd, Int jEnd );
+  IndPair begPair, IndPair endPair );
 template<typename T,Distribution U,Distribution V>
-DistMatrix<T,U,V> LockedViewRange
-( const DistMatrix<T,U,V>& B, Int iBeg, Int jBeg, Int iEnd, Int jEnd );
+DistMatrix<T,U,V> LockedView
+( const DistMatrix<T,U,V>& B, IndPair begPair, IndPair endPair );
 
-//
-// View two horizontally connected matrices
-//
+// View two horizontally-connected matrices
+// ========================================
 
 template<typename T>
-void View1x2
-( Matrix<T>& A,
-  Matrix<T>& BL, Matrix<T>& BR );
+void View1x2( Matrix<T>& A, Matrix<T>& BL, Matrix<T>& BR );
 template<typename T>
 Matrix<T> View1x2( Matrix<T>& BL, Matrix<T>& BR );
 template<typename T,Distribution U,Distribution V>
 void View1x2
-( DistMatrix<T,U,V>& A,
-  DistMatrix<T,U,V>& BL, DistMatrix<T,U,V>& BR );
+( DistMatrix<T,U,V>& A, DistMatrix<T,U,V>& BL, DistMatrix<T,U,V>& BR );
 template<typename T,Distribution U,Distribution V>
 DistMatrix<T,U,V> View1x2( DistMatrix<T,U,V>& BL, DistMatrix<T,U,V>& BR );
 
 template<typename T>
-void LockedView1x2
-(       Matrix<T>& A,
-  const Matrix<T>& BL,
-  const Matrix<T>& BR );
+void LockedView1x2( Matrix<T>& A, const Matrix<T>& BL, const Matrix<T>& BR );
 template<typename T>
 Matrix<T> LockedView1x2( const Matrix<T>& BL, const Matrix<T>& BR );
 template<typename T,Distribution U,Distribution V>
 void LockedView1x2
-(       DistMatrix<T,U,V>& A,
-  const DistMatrix<T,U,V>& BL,
-  const DistMatrix<T,U,V>& BR );
+(       DistMatrix<T,U,V>& A, 
+  const DistMatrix<T,U,V>& BL, const DistMatrix<T,U,V>& BR );
 template<typename T,Distribution U,Distribution V>
 DistMatrix<T,U,V> LockedView1x2
 ( const DistMatrix<T,U,V>& BL, const DistMatrix<T,U,V>& BR );
 
-//
-// View two vertically connected matrices
-//
+// View two vertically-connected matrices
+// ======================================
 
 template<typename T>
-void View2x1
-( Matrix<T>& A,
-  Matrix<T>& BT,
-  Matrix<T>& BB );
+void View2x1( Matrix<T>& A, Matrix<T>& BT, Matrix<T>& BB );
 template<typename T>
 Matrix<T> View2x1( Matrix<T>& BT, Matrix<T>& BB );
 template<typename T,Distribution U,Distribution V>
 void View2x1
-( DistMatrix<T,U,V>& A,
-  DistMatrix<T,U,V>& BT,
-  DistMatrix<T,U,V>& BB );
+( DistMatrix<T,U,V>& A, DistMatrix<T,U,V>& BT, DistMatrix<T,U,V>& BB );
 template<typename T,Distribution U,Distribution V>
 DistMatrix<T,U,V> View2x1( DistMatrix<T,U,V>& BT, DistMatrix<T,U,V>& BB );
 
 template<typename T>
-void LockedView2x1
-(       Matrix<T>& A,
-  const Matrix<T>& BT,
-  const Matrix<T>& BB );
+void LockedView2x1( Matrix<T>& A, const Matrix<T>& BT, const Matrix<T>& BB );
 template<typename T>
 Matrix<T> LockedView2x1( const Matrix<T>& BT, const Matrix<T>& BB );
 template<typename T,Distribution U,Distribution V>
 void LockedView2x1
 (       DistMatrix<T,U,V>& A,
-  const DistMatrix<T,U,V>& BT,
-  const DistMatrix<T,U,V>& BB );
+  const DistMatrix<T,U,V>& BT, const DistMatrix<T,U,V>& BB );
 template<typename T,Distribution U,Distribution V>
 DistMatrix<T,U,V> LockedView2x1
 ( const DistMatrix<T,U,V>& BT, const DistMatrix<T,U,V>& BB );
 
-//
 // View a two-by-two set of connected matrices
-//
+// ===========================================
 
 template<typename T>
 void View2x2
@@ -207,15 +181,13 @@ DistMatrix<T,U,V> LockedView2x2
   const DistMatrix<T,U,V>& BBL, const DistMatrix<T,U,V>& BBR );
 
 // Utilities for handling the extra information needed for [MD,* ] and [* ,MD]
+// ===========================================================================
 template<typename T,Distribution U,Distribution V>
-void HandleDiagPath
-( DistMatrix<T,U,V>& A, const DistMatrix<T,U,V>& B );
+void HandleDiagPath( DistMatrix<T,U,V>& A, const DistMatrix<T,U,V>& B );
 template<typename T>
-void HandleDiagPath
-( DistMatrix<T,MD,STAR>& A, const DistMatrix<T,MD,STAR>& B );
+void HandleDiagPath( DistMatrix<T,MD,STAR>& A, const DistMatrix<T,MD,STAR>& B );
 template<typename T>
-void HandleDiagPath
-( DistMatrix<T,STAR,MD>& A, const DistMatrix<T,STAR,MD>& B );
+void HandleDiagPath( DistMatrix<T,STAR,MD>& A, const DistMatrix<T,STAR,MD>& B );
 
 } // namespace elem
 

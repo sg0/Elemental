@@ -16,9 +16,8 @@ namespace elem {
 #define M  Matrix<T>
 #define DM DistMatrix<T,U,V>
 
-//
-// PartitionUp
-// 
+// Partition from the bottom up
+// ============================
 
 template<typename T>
 void PartitionUp
@@ -40,9 +39,8 @@ void LockedPartitionUp
 ( const DM& A, DM& AT,
                DM& AB, Int heightAB=Blocksize() );
 
-//
-// PartitionDown
-//
+// Partition from the top down
+// ===========================
 
 template<typename T>
 void PartitionDown
@@ -64,9 +62,8 @@ void LockedPartitionDown
 ( const DM& A, DM& AT,
                DM& AB, Int heightAT=Blocksize() );
 
-//
-// PartitionLeft
-//
+// Partition leftward starting from the right side
+// ===============================================
 
 template<typename T>
 void PartitionLeft
@@ -84,9 +81,8 @@ template<typename T, Distribution U, Distribution V>
 void LockedPartitionLeft
 ( const DM& A, DM& AL, DM& AR, Int widthAR=Blocksize() );
 
-//
-// PartitionRight
-//
+// Partition rightward starting from the left side
+// ===============================================
 
 template<typename T>
 void PartitionRight
@@ -104,9 +100,8 @@ template<typename T, Distribution U, Distribution V>
 void LockedPartitionRight
 ( const DM& A, DM& AL, DM& AR, Int widthAL=Blocksize() );
 
-//
-// PartitionUpDiagonal
-//
+// Partition up the main diagonal
+// ==============================
 
 template<typename T>
 void PartitionUpDiagonal
@@ -128,9 +123,8 @@ void LockedPartitionUpDiagonal
 ( const DM& A, DM& ATL, DM& ATR,
                DM& ABL, DM& ABR, Int diagDist=Blocksize() );
 
-//
-// PartitionUpOffsetDiagonal
-//
+// Partition up an arbitrary diagonal
+// ==================================
 
 template<typename T>
 void PartitionUpOffsetDiagonal
@@ -156,9 +150,8 @@ void LockedPartitionUpOffsetDiagonal
   const DM& A, DM& ATL, DM& ATR,
                DM& ABL, DM& ABR, Int diagDist=Blocksize() );
 
-//
-// PartitionDownDiagonal
-//
+// Partition down the main diagonal
+// ================================
 
 template<typename T>
 void PartitionDownDiagonal
@@ -180,9 +173,8 @@ void LockedPartitionDownDiagonal
 ( const DM& A, DM& ATL, DM& ATR,
                DM& ABL, DM& ABR, Int diagDist=Blocksize() );
 
-//
-// PartitionDownOffsetDiagonal
-//
+// Partition down an arbitrary diagonal
+// ====================================
 
 template<typename T>
 void PartitionDownOffsetDiagonal

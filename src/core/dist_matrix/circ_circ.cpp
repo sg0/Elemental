@@ -37,7 +37,7 @@ DM<T>::DistMatrix( Int height, Int width, const elem::Grid& g, Int root )
             LogicError("Invalid root");
     )
     this->root_ = root;
-    this->ResizeTo( height, width );
+    this->Resize( height, width );
 }
 
 template<typename T>
@@ -51,7 +51,7 @@ DM<T>::DistMatrix
             LogicError("Invalid root");
     )
     this->root_ = root;
-    this->ResizeTo( height, width, ldim );
+    this->Resize( height, width, ldim );
 }
 
 template<typename T>
@@ -234,7 +234,7 @@ DM<T>::CopyFromRoot( const Matrix<T>& A )
     dims[1] = A.Width();
     mpi::Broadcast( dims, 2, this->Root(), grid.VCComm() );
 
-    this->ResizeTo( dims[0], dims[1] );
+    this->Resize( dims[0], dims[1] );
     this->matrix_ = A;
 }
 
@@ -250,7 +250,7 @@ DM<T>::CopyFromNonRoot()
     Int dims[2];
     mpi::Broadcast( dims, 2, this->Root(), grid.VCComm() );
 
-    this->ResizeTo( dims[0], dims[1] );
+    this->Resize( dims[0], dims[1] );
 }
 
 template<typename T>
@@ -260,11 +260,11 @@ DM<T>::operator=( const DistMatrix<T,MC,MR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [MC,MR]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
     const elem::Grid& g = this->Grid();
     if( !g.InGrid() )
         return *this;
@@ -343,11 +343,11 @@ DM<T>::operator=( const DistMatrix<T,MC,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [MC,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
 
     const Int root = this->Root();
     const elem::Grid& g = this->Grid();
@@ -417,11 +417,11 @@ DM<T>::operator=( const DistMatrix<T,STAR,MR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [* ,MR]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
 
     const Int root = this->Root();
     const elem::Grid& g = this->Grid();
@@ -488,11 +488,11 @@ DM<T>::operator=( const DistMatrix<T,MD,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [MD,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
     const elem::Grid& g = this->Grid();
     if( !g.InGrid() )
         return *this;
@@ -573,11 +573,11 @@ DM<T>::operator=( const DistMatrix<T,STAR,MD>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [* ,MD]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
     const elem::Grid& g = this->Grid();
     if( !g.InGrid() )
         return *this;
@@ -654,11 +654,11 @@ DM<T>::operator=( const DistMatrix<T,MR,MC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [MR,MC]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
     const elem::Grid& g = this->Grid();
     if( !g.InGrid() )
         return *this;
@@ -737,11 +737,11 @@ DM<T>::operator=( const DistMatrix<T,MR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [MR,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
 
     const Int root = this->Root();
     const elem::Grid& g = this->Grid();
@@ -812,11 +812,11 @@ DM<T>::operator=( const DistMatrix<T,STAR,MC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [* ,MC]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
 
     const Int root = this->Root();
     const elem::Grid& g = this->Grid();
@@ -883,11 +883,11 @@ DM<T>::operator=( const DistMatrix<T,VC,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [VC,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
     const elem::Grid& g = this->Grid();
     if( !g.InGrid() )
         return *this;
@@ -955,11 +955,11 @@ DM<T>::operator=( const DistMatrix<T,STAR,VC>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [o ,o ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     const elem::Grid& g = this->Grid();
     if( !g.InGrid() )
         return *this;
@@ -1022,11 +1022,11 @@ DM<T>::operator=( const DistMatrix<T,VR,STAR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [VR,* ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
     const elem::Grid& g = this->Grid();
     if( !g.InGrid() )
         return *this;
@@ -1097,11 +1097,11 @@ DM<T>::operator=( const DistMatrix<T,STAR,VR>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [* ,VR]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
     const elem::Grid& g = this->Grid();
     if( !g.InGrid() )
         return *this;
@@ -1165,7 +1165,7 @@ const DM<T>&
 DM<T>::operator=( const DistMatrix<T,STAR,STAR>& A )
 {
     DEBUG_ONLY(CallStackEntry cse("[o ,o ] = [* ,* ]"))
-    this->ResizeTo( A.Height(), A.Width() );
+    this->Resize( A.Height(), A.Width() );
     if( A.Grid().VCRank() == this->Root() )
         this->matrix_ = A.LockedMatrix();
     return *this;
@@ -1178,11 +1178,11 @@ DM<T>::operator=( const DM<T>& A )
     DEBUG_ONLY(
         CallStackEntry cse("[o ,o ] = [o ,o ]");
         this->AssertNotLocked();
-        this->AssertSameGrid( A.Grid() );
+        this->CheckSame( A.Grid() );
     )
     const Int m = A.Height();
     const Int n = A.Width();
-    this->ResizeTo( m, n );
+    this->Resize( m, n );
 
     const Grid& g = A.Grid();
     if( this->Root() == A.Root() )

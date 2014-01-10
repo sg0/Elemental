@@ -16,9 +16,8 @@ namespace elem {
 #define M  Matrix<T>
 #define DM DistMatrix<T,U,V>
 
-//
-// RepartitionUp
-//
+// Repartition upwards starting from the bottom
+// ============================================
 
 template<typename T>
 void RepartitionUp
@@ -44,9 +43,8 @@ void LockedRepartitionUp
                 DM& A1,
   const DM& AB, DM& A2, Int bsize=Blocksize() );
 
-//
-// RepartitionDown
-//
+// Repartition downward starting from the top
+// ==========================================
 
 template<typename T>
 void RepartitionDown
@@ -72,9 +70,8 @@ void LockedRepartitionDown
                 DM& A1,
   const DM& AB, DM& A2, Int bsize=Blocksize() );
 
-//
-// RepartitionLeft
-//
+// Repartition leftward starting from the right
+// ============================================
 
 template<typename T>
 void RepartitionLeft
@@ -96,9 +93,8 @@ void LockedRepartitionLeft
 ( const DM& AL, const DM& AR,
   DM& A0, DM& A1, DM& A2, Int bsize=Blocksize() );
 
-//
-// RepartitionRight
-//
+// Repartition rightward starting from the left
+// ============================================
 
 template<typename T>
 void RepartitionRight
@@ -120,9 +116,8 @@ void LockedRepartitionRight
 ( const DM& AL, const DM& AR,
   DM& A0, DM& A1, DM& A2, Int bsize=Blocksize() );
 
-//
-// RepartitionUpDiagonal
-//
+// Repartition up the diagonal
+// ===========================
 
 template<typename T>
 void RepartitionUpDiagonal
@@ -149,9 +144,8 @@ void LockedRepartitionUpDiagonal
   const DM& ABL, const DM& ABR, DM& A20, DM& A21, DM& A22, 
   Int bsize=Blocksize() );
 
-//
-// RepartitionDownDiagonal
-//
+// Repartition down the diagonal
+// =============================
 
 template<typename T>
 void RepartitionDownDiagonal

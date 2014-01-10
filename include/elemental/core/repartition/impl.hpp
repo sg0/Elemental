@@ -16,9 +16,8 @@ namespace elem {
 #define M  Matrix<T>
 #define DM DistMatrix<T,U,V>
 
-//
-// RepartitionUp
-//
+// Repartition upwards starting from the bottom
+// ============================================
 
 template<typename T>
 inline void
@@ -68,9 +67,8 @@ LockedRepartitionUp
     LockedView( A2, AB );
 }
 
-//
-// RepartitionDown
-//
+// Repartition downward starting from the top
+// ==========================================
 
 template<typename T>
 inline void
@@ -120,9 +118,8 @@ LockedRepartitionDown
     LockedPartitionDown( AB, A1, A2, A1Height );
 }
 
-//
-// RepartitionLeft
-//
+// Repartition leftward starting from the right
+// ============================================
 
 template<typename T>
 inline void
@@ -168,9 +165,8 @@ LockedRepartitionLeft
     LockedView( A2, AR );
 }
 
-//
-// RepartitionRight
-//
+// Repartition rightward starting from the left
+// ============================================
 
 template<typename T>
 inline void
@@ -216,9 +212,8 @@ LockedRepartitionRight
     LockedPartitionRight( AR, A1, A2, A1Width );
 }
 
-//
-// RepartitionUpDiagonal
-//
+// Repartition up the diagonal
+// ===========================
 
 template<typename T>
 inline void
@@ -288,9 +283,8 @@ LockedRepartitionUpDiagonal
     LockedView( A22, ABR );
 }
 
-//
-// RepartitionDownDiagonal
-//
+// Repartition down the diagonal
+// =============================
 
 template<typename T>
 inline void
