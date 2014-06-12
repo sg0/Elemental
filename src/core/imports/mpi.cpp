@@ -358,11 +358,27 @@ void Barrier( Comm comm )
     SafeMpi( MPI_Barrier( comm.comm ) );
 }
 
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
+void IBarrier( Comm comm, Request& request )
+{
+    DEBUG_ONLY(CallStackEntry cse("mpi::IBarrier"))
+    SafeMpi( MPI_Ibarrier( comm.comm, &request ) );
+}
+#endif
+
 // Test for completion
 bool Test( Request& request )
 {
     DEBUG_ONLY(CallStackEntry cse("mpi::Test"))
     Status status;
+    int flag;
+    SafeMpi( MPI_Test( &request, &flag, &status ) );
+    return flag;
+}
+
+bool Test( Request& request, Status& status )
+{
+    DEBUG_ONLY(CallStackEntry cse("mpi::Test"))
     int flag;
     SafeMpi( MPI_Test( &request, &flag, &status ) );
     return flag;

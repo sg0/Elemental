@@ -29,6 +29,11 @@ namespace mpi {
 #endif
 #endif
 
+//Use MPI-3 IBarrier instead of El strict EOM matching
+#ifndef EL_USE_IBARRIER
+#define EL_USE_IBARRIER
+#endif
+
 struct Comm
 {
     MPI_Comm comm;
@@ -71,6 +76,7 @@ typedef MPI_User_function UserFunction;
 // Standard constants
 const int ANY_SOURCE = MPI_ANY_SOURCE;
 const int ANY_TAG = MPI_ANY_TAG;
+const int ERR_RANK = MPI_ERR_RANK;
 #ifdef EL_HAVE_MPI_QUERY_THREAD
 const int THREAD_SINGLE = MPI_THREAD_SINGLE;
 const int THREAD_FUNNELED = MPI_THREAD_FUNNELED;
@@ -167,11 +173,17 @@ void Translate
 
 // Utilities
 void Barrier( Comm comm );
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
+void IBarrier( Comm comm, Request& request );
+#endif
 void Wait( Request& request );
 void Wait( Request& request, Status& status );
+//TODO add another function for getting statuses
+void WaitAny( int count, Request *requests, int *indx );
 void WaitAll( int numRequests, Request* requests );
 void WaitAll( int numRequests, Request* requests, Status* statuses );
 bool Test( Request& request );
+bool Test( Request& request, Status& status );
 bool IProbe( int source, int tag, Comm comm, Status& status );
 
 template<typename T>
