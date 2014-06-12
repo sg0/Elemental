@@ -478,7 +478,9 @@ template < typename T > AxpyInterface < T >::AxpyInterface ():attachedForLocalTo
     if (i + X.Height () > Y.Height () || j + X.Width () > Y.Width ())
       LogicError ("Submatrix out of bounds of global matrix");
 
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
     all_sends_are_finished = false;
+#endif
     const Grid & g = Y.Grid ();
     const Int r = g.Height ();
     const Int c = g.Width ();
@@ -545,7 +547,9 @@ template < typename T > AxpyInterface < T >::AxpyInterface ():attachedForLocalTo
 	       dataSendRequests_[destination][index]);
 	  }
 
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
 	all_sends_are_finished = true;
+#endif
 	receivingRow = (receivingRow + 1) % r;
 	if (receivingRow == 0)
 	  receivingCol = (receivingCol + 1) % c;
