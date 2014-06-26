@@ -34,6 +34,11 @@ namespace mpi {
 #define EL_USE_IBARRIER
 #endif
 
+//Experimental MPI performance enhancers
+#ifndef EL_MPI_EXPERIMENTAL
+#define EL_MPI_EXPERIMENTAL
+#endif
+    
 struct Comm
 {
     MPI_Comm comm;
@@ -72,7 +77,19 @@ typedef MPI_Errhandler ErrorHandler;
 typedef MPI_Request Request;
 typedef MPI_Status Status;
 typedef MPI_User_function UserFunction;
-
+#if MPI_VERSION >= 3
+typedef MPI_Win Window;
+typedef enum
+{
+	STRICT_ACC_ORDERING 	= 0,
+	PARTIAL_ACC_ORDERING 	= 2,
+	NO_ACC_ORDERING 	= 4
+} acc_order_t;
+//TODO update these 
+const int MAX_OUTSTANDING_NB 	= 100000;
+const int FLUSH_FREQUENCY 	= 10000;
+#endif
+typedef MPI_Info Info;
 // Standard constants
 const int ANY_SOURCE = MPI_ANY_SOURCE;
 const int ANY_TAG = MPI_ANY_TAG;
@@ -171,6 +188,32 @@ void Translate
 ( Comm origComm, int size, const int* origRanks, 
   Comm newComm,                  int* newRanks );
 
+//MPI-3 one-sided
+#if MPI_VERSION>=3
+void SetWindowProp (Window& window, int prop);
+//NOTE assuming MPI_MODE_NOCHECK
+void WindowLock( int rank, Window& window );
+void WindowLock( Window& window );
+void WindowUnlock( int rank, Window& window );
+void WindowUnlock( Window& window );
+void WindowCreate( int size, Comm comm, Window& window );
+void WindowCreate( int size, Info info, Comm comm, Window& window );
+void Iput( void *source, int source_size, int target_rank, 
+	int target_size, Window& window);
+void Rput( void *source, int source_size, int target_rank, int target_size, 
+	Window& window, Request& request);
+void Iget( void *source, int source_size, int target_rank, 
+	int target_size, Window& window);
+void Rget( void *source, int source_size, int target_rank, int target_size, 
+	Window& window, Request& request);
+void Iacc( void *source, int source_size, int target_rank, 
+	int target_size, Op &op, Window& window);
+void Racc( void *source, int source_size, int target_rank, int target_size, 
+	Op &op, Window& window, Request& request);
+void Flush( int target_rank, Window& window, bool isLocalCompletion );
+void Flush( Window& window, bool isLocalCompletion );
+#endif
+
 // Utilities
 void Barrier( Comm comm );
 #if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
@@ -184,6 +227,9 @@ void WaitAll( int numRequests, Request* requests );
 void WaitAll( int numRequests, Request* requests, Status* statuses );
 bool Test( Request& request );
 bool Test( Request& request, Status& status );
+bool Testany( int count, Request* requests );
+bool Testany( int count, Request* requests, int& indx );
+bool Testany( int count, Request* requests, int& indx, Status& status );
 bool IProbe( int source, int tag, Comm comm, Status& status );
 
 template<typename T>

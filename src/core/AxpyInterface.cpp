@@ -110,53 +110,11 @@ namespace El
     const Int myCol = g.Col ();
     mpi::Status status;
 
-#ifdef EL_PREPOST_MESSAGES
-    mpi::Status prepost_status;
-    int indx = -1;
-    int flag;
-    bool comp = false;
-    // one of the recvs that was preposted in Attach is expected to complete...
-    comp =
-      mpi::Testany (max_preposted_messages, prepost_reqs, indx,
-		    prepost_status);
-    // make sure at least one message is received
-    while (!comp)
-      {
-	comp =
-	  mpi::Testany (max_preposted_messages, prepost_reqs, indx,
-			prepost_status);
-      }
-    // data received
-    //TODO How to resize a large to smaller buffer?
-    if (prepost_status.MPI_TAG == SMALL_DATA_TAG)
-      {
-	// resize buffer
-	const Int count = mpi::GetCount < byte > (prepost_status);
-	recvVector_.resize (count);
-	recvBuffer = recvVector_.data ();
-
-      }
-    else if (prepost_status.MPI_TAG == MORE_DATA_TAG)
-      {
-	// only first half is in receive buffer, prepare another receive
-	const Int count = mpi::GetCount < byte > (prepost_status);
-	DEBUG_ONLY (if (count < Int (4 * sizeof (Int) + sizeof (T)))
-		    LogicError ("Count was too small");)
-	  const Int source = prepost_status.MPI_SOURCE;
-
-	recvVector_.resize (count + PREPOST_THRESHOLD);
-	recvBuffer = recvVector_.data ();
-
-	mpi::TaggedRecv (recvBuffer + PREPOST_THRESHOLD, count, source,
-			 DATA_TAG, g.VCComm ());
-      }
-    else
-      {
-	return;
-      }
-#else
     if (mpi::IProbe (mpi::ANY_SOURCE, DATA_TAG, g.VCComm (), status))
       {
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
+	  all_sends_are_finished = true;
+#endif
 	// Message exists, so recv and pack    
 	const Int count = mpi::GetCount < byte > (status);
 	DEBUG_ONLY (if (count < Int (4 * sizeof (Int) + sizeof (T)))
@@ -165,7 +123,6 @@ namespace El
 	recvVector_.resize (count);
 	byte *recvBuffer = recvVector_.data ();
 	mpi::TaggedRecv (recvBuffer, count, source, DATA_TAG, g.VCComm ());
-#endif
 	// Extract the header
 	byte *head = recvBuffer;
 	const Int i = *reinterpret_cast < const Int * >(head);
@@ -225,13 +182,9 @@ namespace El
 	    for (Int s = 0; s < localHeight; ++s)
 	      YCol[s] += alpha * XCol[s];
 	  }
-
-#ifdef EL_PREPOST_MESSAGES
-#else
 	// Free the memory for the recv buffer
 	recvVector_.clear ();
       }
-#endif
   }
 
   template < typename T >
@@ -422,25 +375,12 @@ template < typename T > AxpyInterface < T >::AxpyInterface ():attachedForLocalTo
       if (attachedForLocalToGlobal_ || attachedForGlobalToLocal_)
       LogicError ("Must detach before reattaching.");
 
+    const Grid & g = Z.Grid ();
+
     if (type == LOCAL_TO_GLOBAL)
       {
 	attachedForLocalToGlobal_ = true;
 	localToGlobalMat_ = &Z;
-//TODO Is this the right place to prepost?
-#ifdef EL_PREPOST_MESSAGES
-//TODO Make max-small-messages configurable, can we calculate an upper bound?
-	max_preposted_messages = Z.Grid ().Size () * 100;	//function of the grid size
-	prepost_reqs = new mpi::Request[max_preposted_messages];
-
-	for (int i = 0; i < max_preposted_messages; i++)
-	  {
-	    //resize to default prepost size
-	    recvVector_.resize (PREPOST_THRESHOLD);
-	    recvBuffer = recvVector_.data ();
-	    mpi::TaggedIRecv (recvBuffer, PREPOST_THRESHOLD, mpi::ANY_SOURCE,
-			      mpi::ANY_TAG, g.VCComm (), &prepost_reqs[i]);
-	  }
-#endif
       }
     else
       {
@@ -484,7 +424,9 @@ template < typename T > AxpyInterface < T >::AxpyInterface ():attachedForLocalTo
 	attachedForGlobalToLocal_ = true;
 	globalToLocalMat_ = &X;
       }
-
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
+        all_sends_are_finished = false;
+#endif
     const Int p = X.Grid ().Size ();
     sentEomTo_.resize (p, false);
     haveEomFrom_.resize (p, false);
@@ -605,30 +547,9 @@ template < typename T > AxpyInterface < T >::AxpyInterface ():attachedForLocalTo
 		  thisSendCol[s] = thisXCol[colShift + s * r];
 	      }
 	    // Fire off the non-blocking send
-#ifdef EL_PREPOST_MESSAGES
-	    if (bufferSize <= PREPOST_THRESHOLD)
-	      {
-		mpi::TaggedISSend
-		  (sendBuffer, bufferSize, destination, SMALL_DATA_TAG,
-		   g.VCComm (), dataSendRequests_[destination][index]);
-	      }
-	    else
-	      {
-		//SMALL_DATA_TAG
-		mpi::TaggedISSend
-		  (sendBuffer, PREPOST_THRESHOLD, destination, MORE_DATA_TAG,
-		   g.VCComm (), dataSendRequests_[destination][index]);
-		//remaining data using MORE_DATA_TAG
-		mpi::TaggedISSend
-		  (sendBuffer + PREPOST_THRESHOLD,
-		   bufferSize - PREPOST_THRESHOLD, destination, DATA_TAG,
-		   g.VCComm (), dataSendRequests_[destination][index]);
-	      }
-#else
 	    mpi::TaggedISSend
 	      (sendBuffer, bufferSize, destination, DATA_TAG, g.VCComm (),
 	       dataSendRequests_[destination][index]);
-#endif
 	  }
 #if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
 	all_sends_are_finished = true;
@@ -801,49 +722,54 @@ template < typename T > AxpyInterface < T >::AxpyInterface ():attachedForLocalTo
   {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::Detach"))
       if (!attachedForLocalToGlobal_ && !attachedForGlobalToLocal_)
-      LogicError ("Must attach before detaching.");
-
-#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
-    DONE = false;
-    nb_bar_active = false;
-#endif
+	  LogicError ("Must attach before detaching.");
+    
     const Grid & g = (attachedForLocalToGlobal_ ?
-		      localToGlobalMat_->Grid () : globalToLocalMat_->
-		      Grid ());
+	    localToGlobalMat_->Grid () : globalToLocalMat_->
+	    Grid ());
+    
+    if (attachedForLocalToGlobal_)
+    {
 #if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
-    while (!DONE)
+            bool DONE = false;
+            mpi::Request nb_bar_request;
+            bool nb_bar_active = false;
+            while (!DONE)
+            {
+                    HandleLocalToGlobalData ();
+                    if (nb_bar_active)
+                    {
+                            // test for IBarrier completion
+                            DONE = mpi::Test (nb_bar_request);
+                    }
+                    else
+                    {
+                            if (all_sends_are_finished)
+                            {
+                                    // all ssends are complete, start nonblocking barrier
+                                    mpi::IBarrier (g.VCComm (), nb_bar_request);
+                                    nb_bar_active = true;
+                            }
+                    }
+            }
 #else
-    while (!Finished ())
+            while (!Finished ())
+            {
+                    HandleLocalToGlobalData ();
+                    HandleEoms ();
+            }
+            mpi::Barrier (g.VCComm ());
 #endif
-      {
-	if (attachedForLocalToGlobal_)
-	  HandleLocalToGlobalData ();
-	else
-	  HandleGlobalToLocalRequest ();
-#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
-	if (nb_bar_active)
-	  {
-	    // test for IBarrier completion
-	    DONE = mpi::Test (nb_bar_request);
-	  }
-	else
-	  {
-	    if (all_sends_are_finished)
-	      {
-		// all ssends are complete, start nonblocking barrier
-		mpi::IBarrier (g.VCComm (), nb_bar_request);
-		nb_bar_active = true;
-	      }
-	  }
-#else
-	HandleEoms ();
-#endif
-      }
-
-#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
-#else
-    mpi::Barrier (g.VCComm ());
-#endif
+    }
+    else
+    {
+            while (!Finished ())
+            {
+                    HandleGlobalToLocalRequest ();
+                    HandleEoms ();
+            }
+            mpi::Barrier (g.VCComm ());
+    }
 
     attachedForLocalToGlobal_ = false;
     attachedForGlobalToLocal_ = false;
@@ -865,10 +791,6 @@ template < typename T > AxpyInterface < T >::AxpyInterface ():attachedForLocalTo
     replySendRequests_.clear ();
 
     eomSendRequests_.clear ();
-
-#ifdef EL_PREPOST_MESSAGES
-    delete[]prepost_reqs;
-#endif
   }
 
   template class AxpyInterface < Int >;

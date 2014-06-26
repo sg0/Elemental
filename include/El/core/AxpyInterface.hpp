@@ -45,18 +45,16 @@ private:
         DATA_TAG        =1, 
         EOM_TAG         =2, 
         DATA_REQUEST_TAG=3, 
-        DATA_REPLY_TAG  =4;
+        DATA_REPLY_TAG  =4
+	    ;
   
 //request object for polling on Issends
 #if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
-    bool DONE;
-    mpi::Request nb_bar_request;
-    bool nb_bar_active;
     bool all_sends_are_finished;
 #endif
-
     bool attachedForLocalToGlobal_, attachedForGlobalToLocal_;
     byte sendDummy_, recvDummy_;
+
     DistMatrix<T,MC,MR>* localToGlobalMat_;
     const DistMatrix<T,MC,MR>* globalToLocalMat_;
 

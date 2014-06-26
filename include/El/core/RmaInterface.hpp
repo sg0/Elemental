@@ -15,6 +15,7 @@
 #ifndef EL_RMAINTERFACE_HPP
 #define EL_RMAINTERFACE_HPP
 
+#if MPI_VERSION>=3
 namespace El {
 
 template<typename T>
@@ -30,21 +31,26 @@ public:
     void Attach(       DistMatrix<T,MC,MR>& Z );
     void Attach( const DistMatrix<T,MC,MR>& Z );
 
-    void Put(       Matrix<T>& Z, Int i, Int j );
-    void Put( const Matrix<T>& Z, Int i, Int j );
+    void Put( T alpha,      Matrix<T>& Z, Int i, Int j );
+    void Put( T alpha, const Matrix<T>& Z, Int i, Int j );
 
     void Get(       Matrix<T>& Z, Int i, Int j );
     void Get( const Matrix<T>& Z, Int i, Int j );
 
-    void Acc(       Matrix<T>& Z, Int i, Int j );
-    void Acc( const Matrix<T>& Z, Int i, Int j );
+    void Acc( T alpha,      Matrix<T>& Z, mpi::Op &op, Int i, Int j );
+    void Acc( T alpha, const Matrix<T>& Z, mpi::Op &op, Int i, Int j );
+
+    void Flush( const Matrix<T>& Z, Int i, Int j);
 
     void Detach();
 
 private:
-
+    mpi::Window window;
+    std::vector<byte> getVector_, putVector_;
+    DistMatrix<T,MC,MR>* localToGlobalMat_;
+    const DistMatrix<T,MC,MR>* globalToLocalMat_;
 };
 
 } // namespace El
-
+#endif
 #endif // ifndef EL_RMAINTERFACE_HPP
