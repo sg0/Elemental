@@ -191,7 +191,7 @@ namespace El
     void AxpyInterface < T >::HandleGlobalToLocalRequest ()
   {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::HandleGlobalToLocalRequest"))
-      DistMatrix < T > &X = *globalToLocalMat_;
+    const DistMatrix < T > &X = *globalToLocalMat_;
     const Grid & g = X.Grid ();
     const Int r = g.Height ();
     const Int c = g.Width ();
