@@ -26,7 +26,7 @@ set(EL_VERSION_MINOR 85-dev)
 
 # By default, Elemental builds static libraries, but shared libraries are 
 # also supported through this option.
-option(EL_SHARED_LIBRARIES "Switch to shared libraries" OFF)
+option(BUILD_SHARED_LIBS "Switch to shared libraries" OFF)
 
 # Whether or not to build a collection of simple example drivers.
 option(EL_EXAMPLES "A collection of simple examples" OFF)
@@ -34,9 +34,12 @@ option(EL_EXAMPLES "A collection of simple examples" OFF)
 # Whether or not to build a collection of performance and correctness tests
 option(EL_TESTS "A collection of performance and correctness tests" OFF)
 
+# Whether or not to have the Memory class zero initialize what it allocates.
+# If valgrind was detected and is running, this will be forced anyway.
+option(EL_ZERO_INIT "Initialize buffers to zero by default?" OFF)
+
 # Whether or not to build current 'experimental' code, such as:
-# 1) prototype F90 interfaces (soon to be deprecated)
-# 2) Martin's 3D Gemm code
+# Martin's 3D Gemm code
 option(EL_EXPERIMENTAL "Build experimental code" OFF)
 
 option(EL_C_INTERFACE "Build work-in-progress C interface" ON)
@@ -201,12 +204,10 @@ if(EL_HAVE_QT5)
   get_filename_component(Qt5_LIBDIR ${Qt5_CMAKEDIR} PATH)
 endif()
 
-# Set the library type from the 'EL_SHARED_LIBRARIES' option
-# =======================================================
-if(EL_SHARED_LIBRARIES)
-  set(LIBRARY_TYPE SHARED)
-else()
-  set(LIBRARY_TYPE STATIC)
+include(FindValgrind)
+if(VALGRIND_FOUND)
+  include_directories(${VALGRIND_INCLUDE_DIR})
+  set(EL_HAVE_VALGRIND TRUE)
 endif()
 
 include(tests/Math)
@@ -273,7 +274,7 @@ set(LINK_LIBS ${MATH_LIBS} ${MPI_CXX_LIBRARIES})
 if(EL_HAVE_QT5)
   set(LINK_LIBS ${LINK_LIBS} ${Qt5Widgets_LIBRARIES})  
 endif()
-add_library(El ${LIBRARY_TYPE} ${EL_CPP_FILES})
+add_library(El ${EL_CPP_FILES})
 target_link_libraries(El pmrrr ${LINK_LIBS})
 install(TARGETS El DESTINATION lib)
 
@@ -300,7 +301,7 @@ include_directories("${PROJECT_BINARY_DIR}/include")
 # Build the test drivers if necessary
 if(EL_TESTS)
   set(TEST_DIR ${PROJECT_SOURCE_DIR}/tests)
-  set(TEST_TYPES core blas-like lapack-like convex)
+  set(TEST_TYPES core blas-like lapack-like optimization)
   foreach(TYPE ${TEST_TYPES})
     file(GLOB_RECURSE ${TYPE}_TESTS RELATIVE ${PROJECT_SOURCE_DIR}/tests/${TYPE}/ 
          "tests/${TYPE}/*.cpp")
@@ -326,7 +327,7 @@ endif()
 # Build the example drivers if necessary
 if(EL_EXAMPLES)
   set(EXAMPLE_DIR ${PROJECT_SOURCE_DIR}/examples)
-  set(EXAMPLE_TYPES convex core blas-like io lapack-like matrices)
+  set(EXAMPLE_TYPES optimization core blas-like io lapack-like matrices)
   foreach(TYPE ${EXAMPLE_TYPES})
     if(EL_C_INTERFACE)
       file(GLOB_RECURSE ${TYPE}_EXAMPLES RELATIVE 
@@ -377,25 +378,6 @@ if(EL_EXPERIMENTAL)
     endif()
     install(TARGETS experimental-g3d-${EXPER} DESTINATION bin/experimental/g3d)
   endforeach()
-
-  if(EL_HAVE_F90_INTERFACE)
-    # Build the F90 drivers
-    set(OUTPUT_DIR "${PROJECT_BINARY_DIR}/bin/experimental/f90")
-    set(DRIVER ${EXPERIMENTAL_DIR}/f90/test.f90)
-    add_executable(experimental-f90-test ${DRIVER}) 
-    set_source_files_properties(${DRIVER} PROPERTIES 
-      OBJECT_DEPENDS "${PREPARED_HEADERS}")
-    target_link_libraries(experimental-f90-test El)
-    set_target_properties(experimental-f90-test PROPERTIES
-      LINKER_LANGUAGE Fortran
-      OUTPUT_NAME f90_test 
-      RUNTIME_OUTPUT_DIRECTORY ${OUTPUT_DIR})
-    if(MPI_LINK_FLAGS)
-      set_target_properties(experimental-f90-test 
-        PROPERTIES LINK_FLAGS ${MPI_LINK_FLAGS})
-    endif()
-    install(TARGETS experimental-f90-test DESTINATION bin/experimental/f90)  
-  endif()
 endif()
 
 # If Elemental is a subproject, then pass some variables to the parent

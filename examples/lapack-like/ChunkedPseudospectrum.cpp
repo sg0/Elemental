@@ -6,25 +6,7 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-// NOTE: It is possible to simply include "El.hpp" instead
-#include "El-lite.hpp"
-#include EL_ENTRYWISEMAP_INC
-#include EL_FROBENIUSNORM_INC
-#include EL_PSEUDOSPECTRUM_INC
-
-#include EL_BULLSHEAD_INC
-#include EL_EHRENFEST_INC
-#include EL_FOXLI_INC
-#include EL_GRCAR_INC
-#include EL_HATANONELSON_INC
-#include EL_HELMHOLTZPML_INC
-#include EL_LOTKIN_INC
-#include EL_RIFFLE_INC
-#include EL_TREFETHEN_INC
-#include EL_TRIANGLE_INC
-#include EL_UNIFORM_INC
-#include EL_UNIFORMHELMHOLTZGREENS_INC
-#include EL_WHALE_INC
+#include "El.hpp"
 using namespace std;
 using namespace El;
 
@@ -242,50 +224,44 @@ main( int argc, char* argv[] )
         const bool formATR = true;
         DistMatrix<Real> QReal(g);
         DistMatrix<C> QCpx(g);
+        SchurCtrl<Real> ctrl;
 #ifdef EL_HAVE_SCALAPACK
-        SetDefaultBlockHeight( nbDist );
-        SetDefaultBlockWidth( nbDist );
-        timer.Start();
-        if( isReal )
-        {
-            if( psNorm == PS_TWO_NORM )
-                schur::QR( AReal, w, formATR );
-            else
-                schur::QR( AReal, w, QReal, formATR );
-        }
-        else
-        {
-            if( psNorm == PS_TWO_NORM )
-                schur::QR( ACpx, w, formATR );
-            else
-                schur::QR( ACpx, w, QCpx, formATR );
-        }
-        mpi::Barrier( mpi::COMM_WORLD );
-        const double qrTime = timer.Stop();
-        if( mpi::WorldRank() == 0 )
-            std::cout << "QR algorithm took " << qrTime << " seconds" 
-                      << std::endl; 
+        ctrl.qrCtrl.blockHeight = nbDist;
+        ctrl.qrCtrl.blockWidth = nbDist;
+        ctrl.qrCtrl.aed = false;
 #else
-        SdcCtrl<Real> sdcCtrl;
-        sdcCtrl.cutoff = cutoff;
-        sdcCtrl.maxInnerIts = maxInnerIts;
-        sdcCtrl.maxOuterIts = maxOuterIts;
-        sdcCtrl.tol = sdcTol;
-        sdcCtrl.spreadFactor = spreadFactor;
-        sdcCtrl.random = random;
-        sdcCtrl.progress = progress;
-        sdcCtrl.signCtrl.tol = signTol;
-        sdcCtrl.signCtrl.progress = progress;
+        ctrl.useSdc = true;
+        ctrl.sdcCtrl.cutoff = cutoff;
+        ctrl.sdcCtrl.maxInnerIts = maxInnerIts;
+        ctrl.sdcCtrl.maxOuterIts = maxOuterIts;
+        ctrl.sdcCtrl.tol = sdcTol;
+        ctrl.sdcCtrl.spreadFactor = spreadFactor;
+        ctrl.sdcCtrl.random = random;
+        ctrl.sdcCtrl.progress = progress;
+        ctrl.sdcCtrl.signCtrl.tol = signTol;
+        ctrl.sdcCtrl.signCtrl.progress = progress;
+#endif
         timer.Start();
         if( isReal )
-            schur::SDC( AReal, w, QReal, formATR, sdcCtrl );
+        {
+            if( psNorm == PS_TWO_NORM )
+                Schur( AReal, w, formATR, ctrl );
+            else
+                Schur( AReal, w, QReal, formATR, ctrl );
+        }
         else
-            schur::SDC( ACpx, w, QCpx, formATR, sdcCtrl );
+        {
+            if( psNorm == PS_TWO_NORM )
+                Schur( ACpx, w, formATR, ctrl );
+            else
+                Schur( ACpx, w, QCpx, formATR, ctrl );
+        }
         mpi::Barrier( mpi::COMM_WORLD );
-        const double sdcTime = timer.Stop();
+        const double schurTime = timer.Stop();
         if( mpi::WorldRank() == 0 )
-            std::cout << "SDC took " << sdcTime << " seconds" << std::endl; 
-#endif
+            std::cout << "Schur decomposition took " << schurTime << " seconds" 
+                      << std::endl; 
+
         if( saveSchur )
         {
             if( mpi::WorldRank() == 0 )
@@ -301,7 +277,7 @@ main( int argc, char* argv[] )
                     os << matName << "-" 
                        << AReal.ColStride() << "x" << AReal.RowStride()
                        << "-" << AReal.DistRank();
-                    write::Binary( AReal.LockedMatrix(), os.str() );
+                    Write( AReal.LockedMatrix(), os.str(), BINARY );
                 }
                 if( psNorm == PS_ONE_NORM )
                 {
@@ -309,7 +285,7 @@ main( int argc, char* argv[] )
                     os << matName << "-Q-"
                        << QReal.ColStride() << "x" << QReal.RowStride()
                        << "-" << QReal.DistRank();
-                    write::Binary( QReal.LockedMatrix(), os.str() );
+                    Write( QReal.LockedMatrix(), os.str(), BINARY );
                 }
             } 
             else
@@ -319,7 +295,7 @@ main( int argc, char* argv[] )
                     os << matName << "-" 
                        << ACpx.ColStride() << "x" << ACpx.RowStride()
                        << "-" << ACpx.DistRank();
-                    write::Binary( ACpx.LockedMatrix(), os.str() );
+                    Write( ACpx.LockedMatrix(), os.str(), BINARY );
                 }
                 if( psNorm == PS_ONE_NORM )
                 {
@@ -327,7 +303,7 @@ main( int argc, char* argv[] )
                     os << matName << "-Q-"
                        << QCpx.ColStride() << "x" << QCpx.RowStride()
                        << "-" << QCpx.DistRank();
-                    write::Binary( QCpx.LockedMatrix(), os.str() );
+                    Write( QCpx.LockedMatrix(), os.str(), BINARY );
                 }
             }
             mpi::Barrier( mpi::COMM_WORLD );

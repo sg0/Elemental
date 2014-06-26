@@ -6,15 +6,7 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-// NOTE: It is possible to simply include "El.hpp" instead
-#include "El-lite.hpp"
-#include EL_GEMM_INC
-#include EL_LU_INC
-#include EL_FROBENIUSNORM_INC
-#include EL_INFINITYNORM_INC
-#include EL_ONENORM_INC
-#include EL_UNIFORM_INC
-#include EL_EXPLICITPERMUTATION_INC
+#include "El.hpp"
 using namespace std;
 using namespace El;
 
@@ -181,11 +173,11 @@ main( int argc, char* argv[] )
 
         if( commRank == 0 )
             cout << "Testing with doubles:" << endl;
-        TestLU<double,MC>( pivot, testCorrectness, print, m, g );
+        TestLU<double,VC>( pivot, testCorrectness, print, m, g );
 
         if( commRank == 0 )
             cout << "Testing with double-precision complex:" << endl;
-        TestLU<Complex<double>,MC>( pivot, testCorrectness, print, m, g );
+        TestLU<Complex<double>,VC>( pivot, testCorrectness, print, m, g );
     }
     catch( exception& e ) { ReportException(e); }
 

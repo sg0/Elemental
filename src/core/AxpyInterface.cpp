@@ -190,8 +190,7 @@ namespace El
   template < typename T >
     void AxpyInterface < T >::HandleGlobalToLocalRequest ()
   {
-    DEBUG_ONLY (CallStackEntry
-		cse ("AxpyInterface::HandleGlobalToLocalRequest")) const
+    DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::HandleGlobalToLocalRequest"))
       DistMatrix < T > &X = *globalToLocalMat_;
     const Grid & g = X.Grid ();
     const Int r = g.Height ();
@@ -261,59 +260,61 @@ namespace El
       }
   }
 
-template < typename T > AxpyInterface < T >::AxpyInterface ():attachedForLocalToGlobal_ (false), attachedForGlobalToLocal_ (false),
-    localToGlobalMat_ (0),
-    globalToLocalMat_ (0)
-  {
-  }
+template<typename T>
+AxpyInterface<T>::AxpyInterface()
+: attachedForLocalToGlobal_(false), attachedForGlobalToLocal_(false), 
+  localToGlobalMat_(0), globalToLocalMat_(0),
+  sendDummy_(0), recvDummy_(0)
+{ }
 
-  template < typename T >
-    AxpyInterface < T >::AxpyInterface (AxpyType type, DistMatrix < T > &Z)
-  {
-    DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::AxpyInterface"))
-      if (type == LOCAL_TO_GLOBAL)
-      {
-	attachedForLocalToGlobal_ = true;
-	attachedForGlobalToLocal_ = false;
-	localToGlobalMat_ = &Z;
-	globalToLocalMat_ = 0;
-      }
+template<typename T>
+AxpyInterface<T>::AxpyInterface( AxpyType type, DistMatrix<T>& Z )
+: sendDummy_(0), recvDummy_(0)
+{
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface::AxpyInterface"))
+    if( type == LOCAL_TO_GLOBAL )
+    {
+        attachedForLocalToGlobal_ = true;
+        attachedForGlobalToLocal_ = false;
+        localToGlobalMat_ = &Z;
+        globalToLocalMat_ = 0;
+    }
     else
-      {
-	attachedForLocalToGlobal_ = false;
-	attachedForGlobalToLocal_ = true;
-	localToGlobalMat_ = 0;
-	globalToLocalMat_ = &Z;
-      }
+    {
+        attachedForLocalToGlobal_ = false;
+        attachedForGlobalToLocal_ = true;
+        localToGlobalMat_ = 0;
+        globalToLocalMat_ = &Z;
+    }
 
-    const Int p = Z.Grid ().Size ();
-    sentEomTo_.resize (p, false);
-    haveEomFrom_.resize (p, false);
+    const Int p = Z.Grid().Size();
+    sentEomTo_.resize( p, false );
+    haveEomFrom_.resize( p, false );
 
-    sendingData_.resize (p);
-    sendingRequest_.resize (p);
-    sendingReply_.resize (p);
+    sendingData_.resize( p );
+    sendingRequest_.resize( p );
+    sendingReply_.resize( p );
 
-    dataVectors_.resize (p);
-    requestVectors_.resize (p);
-    replyVectors_.resize (p);
+    dataVectors_.resize( p );
+    requestVectors_.resize( p );
+    replyVectors_.resize( p );
 
-    dataSendRequests_.resize (p);
-    requestSendRequests_.resize (p);
-    replySendRequests_.resize (p);
+    dataSendRequests_.resize( p );
+    requestSendRequests_.resize( p );
+    replySendRequests_.resize( p );
 
-    eomSendRequests_.resize (p);
-  }
+    eomSendRequests_.resize( p );
+}
 
-  template < typename T >
-    AxpyInterface < T >::AxpyInterface (AxpyType type,
-					const DistMatrix < T > &X)
-  {
-    DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::AxpyInterface"))
-      if (type == LOCAL_TO_GLOBAL)
-      {
-	LogicError ("Cannot update a constant matrix");
-      }
+template<typename T>
+AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
+: sendDummy_(0), recvDummy_(0)
+{
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface::AxpyInterface"))
+    if( type == LOCAL_TO_GLOBAL )
+    {
+        LogicError("Cannot update a constant matrix");
+    }
     else
       {
 	attachedForLocalToGlobal_ = false;

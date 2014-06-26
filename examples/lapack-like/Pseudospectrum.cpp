@@ -6,25 +6,7 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-// NOTE: It is possible to simply include "El.hpp" instead
-#include "El-lite.hpp"
-#include EL_ENTRYWISEMAP_INC
-#include EL_FROBENIUSNORM_INC
-#include EL_PSEUDOSPECTRUM_INC
-
-#include EL_BULLSHEAD_INC
-#include EL_EHRENFEST_INC
-#include EL_FOXLI_INC
-#include EL_GRCAR_INC
-#include EL_HATANONELSON_INC
-#include EL_HELMHOLTZPML_INC
-#include EL_LOTKIN_INC
-#include EL_RIFFLE_INC
-#include EL_TREFETHEN_INC
-#include EL_TRIANGLE_INC
-#include EL_UNIFORM_INC
-#include EL_UNIFORMHELMHOLTZGREENS_INC
-#include EL_WHALE_INC
+#include "El.hpp"
 using namespace std;
 using namespace El;
 
@@ -128,10 +110,6 @@ main( int argc, char* argv[] )
         const GridOrder order = ( colMajor ? COLUMN_MAJOR : ROW_MAJOR );
         const Grid g( mpi::COMM_WORLD, r, order );
         SetBlocksize( nbAlg );
-#ifdef EL_HAVE_SCALAPACK
-        SetDefaultBlockHeight( nbDist );
-        SetDefaultBlockWidth( nbDist );
-#endif
         if( normInt < 0 || normInt > 1 )
             LogicError("Invalid norm");
         if( numFormatInt < 1 || numFormatInt >= FileFormat_MAX )
@@ -254,16 +232,20 @@ main( int argc, char* argv[] )
         psCtrl.arnoldi = arnoldi;
         psCtrl.basisSize = basisSize;
         psCtrl.progress = progress;
-#ifndef EL_HAVE_SCALAPACK
-        psCtrl.sdcCtrl.cutoff = cutoff;
-        psCtrl.sdcCtrl.maxInnerIts = maxInnerIts;
-        psCtrl.sdcCtrl.maxOuterIts = maxOuterIts;
-        psCtrl.sdcCtrl.tol = sdcTol;
-        psCtrl.sdcCtrl.spreadFactor = spreadFactor;
-        psCtrl.sdcCtrl.random = random;
-        psCtrl.sdcCtrl.progress = progress;
-        psCtrl.sdcCtrl.signCtrl.tol = signTol;
-        psCtrl.sdcCtrl.signCtrl.progress = progress;
+#ifdef EL_HAVE_SCALAPACK
+        psCtrl.schurCtrl.qrCtrl.blockHeight = nbDist;
+        psCtrl.schurCtrl.qrCtrl.blockWidth = nbDist;
+        psCtrl.schurCtrl.qrCtrl.aed = false;
+#else
+        psCtrl.schurCtrl.sdcCtrl.cutoff = cutoff;
+        psCtrl.schurCtrl.sdcCtrl.maxInnerIts = maxInnerIts;
+        psCtrl.schurCtrl.sdcCtrl.maxOuterIts = maxOuterIts;
+        psCtrl.schurCtrl.sdcCtrl.tol = sdcTol;
+        psCtrl.schurCtrl.sdcCtrl.spreadFactor = spreadFactor;
+        psCtrl.schurCtrl.sdcCtrl.random = random;
+        psCtrl.schurCtrl.sdcCtrl.progress = progress;
+        psCtrl.schurCtrl.sdcCtrl.signCtrl.tol = signTol;
+        psCtrl.schurCtrl.sdcCtrl.signCtrl.progress = progress;
 #endif
         psCtrl.snapCtrl.imgSaveFreq = imgSaveFreq;
         psCtrl.snapCtrl.numSaveFreq = numSaveFreq;

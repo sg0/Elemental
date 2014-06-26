@@ -67,10 +67,19 @@
 #cmakedefine EL_USE_64BIT_INTS
 
 /* Advanced configuration options */
+#cmakedefine EL_ZERO_INIT
 #cmakedefine EL_CACHE_WARNINGS
 #cmakedefine EL_UNALIGNED_WARNINGS
 #cmakedefine EL_VECTOR_WARNINGS
 #cmakedefine EL_POOL_MEMORY
 #cmakedefine EL_AVOID_OMP_FMA
+
+#cmakedefine EL_HAVE_VALGRIND
+#if defined(EL_HAVE_VALGRIND)
+# include <valgrind/valgrind.h>
+# define EL_RUNNING_ON_VALGRIND RUNNING_ON_VALGRIND
+#else
+# define EL_RUNNING_ON_VALGRIND 0
+#endif
 
 #endif /* EL_CONFIG_H */

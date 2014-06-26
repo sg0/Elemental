@@ -6,24 +6,7 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-// NOTE: It is possible to simply include "El.hpp" instead
-#include "El-lite.hpp"
-#include EL_AXPY_INC
-#include EL_DIAGONALSCALE_INC
-#include EL_MAKESYMMETRIC_INC
-#include EL_MAKETRIANGULAR_INC
-#include EL_SETDIAGONAL_INC
-#include EL_TRANSPOSE_INC
-#include EL_SYMM_INC
-
-#include EL_APPLYPACKEDREFLECTORS_INC
-#include EL_LDL_INC
-#include EL_FROBENIUSNORM_INC
-#include EL_INERTIA_INC
-
-#include EL_UNIFORM_INC
-#include EL_WIGNER_INC
-#include EL_ZEROS_INC
+#include "El.hpp"
 using namespace std;
 using namespace El;
 
@@ -70,10 +53,7 @@ main( int argc, char* argv[] )
         DistMatrix<C,MD,STAR> dSub;
         DistMatrix<C> factA( A );
         MakeTriangular( LOWER, factA );
-        if( conjugate )
-            LDLH( factA, dSub, p, pivotType );
-        else
-            LDLT( factA, dSub, p, pivotType );
+        LDL( factA, dSub, p, conjugate, pivotType );
         if( print )
         {
             Print( A,     "A"     );

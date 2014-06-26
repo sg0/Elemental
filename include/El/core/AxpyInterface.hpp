@@ -45,15 +45,13 @@ private:
         DATA_TAG        =1, 
         EOM_TAG         =2, 
         DATA_REQUEST_TAG=3, 
-        DATA_REPLY_TAG  =4
-	    ;
+        DATA_REPLY_TAG  =4;
   
 //request object for polling on Issends
 #if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
     bool all_sends_are_finished;
 #endif
     bool attachedForLocalToGlobal_, attachedForGlobalToLocal_;
-    byte sendDummy_, recvDummy_;
 
     DistMatrix<T,MC,MR>* localToGlobalMat_;
     const DistMatrix<T,MC,MR>* globalToLocalMat_;
@@ -68,6 +66,8 @@ private:
         sendingData_, sendingRequest_, sendingReply_;
     std::vector<std::deque<mpi::Request>> 
         dataSendRequests_, requestSendRequests_, replySendRequests_;
+
+    byte sendDummy_, recvDummy_;
 
     // Check if we are done with this attachment's work
     bool Finished();

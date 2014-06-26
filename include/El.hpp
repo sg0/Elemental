@@ -10,13 +10,20 @@
 #ifndef EL_HPP
 #define EL_HPP
 
-#include "El-lite.hpp"
+#include "El/config.h"
+#ifdef EL_HAVE_F90_INTERFACE
+# include "El/FCMangle.h"
+#endif
 
 #include "El/core.hpp"
 #include "El/blas-like.hpp"
+
+#include "El/io.hpp"
+
 #include "El/lapack-like.hpp"
-#include "El/convex.hpp"
+#include "El/optimization.hpp"
 #include "El/control.hpp"
+
 #include "El/matrices.hpp"
 
 #endif // ifndef EL_HPP

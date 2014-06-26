@@ -8,12 +8,6 @@
 */
 #include "El-lite.hpp"
 
-#include EL_AXPY_INC
-#include EL_MAKEREAL_INC
-#include EL_MAKETRIANGULAR_INC
-#include EL_SETDIAGONAL_INC
-#include EL_TRANSPOSE_INC
-
 namespace El {
 
 template<typename T>
@@ -103,9 +97,10 @@ void MakeSymmetric
   DIST_PROTO(F,VC,  STAR) \
   DIST_PROTO(F,VR,  STAR)
 
-PROTO(float);
-PROTO(double);
-PROTO(Complex<float>);
-PROTO(Complex<double>);
+PROTO(Int)
+PROTO(float)
+PROTO(double)
+PROTO(Complex<float>)
+PROTO(Complex<double>)
 
 } // namespace El

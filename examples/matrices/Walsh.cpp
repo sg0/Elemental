@@ -6,12 +6,7 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-// NOTE: It is possible to simply include "El.hpp" instead
-#include "El-lite.hpp"
-#include EL_MAKETRIANGULAR_INC
-#include EL_SETDIAGONAL_INC
-#include EL_LDL_INC
-#include EL_WALSH_INC
+#include "El.hpp"
 using namespace El;
 
 int 
@@ -38,7 +33,7 @@ main( int argc, char* argv[] )
 
         if( !binary )
         {
-            LDLH( W );
+            LDL( W, true );
             auto d = W.GetDiagonal();
             MakeTriangular( LOWER, W );
             SetDiagonal( W, 1. );

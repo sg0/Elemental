@@ -9,10 +9,6 @@
 #ifndef EL_TRRK_LOCAL_HPP
 #define EL_TRRK_LOCAL_HPP
 
-#include EL_AXPYTRIANGLE_INC
-#include EL_SCALETRAPEZOID_INC
-#include EL_GEMM_INC
-
 namespace El {
 
 namespace trrk {
@@ -461,10 +457,6 @@ LocalTrrkKernel
     AxpyTriangle( uplo, T(1), DBR, CBR );
 }
 
-} // namespace trrk
-
-namespace internal {
-
 // Local C := alpha A B + beta C
 template<typename T>
 void TrrkNN
@@ -474,7 +466,7 @@ void TrrkNN
 {
     using namespace trrk;
     DEBUG_ONLY(
-        CallStackEntry cse("internal::TrrkNN");
+        CallStackEntry cse("trrk::TrrkNN");
         CheckInputNN( A, B, C );
     )
     if( C.Height() < LocalTrrkBlocksize<T>() )
@@ -518,7 +510,7 @@ void TrrkNT
 {
     using namespace trrk;
     DEBUG_ONLY(
-        CallStackEntry cse("internal::TrrkNT");
+        CallStackEntry cse("trrk::TrrkNT");
         CheckInputNT( orientationOfB, A, B, C );
     )
     if( C.Height() < LocalTrrkBlocksize<T>() )
@@ -562,7 +554,7 @@ void TrrkTN
 {
     using namespace trrk;
     DEBUG_ONLY(
-        CallStackEntry cse("internal::TrrkTN");
+        CallStackEntry cse("trrk::TrrkTN");
         CheckInputTN( orientationOfA, A, B, C );
     )
     if( C.Height() < LocalTrrkBlocksize<T>() )
@@ -606,7 +598,7 @@ void TrrkTT
 {
     using namespace trrk;
     DEBUG_ONLY(
-        CallStackEntry cse("internal::TrrkTT");
+        CallStackEntry cse("trrk::TrrkTT");
         CheckInputTT( orientationOfA, orientationOfB, A, B, C );
     )
     if( C.Height() < LocalTrrkBlocksize<T>() )
@@ -643,7 +635,7 @@ void TrrkTT
     }
 }
 
-} // namespace internal
+} // namespace trrk
 
 // Distributed C := alpha A B + beta C
 template<typename T>

@@ -10,7 +10,38 @@
 #ifndef EL_LAPACK_HPP
 #define EL_LAPACK_HPP
 
-#include "./lapack-like/decl.hpp"
-#include "./lapack-like/impl.hpp"
+namespace El {
+
+// Ones
+// ====
+template<typename T>
+void Ones( Matrix<T>& A, Int m, Int n );
+template<typename T>
+void Ones( AbstractDistMatrix<T>& A, Int m, Int n );
+template<typename T>
+void Ones( AbstractBlockDistMatrix<T>& A, Int m, Int n );
+
+// Zeros
+// =====
+template<typename T>
+void Zeros( Matrix<T>& A, Int m, Int n );
+template<typename T>
+void Zeros( AbstractDistMatrix<T>& A, Int m, Int n );
+template<typename T>
+void Zeros( AbstractBlockDistMatrix<T>& A, Int m, Int n );
+
+} // namespace El
+
+#include "./lapack-like/util.hpp"
+#include "./lapack-like/perm.hpp"
+
+#include "./lapack-like/factor.hpp"
+#include "./lapack-like/condense.hpp"
+#include "./lapack-like/funcs.hpp"
+
+#include "./lapack-like/decomp.hpp"
+#include "./lapack-like/solve.hpp"
+
+#include "./lapack-like/props.hpp"
 
 #endif // ifndef EL_LAPACK_HPP

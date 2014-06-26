@@ -6,14 +6,11 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-// NOTE: It is possible to simply include "El.hpp" instead
-#include "El-lite.hpp"
-#include EL_HERMITIANTRIDIAGEIG_INC
-#include EL_ZEROS_INC
+#include "El.hpp"
 using namespace El;
 
 /*
-   This is a testbed for some of the formulas for 
+   This was originally meant to be a testbed for some of the formulas for 
    Prolate Spheroidal Wave Functions (PSFWs) found in Osipov and Rokhlin's
    "On the evaluation of prolate spheroidal wave functions and associated
     quadrature rules", arXiv:1301.1707.
@@ -81,7 +78,7 @@ main( int argc, char* argv[] )
         }
 
         DistMatrix<double,VR,  STAR> wEven, wOdd;
-        DistMatrix<double> XEven, XOdd;
+        DistMatrix<double,STAR,VR> XEven, XOdd;
         HermitianTridiagEig
         ( AEven.GetDiagonal(), AEven.GetDiagonal(-1), wEven, XEven, ASCENDING );
         HermitianTridiagEig

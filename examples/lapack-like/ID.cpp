@@ -6,14 +6,7 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-// NOTE: It is possible to simply include "El.hpp" instead
-#include "El-lite.hpp"
-#include EL_GEMM_INC
-#include EL_ID_INC
-#include EL_FROBENIUSNORM_INC
-#include EL_PERMUTECOLS_INC
-#include EL_UNIFORM_INC
-#include EL_ZEROS_INC
+#include "El.hpp"
 using namespace std;
 using namespace El;
 
@@ -47,7 +40,15 @@ main( int argc, char* argv[] )
 
         DistMatrix<Int,VR,STAR> perm(g);
         DistMatrix<C,STAR,VR> Z(g);
-        ID( A, perm, Z, maxSteps, tol );
+        QRCtrl<double> ctrl;
+        ctrl.boundRank = true;
+        ctrl.maxRank = maxSteps;
+        if( tol != -1. )
+        {
+            ctrl.adaptive = true;
+            ctrl.tol = tol;
+        }
+        ID( A, perm, Z, ctrl );
         const Int rank = Z.Height();
         if( print )
         {
@@ -68,7 +69,7 @@ main( int argc, char* argv[] )
         // Check || A P - \hat{A} [I, Z] ||_F / || A ||_F
         DistMatrix<C> AL(g), AR(g);
         PartitionRight( A, AL, AR, rank );
-        MakeZeros( AL );
+        Zero( AL );
         {
             DistMatrix<C,MC,STAR> hatA_MC_STAR(g);
             DistMatrix<C,STAR,MR> Z_STAR_MR(g);

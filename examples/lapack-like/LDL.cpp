@@ -6,18 +6,7 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-// NOTE: It is possible to simply include "El.hpp" instead
-#include "El-lite.hpp"
-#include EL_AXPY_INC
-#include EL_DIAGONALSCALE_INC
-#include EL_MAKESYMMETRIC_INC
-#include EL_MAKETRIANGULAR_INC
-#include EL_SETDIAGONAL_INC
-#include EL_TRANSPOSE_INC
-#include EL_APPLYPACKEDREFLECTORS_INC
-#include EL_LDL_INC
-#include EL_FROBENIUSNORM_INC
-#include EL_WIGNER_INC
+#include "El.hpp"
 using namespace std;
 using namespace El;
 
@@ -56,10 +45,7 @@ main( int argc, char* argv[] )
         // Make a copy of A and then overwrite it with its LDL factorization
         // WARNING: There is no pivoting here!
         DistMatrix<C> factA( A );
-        if( conjugate )
-            LDLH( factA );
-        else
-            LDLT( factA );
+        LDL( factA, conjugate );
         auto d = factA.GetDiagonal();
 
         DistMatrix<C> L( factA );

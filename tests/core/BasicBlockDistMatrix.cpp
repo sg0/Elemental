@@ -6,13 +6,7 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-// NOTE: It is possible to simply include "El.hpp" instead
-#include "El-lite.hpp"
-#include EL_SCALE_INC
-#include EL_SCHUR_INC
-#include EL_IO_INC
-#include EL_ONES_INC
-#include EL_UNIFORM_INC
+#include "El.hpp"
 using namespace El;
 
 int 
@@ -44,7 +38,7 @@ main( int argc, char* argv[] )
         const Grid g( comm, r, order );
 
         BlockDistMatrix<Complex<double>> A(m,n,g,mb,nb);
-        MakeOnes( A );
+        Fill( A, Complex<double>(1) );
         Scale( double(commRank), A.Matrix() );
         if( print )
             Print( A, "A" );
@@ -63,7 +57,7 @@ main( int argc, char* argv[] )
             //       This driver was therefore switched to complex arithmetic.
             DistMatrix<Complex<double>,VR,STAR> w( m, 1, g );
             BlockDistMatrix<Complex<double>> Q(m,m,g,mb,nb);
-            schur::QR( A, w, Q, fullTriangle );
+            Schur( A, w, Q, fullTriangle );
             if( print )
             {
                 Print( A, "Schur(A)" );

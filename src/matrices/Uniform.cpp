@@ -6,8 +6,7 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-#include "El-lite.hpp"
-#include "El/matrices/Uniform.hpp"
+#include "El.hpp"
 
 namespace El {
 
@@ -17,11 +16,7 @@ template<typename T>
 void MakeUniform( Matrix<T>& A, T center, Base<T> radius )
 {
     DEBUG_ONLY(CallStackEntry cse("MakeUniform"))
-    const Int m = A.Height();
-    const Int n = A.Width();
-    for( Int j=0; j<n; ++j )
-        for( Int i=0; i<m; ++i )
-            A.Set( i, j, SampleBall( center, radius ) );
+    EntrywiseFill( A, [=]() { return SampleBall( center, radius ); } );
 }
 
 template<typename T>
@@ -36,74 +31,18 @@ template<typename T>
 void MakeUniform( AbstractDistMatrix<T>& A, T center, Base<T> radius )
 {
     DEBUG_ONLY(CallStackEntry cse("MakeUniform"))
-    if( A.RedundantSize() == 1 )
-    {
+    if( A.RedundantRank() == 0 )
         MakeUniform( A.Matrix(), center, radius );
-    }
-    else if( A.Participating() && A.LocalHeight() == A.LDim() )
-    {
-        const Int localHeight = A.LocalHeight();
-        const Int localWidth = A.LocalWidth();
-        if( A.RedundantRank() == 0 )
-            MakeUniform( A.Matrix(), center, radius );
-        mpi::Broadcast
-        ( A.Buffer(), localHeight*localWidth, 0, A.RedundantComm() );
-    }
-    else if( A.Participating() )
-    {
-        const Int localHeight = A.LocalHeight();
-        const Int localWidth = A.LocalWidth();
-        const Int bufSize = localHeight*localWidth;   
-        std::vector<T> buffer( bufSize );
-        if( A.RedundantRank() == 0 )
-        {
-            for( Int jLoc=0; jLoc<localWidth; ++jLoc )
-                for( Int iLoc=0; iLoc<localHeight; ++iLoc )
-                    buffer[iLoc+jLoc*localHeight] = 
-                        SampleBall( center, radius );
-        }
-        mpi::Broadcast( buffer.data(), bufSize, 0, A.RedundantComm() );
-        for( Int jLoc=0; jLoc<localWidth; ++jLoc )
-            MemCopy
-            ( A.Buffer(0,jLoc), &buffer[jLoc*localHeight], localHeight );
-    }
+    A.BroadcastOver( A.RedundantComm(), 0 );
 }
 
 template<typename T>
 void MakeUniform( AbstractBlockDistMatrix<T>& A, T center, Base<T> radius )
 {
     DEBUG_ONLY(CallStackEntry cse("MakeUniform"))
-    if( A.RedundantSize() == 1 )
-    {
+    if( A.RedundantRank() == 0 )
         MakeUniform( A.Matrix(), center, radius );
-    }
-    else if( A.Participating() && A.LocalHeight() == A.LDim() )
-    {
-        const Int localHeight = A.LocalHeight();
-        const Int localWidth = A.LocalWidth();
-        if( A.RedundantRank() == 0 )
-            MakeUniform( A.Matrix(), center, radius );
-        mpi::Broadcast
-        ( A.Buffer(), localHeight*localWidth, 0, A.RedundantComm() );
-    }
-    else if( A.Participating() )
-    {
-        const Int localHeight = A.LocalHeight();
-        const Int localWidth = A.LocalWidth();
-        const Int bufSize = localHeight*localWidth;   
-        std::vector<T> buffer( bufSize );
-        if( A.RedundantRank() == 0 )
-        {
-            for( Int jLoc=0; jLoc<localWidth; ++jLoc )
-                for( Int iLoc=0; iLoc<localHeight; ++iLoc )
-                    buffer[iLoc+jLoc*localHeight] = 
-                        SampleBall( center, radius );
-        }
-        mpi::Broadcast( buffer.data(), bufSize, 0, A.RedundantComm() );
-        for( Int jLoc=0; jLoc<localWidth; ++jLoc )
-            MemCopy
-            ( A.Buffer(0,jLoc), &buffer[jLoc*localHeight], localHeight );
-    }
+    A.BroadcastOver( A.RedundantComm(), 0 );
 }
 
 template<typename T>
@@ -124,6 +63,12 @@ void Uniform
 }
 
 #define PROTO(T) \
+  template void MakeUniform \
+  ( Matrix<T>& A, T center, Base<T> radius ); \
+  template void MakeUniform \
+  ( AbstractDistMatrix<T>& A, T center, Base<T> radius ); \
+  template void MakeUniform \
+  ( AbstractBlockDistMatrix<T>& A, T center, Base<T> radius ); \
   template void Uniform \
   ( Matrix<T>& A, Int m, Int n, T center, Base<T> radius ); \
   template void Uniform \
