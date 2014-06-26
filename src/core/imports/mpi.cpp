@@ -480,6 +480,11 @@ void WindowCreate (int size, Info info, Comm comm,
     SafeMpi (MPI_Barrier (comm.comm));
 }
 
+void WindowFree (Window & window)
+{
+	SafeMpi (MPI_Win_free (&window));
+}
+
 void Iput (void *source, int source_size, int target_rank,
            int target_size, Window & window)
 {
@@ -575,24 +580,16 @@ void Racc (void *source, int source_size, int target_rank,
               window, &request));
 }
 
-void Flush (int target_rank, Window & window,
-            bool isLocalCompletion)
+void Flush (int target_rank, Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Flush"))
-    if (isLocalCompletion)
-        SafeMpi (MPI_Win_flush_local
-                 (target_rank, window));
-    else
-        SafeMpi (MPI_Win_flush (target_rank, window));
+    SafeMpi (MPI_Win_flush (target_rank, window));
 }
 
-void Flush (Window & window, bool isLocalCompletion)
+void Flush (Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Flush"))
-    if (isLocalCompletion)
-        SafeMpi (MPI_Win_flush_local_all (window));
-    else
-        SafeMpi (MPI_Win_flush_all (window));
+    SafeMpi (MPI_Win_flush_all (window));
 }
 #endif
 

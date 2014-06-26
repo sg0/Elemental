@@ -85,6 +85,7 @@ typedef enum
 	PARTIAL_ACC_ORDERING 	= 2,
 	NO_ACC_ORDERING 	= 4
 } acc_order_t;
+
 //TODO update these 
 const int MAX_OUTSTANDING_NB 	= 100000;
 const int FLUSH_FREQUENCY 	= 10000;
@@ -190,6 +191,7 @@ void Translate
 
 //MPI-3 one-sided
 #if MPI_VERSION>=3
+// Window creation/update/delete
 void SetWindowProp (Window& window, int prop);
 //NOTE assuming MPI_MODE_NOCHECK
 void WindowLock( int rank, Window& window );
@@ -198,6 +200,8 @@ void WindowUnlock( int rank, Window& window );
 void WindowUnlock( Window& window );
 void WindowCreate( int size, Comm comm, Window& window );
 void WindowCreate( int size, Info info, Comm comm, Window& window );
+void WindowFree (Window & window);
+// One-sided operations
 void Iput( void *source, int source_size, int target_rank, 
 	int target_size, Window& window);
 void Rput( void *source, int source_size, int target_rank, int target_size, 
@@ -210,8 +214,9 @@ void Iacc( void *source, int source_size, int target_rank,
 	int target_size, Op &op, Window& window);
 void Racc( void *source, int source_size, int target_rank, int target_size, 
 	Op &op, Window& window, Request& request);
-void Flush( int target_rank, Window& window, bool isLocalCompletion );
-void Flush( Window& window, bool isLocalCompletion );
+// Synchronization
+void Flush( int target_rank, Window& window );
+void Flush (Window & window);
 #endif
 
 // Utilities

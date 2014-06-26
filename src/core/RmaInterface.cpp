@@ -29,14 +29,20 @@ template<typename T>
 RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::RmaInterface"))
-	const Int p = Z.Grid ().Size ();
+    GlobalArrayPut_ = &Z;
+
+    const Int p = Z.Grid().Size();
+    putVector_.resize( p );
 }
 
 template<typename T>
 RmaInterface<T>::RmaInterface( const DistMatrix<T>& X )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::RmaInterface"))
-	const Int p = X.Grid ().Size ();
+    GlobalArrayGet_ = &X;
+	
+    const Int p = X.Grid ().Size ();
+    getVector_.resize( p );
 }
 
 template<typename T>
@@ -66,13 +72,30 @@ template<typename T>
 void RmaInterface<T>::Attach( DistMatrix<T>& Z )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Attach"))
-    
+    GlobalArrayPut_ = &Z;
+	
+    const Grid& g = Z.Grid();
+
+    //do rma related checks
+	// find the size of the allocated window
+	const Int windowsize = Z.LocalHeight () * Z.LocalWidth () * sizeof (T);	
+	mpi::WindowCreate (windowsize, g.VCComm (), window);
+	mpi::WindowLock (window);
 }
 
 template<typename T>
 void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Attach"))
+    GlobalArrayGet_ = &X;
+	
+    const Grid& g = X.Grid();
+
+    //do rma related checks
+	// find the size of the allocated window
+	const Int windowsize = X.LocalHeight () * X.LocalWidth () * sizeof (T);	
+	mpi::WindowCreate (windowsize, g.VCComm (), window);
+	mpi::WindowLock (window);
 }
 
 template<typename T>
@@ -80,7 +103,7 @@ void RmaInterface<T>::Put( T alpha, Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Put"))
 
-    DistMatrix<T>& Y = *localToGlobalMat_;
+    DistMatrix<T>& Y = *GlobalArrayPut_;
     if( i < 0 || j < 0 )
         LogicError("Submatrix offsets must be non-negative");
     if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
@@ -159,7 +182,7 @@ template<typename T>
 void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Get"))
-	const DistMatrix < T > &X = *globalToLocalMat_;
+	const DistMatrix < T > &X = *GlobalArrayGet_;
 
     const Int height = Z.Height ();
     const Int width = Z.Width ();
@@ -229,7 +252,7 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, mpi::Op &op, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Acc"))
 
-    DistMatrix<T>& Y = *localToGlobalMat_;
+    DistMatrix<T>& Y = *GlobalArrayPut_;
     if( i < 0 || j < 0 )
         LogicError("Submatrix offsets must be non-negative");
     if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
@@ -308,12 +331,61 @@ template<typename T>
 void RmaInterface<T>::Flush( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Flush"))
+    DistMatrix<T>& Y = *GlobalArrayPut_;
+
+    //do rma related checks
+
+    const Grid& g = Y.Grid();
+    const Int r = g.Height();
+    const Int c = g.Width();
+    const Int p = g.Size();
+    const Int myProcessRow = g.Row();
+    const Int myProcessCol = g.Col();
+    const Int colAlign = (Y.ColAlign() + i) % r;
+    const Int rowAlign = (Y.RowAlign() + j) % c;
+
+    // local width and height
+    const Int height = Z.Height();
+    const Int width = Z.Width();
+
+    // put local matrix cells in
+    // correct places in global array
+    Int receivingRow = myProcessRow;
+    Int receivingCol = myProcessCol;
+    for( Int step=0; step<p; ++step )
+    {
+        const Int colShift = Shift( receivingRow, colAlign, r );
+        const Int rowShift = Shift( receivingCol, rowAlign, c );
+        const Int localHeight = Length( height, colShift, r );
+        const Int localWidth = Length( width, rowShift, c );
+        const Int numEntries = localHeight*localWidth;
+
+        if( numEntries != 0 )
+        {
+            const Int destination = receivingRow + r*receivingCol; 
+	    mpi::Flush ( destination, window );
+	}
+
+        receivingRow = (receivingRow + 1) % r;
+        if( receivingRow == 0 )
+            receivingCol = (receivingCol + 1) % c;
+    }
+}
+
+template<typename T>
+void RmaInterface<T>::Flush( const Matrix<T>& Z )
+{
+    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Flush"))
+    mpi::Flush (window);
 }
 
 template<typename T>
 void RmaInterface<T>::Detach()
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Detach"))
+    
+    mpi::WindowUnlock (window);
+    mpi::WindowFree (window);
 }
 
 template class RmaInterface<Int>;

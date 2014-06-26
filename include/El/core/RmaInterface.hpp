@@ -40,15 +40,16 @@ public:
     void Acc( T alpha,      Matrix<T>& Z, mpi::Op &op, Int i, Int j );
     void Acc( T alpha, const Matrix<T>& Z, mpi::Op &op, Int i, Int j );
 
-    void Flush( const Matrix<T>& Z, Int i, Int j);
+    void Flush( const Matrix<T>& Z, Int i, Int j );
+    void Flush( const Matrix<T>& Z );
 
     void Detach();
 
 private:
     mpi::Window window;
     std::vector<byte> getVector_, putVector_;
-    DistMatrix<T,MC,MR>* localToGlobalMat_;
-    const DistMatrix<T,MC,MR>* globalToLocalMat_;
+    DistMatrix<T,MC,MR>* GlobalArrayPut_;
+    const DistMatrix<T,MC,MR>* GlobalArrayGet_;
 };
 
 } // namespace El
