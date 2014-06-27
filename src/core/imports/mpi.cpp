@@ -10,7 +10,7 @@
 http://opensource.org/licenses/BSD-2-Clause
 */
 #include "El-lite.hpp"
-
+#include <assert.h>
 typedef unsigned char *UCP;
 
 namespace
@@ -454,35 +454,54 @@ void WindowUnlock (Window & window)
     SafeMpi (MPI_Win_unlock_all (window));
 }
 
-void WindowCreate (int size, Comm comm, Window & window)
+// RMA Utilities
+void WindowCreate (void *baseptr, int size, Comm comm, Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Windowcreate"))
-    void *baseptr;
 
-    SafeMpi (MPI_Win_allocate
-             ((MPI_Aint) size, 1, MPI_INFO_NULL, comm.comm,
-              baseptr, &window));
+	// use alloc_shm
+    SafeMpi (MPI_Win_create
+             (baseptr, (MPI_Aint) size, 1, MPI_INFO_NULL, 
+	      comm.comm, &window));
 #ifdef EL_NO_ACC_ORDERING
     SetWindowProp (window, NO_ACC_ORDERING);
 #endif
-    SafeMpi (MPI_Barrier (comm.comm));
 }
 
-void WindowCreate (int size, Info info, Comm comm,
-                   Window & window)
+void CheckBounds (Window & window, Datatype win_type, Datatype type, 
+size_t count, ptrdiff_t target_offset)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Windowcreate"))
-    void *baseptr;
+        int flag, type_size, win_type_size;
+        size_t displ;
+        void * dest=NULL;
 
-    SafeMpi (MPI_Win_allocate
-             ((MPI_Aint) size, 1, info, comm.comm, baseptr,
-              &window));
-    SafeMpi (MPI_Barrier (comm.comm));
+        SafeMpi (MPI_Type_size (type, &type_size));
+        SafeMpi (MPI_Type_size (win_type, &win_type_size));
+        Aint lb, extent;
+
+        SafeMpi (MPI_Win_get_attr(window, MPI_WIN_BASE, dest, &flag /* unused */));
+
+        /* Calculate displacement from beginning of the window */
+        if (dest == MPI_BOTTOM)
+                displ = 0;
+        else
+                displ = (size_t) ((uint8_t*)(dest + target_offset * type_size) - (uint8_t*)dest);
+
+        SafeMpi (MPI_Type_get_true_extent(type, &lb, &extent));
+
+	// invalid remote address
+        assert (displ >= 0 && displ < win_type_size);
+	// transfer out of range
+        assert (displ + count*extent <= win_type_size);
 }
 
 void WindowFree (Window & window)
 {
+    void* baseptr = NULL;
+    int flag;
+        SafeMpi (MPI_Win_get_attr(window, MPI_WIN_BASE, baseptr, &flag /* unused */));
 	SafeMpi (MPI_Win_free (&window));
+	free (baseptr);
 }
 
 void Iput (void *source, int source_size, int target_rank,

@@ -95,6 +95,7 @@ typedef MPI_Info Info;
 const int ANY_SOURCE = MPI_ANY_SOURCE;
 const int ANY_TAG = MPI_ANY_TAG;
 const int ERR_RANK = MPI_ERR_RANK;
+const int BOTTOM = MPI_BOTTOM;
 #ifdef EL_HAVE_MPI_QUERY_THREAD
 const int THREAD_SINGLE = MPI_THREAD_SINGLE;
 const int THREAD_FUNNELED = MPI_THREAD_FUNNELED;
@@ -191,15 +192,17 @@ void Translate
 
 //MPI-3 one-sided
 #if MPI_VERSION>=3
-// Window creation/update/delete
+// Utilities
 void SetWindowProp (Window& window, int prop);
+void CheckBounds (Window & window, Datatype win_type, Datatype type, 
+size_t count, ptrdiff_t target_offset);
 //NOTE assuming MPI_MODE_NOCHECK
+// Window creation/update/delete
 void WindowLock( int rank, Window& window );
 void WindowLock( Window& window );
 void WindowUnlock( int rank, Window& window );
 void WindowUnlock( Window& window );
-void WindowCreate( int size, Comm comm, Window& window );
-void WindowCreate( int size, Info info, Comm comm, Window& window );
+void WindowCreate( void* baseptr, int size, Comm comm, Window& window );
 void WindowFree (Window & window);
 // One-sided operations
 void Iput( void *source, int source_size, int target_rank, 
