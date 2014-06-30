@@ -76,7 +76,7 @@ namespace El {
 	    const Grid& g = Z.Grid();
 
 	    // return submatrix
-	    //do rma related checks
+	    // do rma related checks
 	    const Int windowsize = Z.LocalHeight () * Z.LocalWidth () * sizeof (T);	
 
 	    void* baseptr = (void *)Z.Buffer ();
@@ -85,6 +85,8 @@ namespace El {
 	    mpi::WindowLock (window);
 	}
 
+    // TODO alpha in Put/Get is standing out and would hinder generalization
+    // can we circumvent this?
     template<typename T>
 	void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 	{
@@ -107,8 +109,7 @@ namespace El {
 	void RmaInterface<T>::Put( T alpha, Matrix<T>& Z, Int i, Int j )
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Put"))
-
-		DistMatrix<T>& Y = *GlobalArrayPut_;
+	    DistMatrix<T>& Y = *GlobalArrayPut_;
 	    if( i < 0 || j < 0 )
 		LogicError("Submatrix offsets must be non-negative");
 	    if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
@@ -245,6 +246,7 @@ namespace El {
 	    }
 	}
 
+    // TODO will deal with const interfaces later
     template<typename T>
 	void RmaInterface<T>::Get( const Matrix<T>& Z, Int i, Int j )
 	{
