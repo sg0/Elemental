@@ -26,6 +26,12 @@ namespace El {
     // dont care about const 
     // interfaces now
     template<typename T>
+	RmaInterface<T>::RmaInterface()
+	: GlobalArrayPut_(0), GlobalArrayGet_(0),
+	putVector_(0), getVector_(0), window (MPI_WIN_NULL)
+        { }
+
+    template<typename T>
 	RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::RmaInterface"))
