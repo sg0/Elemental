@@ -29,12 +29,20 @@ namespace mpi {
 #endif
 #endif
 
-//Use MPI-3 IBarrier instead of El strict EOM matching
-#ifndef EL_USE_IBARRIER
-#define EL_USE_IBARRIER
+// Use MPI-3 IBarrier in developing a Non-blocking 
+// consensus instead of El strict EOM matching
+// see - Scalable communication protocols for 
+// dynamic sparse data exchange by Hoefler, et al
+#ifndef EL_USE_NONBLOCKING_CONSENSUS
+#define EL_USE_NONBLOCKING_CONSENSUS
 #endif
 
-//Experimental MPI performance enhancers
+// TODO Give this a better name    
+#ifndef EL_PREFER_WAIT_OVER_TEST
+#define EL_PREFER_WAIT_OVER_TEST
+#endif    
+
+// Experimental MPI performance enhancers
 #ifndef EL_MPI_EXPERIMENTAL
 #define EL_MPI_EXPERIMENTAL
 #endif
@@ -95,7 +103,6 @@ typedef MPI_Info Info;
 const int ANY_SOURCE = MPI_ANY_SOURCE;
 const int ANY_TAG = MPI_ANY_TAG;
 const int ERR_RANK = MPI_ERR_RANK;
-const int BOTTOM = MPI_BOTTOM;
 #ifdef EL_HAVE_MPI_QUERY_THREAD
 const int THREAD_SINGLE = MPI_THREAD_SINGLE;
 const int THREAD_FUNNELED = MPI_THREAD_FUNNELED;
@@ -224,7 +231,7 @@ void Flush (Window & window);
 
 // Utilities
 void Barrier( Comm comm );
-#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
+#if MPI_VERSION>=3
 void IBarrier( Comm comm, Request& request );
 #endif
 void Wait( Request& request );

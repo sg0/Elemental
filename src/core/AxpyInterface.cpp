@@ -112,7 +112,7 @@ namespace El
 
     if (mpi::IProbe (mpi::ANY_SOURCE, DATA_TAG, g.VCComm (), status))
       {
-#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
 	  all_sends_are_finished = true;
 #endif
 	// Message exists, so recv and pack    
@@ -425,7 +425,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	attachedForGlobalToLocal_ = true;
 	globalToLocalMat_ = &X;
       }
-#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
         all_sends_are_finished = false;
 #endif
     const Int p = X.Grid ().Size ();
@@ -484,7 +484,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     if (i + X.Height () > Y.Height () || j + X.Width () > Y.Width ())
       LogicError ("Submatrix out of bounds of global matrix");
 
-#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
     all_sends_are_finished = false;
 #endif
     const Grid & g = Y.Grid ();
@@ -552,7 +552,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	      (sendBuffer, bufferSize, destination, DATA_TAG, g.VCComm (),
 	       dataSendRequests_[destination][index]);
 	  }
-#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
 	all_sends_are_finished = true;
 #endif
 	receivingRow = (receivingRow + 1) % r;
@@ -731,7 +731,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     
     if (attachedForLocalToGlobal_)
     {
-#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
             bool DONE = false;
             mpi::Request nb_bar_request;
             bool nb_bar_active = false;
@@ -741,7 +741,12 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
                     if (nb_bar_active)
                     {
                             // test for IBarrier completion
+#if defined(EL_PREFER_WAIT_OVER_TEST)
+                            mpi::Wait (nb_bar_request);
+			    DONE = true;
+#else
                             DONE = mpi::Test (nb_bar_request);
+#endif
                     }
                     else
                     {

@@ -622,7 +622,7 @@ void Barrier (Comm comm)
     SafeMpi (MPI_Barrier (comm.comm));
 }
 
-#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
+#if MPI_VERSION>=3
 void IBarrier (Comm comm, Request & request)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::IBarrier"))

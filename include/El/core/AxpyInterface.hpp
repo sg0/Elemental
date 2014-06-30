@@ -48,7 +48,7 @@ private:
         DATA_REPLY_TAG  =4;
   
 //request object for polling on Issends
-#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER)
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
     bool all_sends_are_finished;
 #endif
     bool attachedForLocalToGlobal_, attachedForGlobalToLocal_;
