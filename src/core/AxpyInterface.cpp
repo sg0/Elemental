@@ -551,6 +551,10 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	    mpi::TaggedISSend
 	      (sendBuffer, bufferSize, destination, DATA_TAG, g.VCComm (),
 	       dataSendRequests_[destination][index]);
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+// we won't use this request, so free it
+	    mpi::RequestFree (dataSendRequests_[destination][index]);
+#endif
 	  }
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
 	all_sends_are_finished = true;
@@ -728,36 +732,40 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     const Grid & g = (attachedForLocalToGlobal_ ?
 	    localToGlobalMat_->Grid () : globalToLocalMat_->
 	    Grid ());
-    
+// TODO Fix bug which causes deadlock in NBC version
+// when AXPY_DIM < NPES. Also the Wait variant is buggy
+// in it's case HandleLocalToGlobalData after the if loop
+// causes it to work.
     if (attachedForLocalToGlobal_)
     {
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-            bool DONE = false;
-            mpi::Request nb_bar_request;
-            bool nb_bar_active = false;
-            while (!DONE)
-            {
-                    HandleLocalToGlobalData ();
-                    if (nb_bar_active)
-                    {
-                            // test for IBarrier completion
+	bool DONE = false;
+	mpi::Request nb_bar_request;
+	bool nb_bar_active = false;
+	    
+	while (!DONE)
+	{
+	    HandleLocalToGlobalData ();
+	    if (nb_bar_active)
+	    {
+		// test/wait for IBarrier completion
 #if defined(EL_PREFER_WAIT_OVER_TEST)
-                            mpi::Wait (nb_bar_request);
-			    DONE = true;
+		mpi::Wait (nb_bar_request);
+		DONE = true;
 #else
-                            DONE = mpi::Test (nb_bar_request);
-#endif
-                    }
-                    else
-                    {
-                            if (all_sends_are_finished)
-                            {
-                                    // all ssends are complete, start nonblocking barrier
-                                    mpi::IBarrier (g.VCComm (), nb_bar_request);
-                                    nb_bar_active = true;
-                            }
-                    }
-            }
+		DONE = mpi::Test (nb_bar_request);
+#endif                    
+	    }
+	    else
+	    {
+		if (all_sends_are_finished)
+		{
+		    // all ssends are complete, start nonblocking barrier
+		    mpi::IBarrier (g.VCComm (), nb_bar_request);
+		    nb_bar_active = true;
+		}
+	    }
+	}
 #else
             while (!Finished ())
             {

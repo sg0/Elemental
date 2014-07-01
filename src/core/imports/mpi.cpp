@@ -614,6 +614,12 @@ void Flush (Window & window)
 
 // Various utilities
 // =================
+// Free request
+void RequestFree (Request & request)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::RequestFree"))
+    SafeMpi (MPI_Request_free (&request));
+}
 
 // Wait until every process in comm reaches this statement
 void Barrier (Comm comm)
@@ -1085,7 +1091,8 @@ void TaggedISSend
  Request & request)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::ISSend"))
-    SafeMpi
+
+  SafeMpi
     (MPI_Issend
      (const_cast < R * >(buf), count,
       TypeMap < R > (), to, tag, comm.comm,
