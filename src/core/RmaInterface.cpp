@@ -12,7 +12,7 @@ which can be found in the LICENSE file in the root directory, or at
 http://opensource.org/licenses/BSD-2-Clause
 */
 #include "El-lite.hpp"
-
+#include <assert.h>
 // This is direct copy-paste from
 // El two-sided implementation with
 // point-to-point replaced by one-sided
@@ -85,14 +85,16 @@ namespace El {
 	    // do rma related checks
 	    const Int windowsize = Z.LocalHeight () * Z.LocalWidth () * sizeof (T);	
 
+	    // TODO C++ way of type casting?
 	    void* baseptr = (void *)Z.Buffer ();
+	    // TODO Use DEBUG_ONLY or something that EL provides
+	    assert(baseptr != NULL);
 
 	    mpi::WindowCreate (baseptr, windowsize, g.VCComm (), window);
 	    mpi::WindowLock (window);
 	}
 
-    // TODO alpha in Put/Get is standing out and would hinder generalization
-    // can we circumvent this?
+    // TODO Perhaps we should mention scale instead of alpha ala ARMCI
     template<typename T>
 	void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 	{
@@ -107,6 +109,8 @@ namespace El {
 	    // find the size of the allocated window
 	    const Int windowsize = X.LocalHeight () * X.LocalWidth () * sizeof (T);	
 	    void* baseptr = (void *)Z.LockedBuffer ();
+	    assert (baseptr != NULL);
+
 	    mpi::WindowCreate (baseptr, windowsize, g.VCComm (), window);
 	    mpi::WindowLock (window);
 	}
@@ -136,6 +140,7 @@ namespace El {
 	    const Int height = Z.Height();
 	    const Int width = Z.Width();
 
+		    std::cout << "After initial width/height functions...\n";
 	    // put local matrix cells in
 	    // correct places in global array
 	    Int receivingRow = myProcessRow;
@@ -144,8 +149,10 @@ namespace El {
 	    {
 		const Int colShift = Shift( receivingRow, colAlign, r );
 		const Int rowShift = Shift( receivingCol, rowAlign, c );
+		    std::cout << "After colshift/rowshift...\n";
 		const Int localHeight = Length( height, colShift, r );
 		const Int localWidth = Length( width, rowShift, c );
+		    std::cout << "After Length...\n";
 		const Int numEntries = localHeight*localWidth;
 
 		if( numEntries != 0 )
@@ -154,14 +161,18 @@ namespace El {
 		    const Int bufferSize = 4*sizeof(Int) + (numEntries+1)*sizeof(T);
 		    // Pack the header
 		    // make variable names rma friendly
-		    byte* sendBuffer;
+    
+		    putVector_.resize( bufferSize );
+        	    byte* sendBuffer = putVector_.data();
 		    byte* head = sendBuffer;
+		    std::cout << "After pointing head to sendbuffer\n";
 		    *reinterpret_cast<Int*>(head) = i; head += sizeof(Int);
 		    *reinterpret_cast<Int*>(head) = j; head += sizeof(Int);
 		    *reinterpret_cast<Int*>(head) = height; head += sizeof(Int);
 		    *reinterpret_cast<Int*>(head) = width; head += sizeof(Int);
 		    *reinterpret_cast<T*>(head) = alpha; head += sizeof(T);
 
+		    std::cout << "Before packing payload\n";
 		    // Pack the payload
 		    // consider ddt here
 		    T* sendData = reinterpret_cast<T*>(head);
@@ -174,14 +185,18 @@ namespace El {
 			for( Int s=0; s<localHeight; ++s )
 			    thisSendCol[s] = thisXCol[colShift+s*r];
 		    }
-
+		    std::cout << "Before IPut\n";
 		    mpi::Iput (sendBuffer, bufferSize, destination, bufferSize, window);
+		    std::cout << "After IPut\n";
 		}
 
 		receivingRow = (receivingRow + 1) % r;
 		if( receivingRow == 0 )
 		    receivingCol = (receivingCol + 1) % c;
 	    }
+
+	    // Free the memory for the put buffer
+            putVector_.clear();
 	}
 
     template<typename T>
