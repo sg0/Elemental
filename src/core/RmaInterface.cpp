@@ -40,9 +40,11 @@ namespace El {
 	    attachedForPut_ = true;
 	    GlobalArrayPut_ = &Z;
 	    GlobalArrayGet_ = 0;
+	    window 	    = MPI_WIN_NULL;
 
-	    const Int p = Z.Grid().Size();
+	    const Int p = Z.Grid ().Size();
 	    putVector_.resize( p );
+	    getVector_.resize( p );
 	}
 
     template<typename T>
@@ -54,9 +56,11 @@ namespace El {
 	    attachedForPut_ = false;
 	    GlobalArrayGet_ = &X;
 	    GlobalArrayPut_ = 0;
-
+	    window 	    = MPI_WIN_NULL;
+	    
 	    const Int p = X.Grid ().Size ();
 	    getVector_.resize( p );
+	    putVector_.resize( p );
 	}
 
     template<typename T>
@@ -90,7 +94,8 @@ namespace El {
         	LogicError("Must detach before reattaching.");
 	    
 	    GlobalArrayPut_ = &Z;
-	    
+	    attachedForPut_ = true;
+	     
 	    const Grid& g = Z.Grid();
 	    // do rma related checks
 	    // extra for headers
@@ -115,7 +120,8 @@ namespace El {
         	LogicError("Must detach before reattaching.");
            
 	    GlobalArrayGet_ = &X;
-
+	    attachedForGet_ = true;
+	    
 	    const Grid& g = X.Grid();
 
 	    //do rma related checks
@@ -136,14 +142,16 @@ namespace El {
 	void RmaInterface<T>::Put( T alpha, Matrix<T>& Z, Int i, Int j )
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Put"))
-	    DistMatrix<T>& Y = *GlobalArrayPut_;
 
 	    if( i < 0 || j < 0 )
 		LogicError("Submatrix offsets must be non-negative");
+	    if ( !attachedForPut_ )
+		LogicError("Global matrix cannot be updated");
+
+	    DistMatrix<T>& Y = *GlobalArrayPut_;
+	    //do rma related checks
 	    if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
 		LogicError("Submatrix out of bounds of global matrix");
-
-	    //do rma related checks
 
 	    const Grid& g = Y.Grid();
 	    const Int r = g.Height();
@@ -220,6 +228,9 @@ namespace El {
 	void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Get"))
+	    if ( !attachedForGet_ )
+		LogicError("Local matrix cannot be updated");    
+	    
 	    const DistMatrix < T > &X = *GlobalArrayGet_;
 	    
 	    const Grid & g = X.Grid ();
@@ -318,10 +329,13 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Acc"))
 
-	    DistMatrix<T>& Y = *GlobalArrayPut_;
-
+	    if ( !attachedForPut_ )
+		LogicError("Global matrix cannot be updated"); 
 	    if( i < 0 || j < 0 )
 		LogicError("Submatrix offsets must be non-negative");
+	    
+	    DistMatrix<T>& Y = *GlobalArrayPut_;
+	    
 	    if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
 		LogicError("Submatrix out of bounds of global matrix");
 
@@ -402,7 +416,7 @@ namespace El {
 	void RmaInterface<T>::Flush( Matrix<T>& Z, Int i, Int j )
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Flush"))
-	    if( !attachedForPut_ || !attachedForGet_ )
+	    if( !attachedForPut_ && !attachedForGet_ )
         	LogicError("Must initiate transfer before flushing.");
 	
 	    DistMatrix<T>& Y = *GlobalArrayPut_;
@@ -448,7 +462,7 @@ namespace El {
 	void RmaInterface<T>::Flush( const Matrix<T>& Z, Int i, Int j )
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Flush"))
-	    if( !attachedForPut_ || !attachedForGet_ )
+	    if( !attachedForPut_ && !attachedForGet_ )
         	LogicError("Must initiate transfer before flushing.");
 	
 	    const DistMatrix<T>& Y = *GlobalArrayGet_;
@@ -495,7 +509,7 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Flush"))
 	    
-	    if( !attachedForPut_ || !attachedForGet_ )
+	    if( !attachedForPut_ && !attachedForGet_ )
         	LogicError("Must initiate transfer before flushing.");
 	
 	    // rma checks, see if Z is not NULL, etc
@@ -509,7 +523,7 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Flush"))
 	    
-	    if( !attachedForPut_ || !attachedForGet_ )
+	    if( !attachedForPut_ && !attachedForGet_ )
         	LogicError("Must initiate transfer before flushing.");
 	
 	    // rma checks, see if Z is not NULL, etc
@@ -522,7 +536,7 @@ namespace El {
 	void RmaInterface<T>::Detach()
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Detach"))
-    	    if( !attachedForPut_ || !attachedForGet_ )
+    	    if( !attachedForPut_ && !attachedForGet_ )
         	LogicError("Must attach before detaching.");
 	    //do rma related checks
 
