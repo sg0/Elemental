@@ -485,7 +485,7 @@ size_t count, ptrdiff_t target_offset)
         if (dest == MPI_BOTTOM)
                 displ = 0;
         else
-                displ = (size_t) ((uint8_t*)(dest + target_offset * type_size) - (uint8_t*)dest);
+                displ = (size_t) ((uint8_t*)((uint8_t*)dest + target_offset * type_size) - (uint8_t*)dest);
 
         SafeMpi (MPI_Type_get_true_extent(type, &lb, &extent));
 
