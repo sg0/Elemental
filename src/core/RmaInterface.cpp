@@ -2,6 +2,7 @@
    Copyright (c) 2009-2014, Jack Poulson
    Copyright (c) 2011, The University of Texas at Austin
    Copyright (c) 2014, Jeff Hammond (Intel)
+   Copyright (c) 2014, Sayan Ghosh (University of Houston)
    All rights reserved.
 
 Authors:
@@ -13,12 +14,10 @@ http://opensource.org/licenses/BSD-2-Clause
 */
 #include "El-lite.hpp"
 #include <assert.h>
+
 // This is direct copy-paste from
 // El two-sided implementation with
 // point-to-point replaced by one-sided
-
-// If you're seeing this then at this 
-// point I just want to compile
 
 #if MPI_VERSION>=3
 namespace El {
@@ -89,8 +88,9 @@ namespace El {
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Attach"))
 	    if( attachedForPut_ || attachedForGet_ )
         	LogicError("Must detach before reattaching.");
-		
+	    
 	    GlobalArrayPut_ = &Z;
+	    
 	    const Grid& g = Z.Grid();
 	    // do rma related checks
 	    // extra for headers
@@ -115,16 +115,15 @@ namespace El {
         	LogicError("Must detach before reattaching.");
            
 	    GlobalArrayGet_ = &X;
-	    const DistMatrix <T> &Z = *GlobalArrayGet_;
 
 	    const Grid& g = X.Grid();
 
 	    //do rma related checks
 	    // extra for headers
-	    const Int numEntries = Z.LocalHeight () * Z.LocalWidth ();	
+	    const Int numEntries = X.LocalHeight () * X.LocalWidth ();	
 	    const Int bufferSize = 4*sizeof(Int) + (numEntries+1)*sizeof(T);
 
-	    void* baseptr = (void *)Z.LockedBuffer ();
+	    void* baseptr = (void *)X.LockedBuffer ();
 	    assert (baseptr != NULL);
 
 	    mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
@@ -138,7 +137,6 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Put"))
 	    DistMatrix<T>& Y = *GlobalArrayPut_;
-	    attachedForPut_ = true;
 
 	    if( i < 0 || j < 0 )
 		LogicError("Submatrix offsets must be non-negative");
@@ -223,7 +221,6 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Get"))
 	    const DistMatrix < T > &X = *GlobalArrayGet_;
-	    attachedForGet_ = true;
 	    
 	    const Grid & g = X.Grid ();
 	    const Int r = g.Height ();
@@ -322,7 +319,6 @@ namespace El {
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Acc"))
 
 	    DistMatrix<T>& Y = *GlobalArrayPut_;
-	    attachedForPut_ = true;
 
 	    if( i < 0 || j < 0 )
 		LogicError("Submatrix offsets must be non-negative");
@@ -527,7 +523,7 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Detach"))
     	    if( !attachedForPut_ || !attachedForGet_ )
-        	LogicError("Must initiate transfer before flushing.");
+        	LogicError("Must attach before detaching.");
 	    //do rma related checks
 
 	    const Grid& g = ( attachedForPut_ ? 
