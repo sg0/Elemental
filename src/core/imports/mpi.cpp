@@ -15,7 +15,7 @@ typedef unsigned char *UCP;
 
 namespace
 {
-
+//TODO RMA related checks
 inline void SafeMpi (int mpiError)
 {
     DEBUG_ONLY (if (mpiError != MPI_SUCCESS)
@@ -457,7 +457,7 @@ void WindowUnlock (Window & window)
 // RMA Utilities
 void WindowCreate (void *baseptr, int size, Comm comm, Window & window)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Windowcreate"))
+    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowCreate"))
 
 	// use alloc_shm
     SafeMpi (MPI_Win_create
@@ -497,11 +497,7 @@ size_t count, ptrdiff_t target_offset)
 
 void WindowFree (Window & window)
 {
-    void* baseptr = NULL;
-    int flag;
-        SafeMpi (MPI_Win_get_attr(window, MPI_WIN_BASE, baseptr, &flag /* unused */));
 	SafeMpi (MPI_Win_free (&window));
-	free (baseptr);
 }
 
 void Iput (void *source, int source_size, int target_rank,

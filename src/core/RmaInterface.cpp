@@ -14,16 +14,12 @@ http://opensource.org/licenses/BSD-2-Clause
 */
 #include "El-lite.hpp"
 #include <assert.h>
-
-// This is direct copy-paste from
-// El two-sided implementation with
-// point-to-point replaced by one-sided
-
+    
+// TODO complete the const interfaces...
+// TODO RMA related checks pending (e.g bounds checking)...
 #if MPI_VERSION>=3
 namespace El {
 
-    // dont care about const 
-    // interfaces now
     template<typename T>
 	RmaInterface<T>::RmaInterface()
 	: GlobalArrayPut_(0), GlobalArrayGet_(0),
@@ -92,10 +88,14 @@ namespace El {
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Attach"))
 	    if( attachedForPut_ || attachedForGet_ )
         	LogicError("Must detach before reattaching.");
-	    
+	   
+	    // if DistMatrix is non-const, all one-sided 
+	    // transfers -- put, get and acc are possible
 	    GlobalArrayPut_ = &Z;
-	    attachedForPut_ = true;
-	     
+	    attachedForPut_ = true;	    
+	    GlobalArrayGet_ = &Z;
+	    attachedForGet_ = true;     
+
 	    const Grid& g = Z.Grid();
 	    // do rma related checks
 	    // extra for headers
@@ -229,9 +229,9 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Get"))
 	    if ( !attachedForGet_ )
-		LogicError("Local matrix cannot be updated");    
+		LogicError ("Cannot perform this operation as matrix is not attached.");
 	    
-	    const DistMatrix < T > &X = *GlobalArrayGet_;
+	    const DistMatrix <T> &X = *GlobalArrayGet_;
 	    
 	    const Grid & g = X.Grid ();
 	    const Int r = g.Height ();
@@ -247,7 +247,7 @@ namespace El {
 	    const Int width = Z.Width();
 
 	    if (i + height > X.Height () || j + width > X.Width ())
-		LogicError ("Invalid AxpyGlobalToLocal submatrix");
+		LogicError("Submatrix out of bounds of global matrix");
 	  
 	    const Int colAlign = (X.ColAlign() + i) % r;
 	    const Int rowAlign = (X.RowAlign() + j) % c;
@@ -538,22 +538,22 @@ namespace El {
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Detach"))
     	    if( !attachedForPut_ && !attachedForGet_ )
         	LogicError("Must attach before detaching.");
-	    //do rma related checks
-
+	    // Both attachedForPut_ and attachedForGet_
+	    // could be true, will it cause issues?
 	    const Grid& g = ( attachedForPut_ ? 
                       GlobalArrayPut_->Grid() : 
                       GlobalArrayGet_->Grid() );
 
-            mpi::Barrier (g.VCComm ());
-	    
 	    attachedForPut_ = false;
 	    attachedForGet_ = false;
-       
+
+	    mpi::WindowUnlock (window);
+	    mpi::WindowFree (window);    
+      
 	    putVector_.clear();
             getVector_.clear();
 
-	    mpi::WindowUnlock (window);
-	    mpi::WindowFree (window);
+	    mpi::Barrier (g.VCComm ());
 	}
 
     template class RmaInterface<Int>;
