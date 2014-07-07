@@ -547,7 +547,7 @@ void Iget (void *source, int source_size, int target_rank,
               MPI_BYTE, MPI_NO_OP, window));
 #else
     SafeMpi (MPI_Get
-             (source, (MPI_Aint) source_size, 1,
+             (source, (MPI_Aint) source_size, MPI_BYTE,
               target_rank, 1, (MPI_Aint) target_size,
               MPI_BYTE, window));
 #endif

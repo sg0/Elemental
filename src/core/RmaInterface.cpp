@@ -229,7 +229,8 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Get"))
 	    // a call to Attach with a non-const DistMatrix must set
-	    // attachedForGet_ also, of not DistMatrix isn't attached
+	    // attachedForGet_ also, if not then it is assumed that
+	    // the DistMatrix isn't attached
 	    if ( !attachedForGet_ )
 		LogicError ("Cannot perform this operation as matrix is not attached.");
 	    
