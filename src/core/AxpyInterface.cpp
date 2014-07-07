@@ -514,14 +514,26 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	    const Int destination = receivingRow + r * receivingCol;
 	    const Int bufferSize =
 	      4 * sizeof (Int) + (numEntries + 1) * sizeof (T);
+// TODO the size of request object is set in this function
+// bypassing it means passing same request handle multiple
+// times, we don't care about it in NbC version though(?)
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+	    //const Int numCreated = dataVectors_[destination].size();
+	    const Int index = 0;//numCreated;
+	    //dataVectors_[destination].resize (numCreated + 1);
+	    //dataVectors_[numCreated].resize (bufferSize);
+	    dataVectors_[0].resize (bufferSize);
+    	    //dataSendRequests_[destination].push_back (mpi::REQUEST_NULL);
+            //sendingData_[destination].push_back (true);
+#else
 	    const Int index =
-	      ReadyForSend (bufferSize, dataVectors_[destination],
-			    dataSendRequests_[destination],
-			    sendingData_[destination]);
+	    ReadyForSend (bufferSize, dataVectors_[destination],
+		    dataSendRequests_[destination],
+		    sendingData_[destination]);
+#endif
 	    DEBUG_ONLY (if
 			(Int (dataVectors_[destination][index].size ()) !=
 			 bufferSize) LogicError ("Error in ReadyForSend");)
-
 	      // Pack the header
 	      byte *sendBuffer = dataVectors_[destination][index].data ();
 	    byte *head = sendBuffer;
@@ -551,10 +563,10 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	    mpi::TaggedISSend
 	      (sendBuffer, bufferSize, destination, DATA_TAG, g.VCComm (),
 	       dataSendRequests_[destination][index]);
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+//#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
 // we won't use this request, so free it
-	    mpi::RequestFree (dataSendRequests_[destination][index]);
-#endif
+//	    mpi::RequestFree (dataSendRequests_[destination][index]);
+//#endif
 	  }
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
 	all_sends_are_finished = true;
@@ -668,14 +680,14 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
      std::deque < bool > &requestStatuses)
   {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::ReadyForSend"))
-      const Int numCreated = sendVectors.size ();
+	const Int numCreated = sendVectors.size ();
     DEBUG_ONLY (if (numCreated != Int (requests.size ()) ||
 		    numCreated !=
 		    Int (requestStatuses.size ()))LogicError
 		("size mismatch");)
-      for (Int i = 0; i < numCreated; ++i)
+	for (Int i = 0; i < numCreated; ++i)
 	{
-	  // If this request is still running, test to see if it finished.
+	    // If this request is still running, test to see if it finished.
 	  if (requestStatuses[i])
 	    {
 	      const bool finished = mpi::Test (requests[i]);
@@ -689,12 +701,11 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	      return i;
 	    }
 	}
-
     sendVectors.resize (numCreated + 1);
     sendVectors[numCreated].resize (sendSize);
     requests.push_back (mpi::REQUEST_NULL);
     requestStatuses.push_back (true);
-
+    
     return numCreated;
   }
 
@@ -733,9 +744,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	    localToGlobalMat_->Grid () : globalToLocalMat_->
 	    Grid ());
 // TODO Fix bug which causes deadlock in NBC version
-// when AXPY_DIM < NPES. Also the Wait variant is buggy
-// in it's case HandleLocalToGlobalData after the if loop
-// causes it to work.
+// when for small AXPY_DIMs
     if (attachedForLocalToGlobal_)
     {
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
@@ -749,12 +758,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	    if (nb_bar_active)
 	    {
 		// test/wait for IBarrier completion
-#if defined(EL_PREFER_WAIT_OVER_TEST)
-		mpi::Wait (nb_bar_request);
-		DONE = true;
-#else
 		DONE = mpi::Test (nb_bar_request);
-#endif                    
 	    }
 	    else
 	    {
