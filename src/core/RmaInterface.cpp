@@ -32,7 +32,7 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::RmaInterface"))
 	    
-	    attachedForGet_ = false;
+	    attachedForGet_ = true;
 	    attachedForPut_ = true;
 	    GlobalArrayPut_ = &Z;
 	    GlobalArrayGet_ = 0;
@@ -86,16 +86,20 @@ namespace El {
 	void RmaInterface<T>::Attach( DistMatrix<T>& Z )
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Attach"))
-	    if( attachedForPut_ || attachedForGet_ )
-        	LogicError("Must detach before reattaching.");
-	   
+		if (attached_)
+		    LogicError("Must detach before reattaching.");
+		else
+		    attached_ = true;
+
 	    // if DistMatrix is non-const, all one-sided 
 	    // transfers -- put, get and acc are possible
-	    GlobalArrayPut_ = &Z;
-	    attachedForPut_ = true;	    
-	    GlobalArrayGet_ = &Z;
-	    attachedForGet_ = true;     
-
+	    if( !attachedForPut_ && !attachedForGet_ )
+	    {
+		GlobalArrayPut_ = &Z;
+		GlobalArrayGet_ = &Z;
+		attachedForPut_ = true;	    
+		attachedForGet_ = true;     
+	    }
 	    const Grid& g = Z.Grid();
 	    // do rma related checks
 	    // extra for headers
@@ -108,20 +112,23 @@ namespace El {
 
 	    mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
 	    mpi::WindowLock (window);
-	    // do we need a barrier here?
-	    mpi::Barrier (g.VCComm ());
 	}
 
     template<typename T>
 	void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Attach"))
-	    if( attachedForPut_ || attachedForGet_ )
-        	LogicError("Must detach before reattaching.");
-           
-	    GlobalArrayGet_ = &X;
-	    attachedForGet_ = true;
-	    
+		if (attached_)
+		    LogicError("Must detach before reattaching.");
+		else
+		    attached_ = true;
+
+	    if( !attachedForGet_ )
+	    {
+		GlobalArrayGet_ = &X;
+		attachedForGet_ = true;
+	    }
+
 	    const Grid& g = X.Grid();
 
 	    //do rma related checks
@@ -134,8 +141,6 @@ namespace El {
 
 	    mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
 	    mpi::WindowLock (window);
-	    // do we need a barrier here?
-	    mpi::Barrier (g.VCComm ());
 	}
 
     template<typename T>
@@ -541,21 +546,21 @@ namespace El {
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Detach"))
     	    if( !attachedForPut_ && !attachedForGet_ )
         	LogicError("Must attach before detaching.");
-	    // Both attachedForPut_ and attachedForGet_
-	    // could be true, will it cause issues?
+	    
 	    const Grid& g = ( attachedForPut_ ? 
                       GlobalArrayPut_->Grid() : 
                       GlobalArrayGet_->Grid() );
-
-	    attachedForPut_ = false;
-	    attachedForGet_ = false;
-
+	    
 	    mpi::WindowUnlock (window);
 	    mpi::WindowFree (window);    
-      
+	    
+	    attachedForPut_ = false;
+	    attachedForGet_ = false;
+	    attached_	    = false;
+
 	    putVector_.clear();
             getVector_.clear();
-
+	    
 	    mpi::Barrier (g.VCComm ());
 	}
 
