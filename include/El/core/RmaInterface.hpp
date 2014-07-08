@@ -52,7 +52,8 @@ private:
     std::vector<byte> getVector_, putVector_;
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     const DistMatrix<T,MC,MR>* GlobalArrayGet_;
-    bool toBeAttachedForPut_, toBeAttachedForGet_, attached_;
+    bool toBeAttachedForPut_, toBeAttachedForGet_, 
+	 attached_, detached_;
 };
 
 } // namespace El
