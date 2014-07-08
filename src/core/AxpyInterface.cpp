@@ -517,20 +517,20 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 // TODO the size of request object is set in this function
 // bypassing it means passing same request handle multiple
 // times, we don't care about it in NbC version though(?)
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+//#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
 	    //const Int numCreated = dataVectors_[destination].size();
-	    const Int index = 0;//numCreated;
+//	    const Int index = 0;//numCreated;
 	    //dataVectors_[destination].resize (numCreated + 1);
 	    //dataVectors_[numCreated].resize (bufferSize);
-	    dataVectors_[0].resize (bufferSize);
+//	    dataVectors_[0].resize (bufferSize);
     	    //dataSendRequests_[destination].push_back (mpi::REQUEST_NULL);
             //sendingData_[destination].push_back (true);
-#else
+//#else
 	    const Int index =
 	    ReadyForSend (bufferSize, dataVectors_[destination],
 		    dataSendRequests_[destination],
 		    sendingData_[destination]);
-#endif
+//#endif
 	    DEBUG_ONLY (if
 			(Int (dataVectors_[destination][index].size ()) !=
 			 bufferSize) LogicError ("Error in ReadyForSend");)
