@@ -24,7 +24,8 @@ namespace El {
 	RmaInterface<T>::RmaInterface()
 	: GlobalArrayPut_(0), GlobalArrayGet_(0),
 	putVector_(0), getVector_(0), window (MPI_WIN_NULL),
-	attachedForPut_(false), attachedForGet_(false)
+	toBeAttachedForPut_(false), toBeAttachedForGet_(false), 
+	attached_(false)
         { }
 
     template<typename T>
@@ -32,11 +33,11 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::RmaInterface"))
 	    
-	    attachedForGet_ = true;
-	    attachedForPut_ = true;
-	    GlobalArrayPut_ = &Z;
-	    GlobalArrayGet_ = 0;
-	    window 	    = MPI_WIN_NULL;
+	    toBeAttachedForGet_ = true;
+	    toBeAttachedForPut_ = true;
+	    GlobalArrayPut_ 	= &Z;
+	    GlobalArrayGet_ 	= &Z;
+	    window 	    	= MPI_WIN_NULL;
 
 	    const Int p = Z.Grid ().Size();
 	    putVector_.resize( p );
@@ -48,11 +49,11 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::RmaInterface"))
 	    
-	    attachedForGet_ = true;
-	    attachedForPut_ = false;
-	    GlobalArrayGet_ = &X;
-	    GlobalArrayPut_ = 0;
-	    window 	    = MPI_WIN_NULL;
+	    toBeAttachedForGet_ = true;
+	    toBeAttachedForPut_ = false;
+	    GlobalArrayGet_ 	= &X;
+	    GlobalArrayPut_ 	= 0;
+	    window 	    	= MPI_WIN_NULL;
 	    
 	    const Int p = X.Grid ().Size ();
 	    getVector_.resize( p );
@@ -93,12 +94,12 @@ namespace El {
 
 	    // if DistMatrix is non-const, all one-sided 
 	    // transfers -- put, get and acc are possible
-	    if( !attachedForPut_ && !attachedForGet_ )
+	    if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
 	    {
-		GlobalArrayPut_ = &Z;
-		GlobalArrayGet_ = &Z;
-		attachedForPut_ = true;	    
-		attachedForGet_ = true;     
+		GlobalArrayPut_ 	= &Z;
+		toBeAttachedForPut_ 	= true;	    
+		GlobalArrayGet_ 	= &Z;
+		toBeAttachedForGet_ 	= true;     
 	    }
 	    const Grid& g = Z.Grid();
 	    // do rma related checks
@@ -123,11 +124,15 @@ namespace El {
 		else
 		    attached_ = true;
 
-	    if( !attachedForGet_ )
+	    if( !toBeAttachedForGet_ && !toBeAttachedForPut_)
 	    {
-		GlobalArrayGet_ = &X;
-		attachedForGet_ = true;
+		GlobalArrayGet_ 	= &X;
+		toBeAttachedForGet_ 	= true;
+		GlobalArrayPut_ 	= 0;
+		toBeAttachedForPut_ 	= false;
 	    }
+	    else
+		LogicError("Cannot update Global matrix.");
 
 	    const Grid& g = X.Grid();
 
@@ -150,7 +155,7 @@ namespace El {
 
 	    if( i < 0 || j < 0 )
 		LogicError("Submatrix offsets must be non-negative");
-	    if ( !attachedForPut_ )
+	    if ( !toBeAttachedForPut_ )
 		LogicError("Global matrix cannot be updated");
 
 	    DistMatrix<T>& Y = *GlobalArrayPut_;
@@ -234,9 +239,9 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Get"))
 	    // a call to Attach with a non-const DistMatrix must set
-	    // attachedForGet_ also, if not then it is assumed that
+	    // toBeAttachedForGet_ also, if not then it is assumed that
 	    // the DistMatrix isn't attached
-	    if ( !attachedForGet_ )
+	    if ( !toBeAttachedForGet_ )
 		LogicError ("Cannot perform this operation as matrix is not attached.");
 	    
 	    const DistMatrix <T> &X = *GlobalArrayGet_;
@@ -337,15 +342,15 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Acc"))
 
-	    if ( !attachedForPut_ )
-		LogicError("Global matrix cannot be updated"); 
+	    if ( !toBeAttachedForPut_ )
+		LogicError("Global matrix cannot be updated."); 
 	    if( i < 0 || j < 0 )
-		LogicError("Submatrix offsets must be non-negative");
+		LogicError("Submatrix offsets must be non-negative.");
 	    
 	    DistMatrix<T>& Y = *GlobalArrayPut_;
 	    
 	    if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
-		LogicError("Submatrix out of bounds of global matrix");
+		LogicError("Submatrix out of bounds of global matrix.");
 
 	    //do rma related checks
 
@@ -424,7 +429,7 @@ namespace El {
 	void RmaInterface<T>::Flush( Matrix<T>& Z, Int i, Int j )
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Flush"))
-	    if( !attachedForPut_ && !attachedForGet_ )
+	    if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
         	LogicError("Must initiate transfer before flushing.");
 	
 	    DistMatrix<T>& Y = *GlobalArrayPut_;
@@ -470,7 +475,7 @@ namespace El {
 	void RmaInterface<T>::Flush( const Matrix<T>& Z, Int i, Int j )
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Flush"))
-	    if( !attachedForPut_ && !attachedForGet_ )
+	    if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
         	LogicError("Must initiate transfer before flushing.");
 	
 	    const DistMatrix<T>& Y = *GlobalArrayGet_;
@@ -517,7 +522,7 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Flush"))
 	    
-	    if( !attachedForPut_ && !attachedForGet_ )
+	    if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
         	LogicError("Must initiate transfer before flushing.");
 	
 	    // rma checks, see if Z is not NULL, etc
@@ -531,7 +536,7 @@ namespace El {
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Flush"))
 	    
-	    if( !attachedForPut_ && !attachedForGet_ )
+	    if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
         	LogicError("Must initiate transfer before flushing.");
 	
 	    // rma checks, see if Z is not NULL, etc
@@ -544,19 +549,19 @@ namespace El {
 	void RmaInterface<T>::Detach()
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Detach"))
-    	    if( !attachedForPut_ && !attachedForGet_ )
+    	    if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
         	LogicError("Must attach before detaching.");
 	    
-	    const Grid& g = ( attachedForPut_ ? 
+	    const Grid& g = ( toBeAttachedForPut_ ? 
                       GlobalArrayPut_->Grid() : 
                       GlobalArrayGet_->Grid() );
 	    
 	    mpi::WindowUnlock (window);
 	    mpi::WindowFree (window);    
 	    
-	    attachedForPut_ = false;
-	    attachedForGet_ = false;
-	    attached_	    = false;
+	    toBeAttachedForPut_ = false;
+	    toBeAttachedForGet_ = false;
+	    attached_	    	= false;
 
 	    putVector_.clear();
             getVector_.clear();
