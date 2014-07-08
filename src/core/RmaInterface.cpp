@@ -549,7 +549,7 @@ namespace El {
 	void RmaInterface<T>::Detach()
 	{
 	    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Detach"))
-    	    if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
+    	    if( !attached_ )
         	LogicError("Must attach before detaching.");
 	    
 	    const Grid& g = ( toBeAttachedForPut_ ? 
@@ -563,10 +563,11 @@ namespace El {
 	    toBeAttachedForGet_ = false;
 	    attached_	    	= false;
 
+	    GlobalArrayPut_ 	= 0;
+	    GlobalArrayGet_ 	= 0;
+
 	    putVector_.clear();
             getVector_.clear();
-	    
-	    mpi::Barrier (g.VCComm ());
 	}
 
     template class RmaInterface<Int>;
