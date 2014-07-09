@@ -112,7 +112,8 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
     // do rma related checks
     // extra for headers
     const Int numEntries = Z.LocalHeight () * Z.LocalWidth ();
-    const Int bufferSize = 4*sizeof(Int) + (numEntries+1)*sizeof(T);
+    // why numEntries+1?
+    const Int bufferSize = (numEntries+1)*sizeof(T);
     // TODO C++ way of type casting?
     void* baseptr = (void *)Z.Buffer ();
     // TODO Use DEBUG_ONLY or something that EL provides
@@ -146,7 +147,7 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
     //do rma related checks
     // extra for headers
     const Int numEntries = X.LocalHeight () * X.LocalWidth ();
-    const Int bufferSize = 4*sizeof(Int) + (numEntries+1)*sizeof(T);
+    const Int bufferSize = (numEntries+1)*sizeof(T);
 
     void* baseptr = (void *)X.LockedBuffer ();
     assert (baseptr != NULL);
@@ -198,29 +199,15 @@ void RmaInterface<T>::Put( T alpha, Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-            const Int bufferSize = 4*sizeof(Int) + (numEntries+1)*sizeof(T);
+            const Int bufferSize = (numEntries+1)*sizeof(T);
             // Pack the header
             // make variable names rma friendly
 
             putVector_.resize( bufferSize );
             byte* sendBuffer = putVector_.data();
-            byte* head = sendBuffer;
-            std::cout << "After pointing head to sendbuffer\n";
-            *reinterpret_cast<Int*>(head) = i;
-            head += sizeof(Int);
-            *reinterpret_cast<Int*>(head) = j;
-            head += sizeof(Int);
-            *reinterpret_cast<Int*>(head) = height;
-            head += sizeof(Int);
-            *reinterpret_cast<Int*>(head) = width;
-            head += sizeof(Int);
-            *reinterpret_cast<T*>(head) = alpha;
-            head += sizeof(T);
-
-            std::cout << "Before packing payload\n";
             // Pack the payload
             // consider ddt here
-            T* sendData = reinterpret_cast<T*>(head);
+            T* sendData = reinterpret_cast<T *>(sendBuffer);
             const T* XBuffer = Y.Buffer();
             const Int XLDim = Y.LDim();
             for( Int t=0; t<localWidth; ++t )
@@ -230,6 +217,7 @@ void RmaInterface<T>::Put( T alpha, Matrix<T>& Z, Int i, Int j )
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
             }
+	    //TODO add disp as a parameter?
             mpi::Iput (sendBuffer, bufferSize, destination, bufferSize, window);
         }
         receivingRow = (receivingRow + 1) % r;
@@ -256,7 +244,7 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
     if ( !toBeAttachedForGet_ )
         LogicError ("Cannot perform this operation as matrix is not attached.");
 
-    const DistMatrix <T> &X = *GlobalArrayGet_;
+    const DistMatrix<T> &X = *GlobalArrayGet_;
 
     const Grid & g = X.Grid ();
     const Int r = g.Height ();
@@ -277,10 +265,9 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
     const Int colAlign = (X.ColAlign() + i) % r;
     const Int rowAlign = (X.RowAlign() + j) % c;
 
-    // get into local matrix cells from
-    // correct places in global array
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
+ 
     for( Int step=0; step<p; ++step )
     {
         const Int colShift = Shift( receivingRow, colAlign, r );
@@ -292,29 +279,15 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-            const Int bufferSize = 4*sizeof(Int) + (numEntries+1)*sizeof(T);
+            const Int bufferSize = (numEntries+1)*sizeof(T);
 
             getVector_.resize (bufferSize);
             byte *getBuffer = getVector_.data ();
 
             mpi::Iget (getBuffer, bufferSize, destination, bufferSize, window);
             //do we need flush here?
-
-            // Extract the header
-            byte *head = getBuffer;
-            const Int i = *reinterpret_cast < const Int * >(head);
-            head += sizeof (Int);
-            const Int j = *reinterpret_cast < const Int * >(head);
-            head += sizeof (Int);
-            const Int height = *reinterpret_cast < const Int * >(head);
-            head += sizeof (Int);
-            const Int width = *reinterpret_cast < const Int * >(head);
-            head += sizeof (Int);
-            const T alpha = *reinterpret_cast < const T * >(head);
-            head += sizeof (T);
-
             // Update Y
-            const T *XBuffer = reinterpret_cast < const T * >(head);
+            const T *XBuffer = reinterpret_cast<const T*>(getBuffer);
             const Int colAlign = (X.ColAlign () + i) % r;
             const Int rowAlign = (X.RowAlign () + j) % c;
             const Int colShift = Shift (myRow, colAlign, r);
@@ -330,7 +303,7 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
                 T *YCol = Z.Buffer (iLocalOffset, jLocalOffset + t);
                 const T *XCol = &XBuffer[t * localHeight];
                 for (Int s = 0; s < localHeight; ++s)
-                    YCol[s] += alpha * XCol[s];
+                    YCol[s] = XCol[s];
             }
         }
         receivingRow = (receivingRow + 1) % r;
@@ -348,7 +321,7 @@ void RmaInterface<T>::Get( const Matrix<T>& Z, Int i, Int j )
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Get"))
 }
 
-// scaled accumulate
+// scaled accumulate - dst = dst + alpha*src
 template<typename T>
 void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, mpi::Op &op, Int i, Int j )
 {
@@ -391,43 +364,30 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, mpi::Op &op, Int i, Int j )
         const Int localWidth = Length( width, rowShift, c );
         const Int numEntries = localHeight*localWidth;
 
-        if( numEntries != 0 )
+	if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-            const Int bufferSize = 4*sizeof(Int) + (numEntries+1)*sizeof(T);
+            const Int bufferSize = (numEntries+1)*sizeof(T);
             // Pack the header
             // make variable names rma friendly
             putVector_.resize( bufferSize );
             byte* sendBuffer = putVector_.data();
-
-            byte* head = sendBuffer;
-            *reinterpret_cast<Int*>(head) = i;
-            head += sizeof(Int);
-            *reinterpret_cast<Int*>(head) = j;
-            head += sizeof(Int);
-            *reinterpret_cast<Int*>(head) = height;
-            head += sizeof(Int);
-            *reinterpret_cast<Int*>(head) = width;
-            head += sizeof(Int);
-            *reinterpret_cast<T*>(head) = alpha;
-            head += sizeof(T);
-
-            // Pack the payload
-            // consider ddt here
-            T* sendData = reinterpret_cast<T*>(head);
-            const T* XBuffer = Z.Buffer();
+            
+	    // consider ddt here
+            T* sendData = reinterpret_cast<T *>(sendBuffer);
+            T* XBuffer = Z.Buffer();
             const Int XLDim = Z.LDim();
-            for( Int t=0; t<localWidth; ++t )
+	    // src*alpha
+	    for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendData[t*localHeight];
                 const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
                 for( Int s=0; s<localHeight; ++s )
-                    thisSendCol[s] = thisXCol[colShift+s*r];
+                    thisSendCol[s] += alpha*thisXCol[colShift+s*r];
             }
-
+	    
             mpi::Iacc (sendBuffer, bufferSize, destination, bufferSize, op, window);
-        }
-
+	    }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;

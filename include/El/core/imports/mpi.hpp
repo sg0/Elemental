@@ -220,8 +220,8 @@ void Iget( void *source, int source_size, int target_rank,
 	int target_size, Window& window);
 void Rget( void *source, int source_size, int target_rank, int target_size, 
 	Window& window, Request& request);
-void Iacc( void *source, int source_size, int target_rank, 
-	int target_size, Op &op, Window& window);
+void Iacc( void *source, int source_size, int target_rank,
+           int target_size, Op & op, Window & window);
 void Racc( void *source, int source_size, int target_rank, int target_size, 
 	Op &op, Window& window, Request& request);
 // Synchronization
