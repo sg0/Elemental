@@ -213,17 +213,20 @@ void WindowCreate( void* baseptr, int size, Comm comm, Window& window );
 void WindowFree (Window & window);
 // One-sided operations
 void Iput( void *source, int source_size, int target_rank, 
-	int target_size, Window& window);
-void Rput( void *source, int source_size, int target_rank, int target_size, 
-	Window& window, Request& request);
+	Aint disp, int target_size, Window& window);
+void Rput( void *source, int source_size, int target_rank, 
+	Aint disp, int target_size, Window& window, 
+	Request& request);
 void Iget( void *source, int source_size, int target_rank, 
-	int target_size, Window& window);
-void Rget( void *source, int source_size, int target_rank, int target_size, 
-	Window& window, Request& request);
+	Aint disp, int target_size, Window& window);
+void Rget( void *source, int source_size, int target_rank, 
+	Aint disp, int target_size, Window& window, 
+	Request& request);
 void Iacc( void *source, int source_size, int target_rank,
-           int target_size, Op & op, Window & window);
-void Racc( void *source, int source_size, int target_rank, int target_size, 
-	Op &op, Window& window, Request& request);
+           Aint disp, int target_size, Op & op, Window & window);
+void Racc( void *source, int source_size, int target_rank, 
+	Aint disp, int target_size, Op &op, Window& window, 
+	Request& request);
 // Synchronization
 void Flush( int target_rank, Window& window );
 void Flush (Window & window);

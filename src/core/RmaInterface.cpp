@@ -228,7 +228,8 @@ void RmaInterface<T>::Put( T alpha, Matrix<T>& Z, Int i, Int j )
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
             }
-            mpi::Iput (sendBuffer, bufferSize, destination, bufferSize, window);
+	    mpi::Aint disp = XLDim * sizeof(T);
+            mpi::Iput (sendBuffer, bufferSize, destination, disp, bufferSize, window);
        	    // clear
 	    putVector_[destination].resize (0);
 	}
@@ -294,7 +295,8 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
             getVector_[destination].resize (bufferSize);
             byte *getBuffer = getVector_[destination].data ();
 
-            mpi::Iget (getBuffer, bufferSize, destination, bufferSize, window);
+	    mpi::Aint disp = X.LDim () * sizeof(T);
+            mpi::Iget (getBuffer, bufferSize, destination, disp, bufferSize, window);
             //do we need flush here?
             // Update Y
             const T *XBuffer = reinterpret_cast<const T*>(getBuffer);
@@ -392,14 +394,9 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, mpi::Op &op, Int i, Int j )
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = alpha*thisXCol[colShift+s*r];
             }
-	   /*
-	    MPI_Accumulate
-             (sendBuffer, bufferSize,
-              MPI_BYTE, destination, 1, //Z.LDim () * sizeof(T),
-              bufferSize, MPI_BYTE, op.op,
-              window);   
-	      */
-	mpi::Iacc (sendBuffer, bufferSize, destination, bufferSize, op, window);
+    
+	mpi::Aint disp = XLDim * sizeof(T);
+	mpi::Iacc (sendBuffer, bufferSize, destination, disp, bufferSize, op, window);
         // clear
         putVector_[destination].resize (0);
 	}

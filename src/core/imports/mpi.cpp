@@ -501,63 +501,63 @@ void WindowFree (Window & window)
 }
 
 void Iput (void *source, int source_size, int target_rank,
-           int target_size, Window & window)
+           Aint disp, int target_size, Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Iput"))
 #ifdef EL_ENSURE_PUT_ATOMICITY
     SafeMpi (MPI_Accumulate
              (source, (MPI_Aint) source_size, MPI_BYTE,
-              target_rank, 1, (MPI_Aint) target_size,
+              target_rank, disp, (MPI_Aint) target_size,
               MPI_BYTE, MPI_REPLACE, window));
 #else
     SafeMpi (MPI_Put
              (source, (MPI_Aint) source_size, MPI_BYTE,
-	      target_rank, 1, (MPI_Aint) target_size,
+	      target_rank, disp, (MPI_Aint) target_size,
 	      MPI_BYTE, window));
 #endif
     SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
 void Rput (void *source, int source_size, int target_rank,
-           int target_size, Window & window,
+           Aint disp, int target_size, Window & window,
            Request & request)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Rput"))
 #ifdef EL_ENSURE_PUT_ATOMICITY
     SafeMpi (MPI_Raccumulate
              (source, (MPI_Aint) source_size, MPI_BYTE,
-              target_rank, 1, (MPI_Aint) target_size,
+              target_rank, disp, (MPI_Aint) target_size,
               MPI_BYTE, MPI_REPLACE, window, &request));
 #else
     SafeMpi (MPI_Rput
              (source, (MPI_Aint) source_size, MPI_BYTE,
-              target_rank, 1, (MPI_Aint) target_size,
+              target_rank, disp, (MPI_Aint) target_size,
               MPI_BYTE, window, &request));
 #endif
     SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
 void Iget (void *source, int source_size, int target_rank,
-           int target_size, Window & window)
+           Aint disp, int target_size, Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Iget"))
 #ifdef EL_ENSURE_GET_ATOMICITY
     SafeMpi (MPI_Get_accumulate
              (NULL, 0, MPI_BYTE, source,
               (MPI_Aint) source_size, MPI_BYTE,
-              target_rank, 1, (MPI_Aint) target_size,
+              target_rank, disp, (MPI_Aint) target_size,
               MPI_BYTE, MPI_NO_OP, window));
 #else
     SafeMpi (MPI_Get
              (source, (MPI_Aint) source_size, MPI_BYTE,
-              target_rank, 1, (MPI_Aint) target_size,
+              target_rank, disp, (MPI_Aint) target_size,
               MPI_BYTE, window));
 #endif
     SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
 void Rget (void *source, int source_size, int target_rank,
-           int target_size, Window & window,
+           Aint disp, int target_size, Window & window,
            Request & request)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Rget"))
@@ -565,37 +565,37 @@ void Rget (void *source, int source_size, int target_rank,
     SafeMpi (MPI_Rget_accumulate
              (NULL, 0, MPI_BYTE, source,
               (MPI_Aint) source_size, MPI_BYTE,
-              target_rank, 1, (MPI_Aint) target_size,
+              target_rank, disp, (MPI_Aint) target_size,
               MPI_BYTE, MPI_NO_OP, window, &request));
 #else
     SafeMpi (MPI_Rget
              (source, (MPI_Aint) source_size, MPI_BYTE,
-              target_rank, 1, (MPI_Aint) target_size,
+              target_rank, disp, (MPI_Aint) target_size,
               MPI_BYTE, window, &request));
 #endif
     SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
 void Iacc (void *source, int source_size, int target_rank,
-           int target_size, Op & op, Window & window)
+           Aint disp, int target_size, Op & op, Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
     SafeMpi (MPI_Accumulate
              (source, (MPI_Aint) source_size,
-              MPI_BYTE, target_rank, 1,
+              MPI_BYTE, target_rank, disp,
               (MPI_Aint) target_size, MPI_BYTE, op.op,
               window));
     SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
 void Racc (void *source, int source_size, int target_rank,
-           int target_size, Op & op, Window & window,
+           Aint disp, int target_size, Op & op, Window & window,
            Request & request)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Raccumulate"))
     SafeMpi (MPI_Raccumulate
              (source, (MPI_Aint) source_size,
-              MPI_BYTE, target_rank, 1,
+              MPI_BYTE, target_rank, disp,
               (MPI_Aint) target_size, MPI_BYTE, op.op,
               window, &request));
     SafeMpi (MPI_Win_flush_local (target_rank, window));
