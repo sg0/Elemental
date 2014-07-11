@@ -15,8 +15,12 @@ http://opensource.org/licenses/BSD-2-Clause
 #include "El-lite.hpp"
 #include <assert.h>
 
-// TODO complete the const interfaces...
+// TODO Complete the const interfaces...
 // TODO RMA related checks pending (e.g bounds checking)...
+// TODO Consider DDT
+// TODO Add disp as a parameter to MPI one sided functions?
+// TODO Use DEBUG_ONLY or something that EL provides instead of assert
+// TODO Make variable names rma friendly
 #if MPI_VERSION>=3
 namespace El
 {
@@ -106,17 +110,21 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
         GlobalArrayPut_ 	= &Z;
         toBeAttachedForPut_ 	= true;
         GlobalArrayGet_ 	= &Z;
-        toBeAttachedForGet_ 	= true;
+        toBeAttachedForGet_ 	= true;    
     }
     const Grid& g = Z.Grid();
+    const Int p = g.Size ();
+    
+    if (putVector_.size() != p)
+    {
+	getVector_.resize( p );
+	putVector_.resize( p );
+    }
+
     // do rma related checks
-    // extra for headers
     const Int numEntries = Z.LocalHeight () * Z.LocalWidth ();
-    // why numEntries+1?
-    const Int bufferSize = (numEntries+1)*sizeof(T);
-    // TODO C++ way of type casting?
-    void* baseptr = (void *)Z.Buffer ();
-    // TODO Use DEBUG_ONLY or something that EL provides
+    const Int bufferSize = numEntries * sizeof(T);
+    void* baseptr = reinterpret_cast<void*>(Z.Buffer ());
     assert(baseptr != NULL);
 
     mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
@@ -143,13 +151,18 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
         LogicError("Cannot update Global matrix.");
 
     const Grid& g = X.Grid();
+    const Int p = g.Size ();
+
+    if (putVector_.size() != p)
+    {
+	getVector_.resize( p );
+	putVector_.resize( p );
+    }
 
     //do rma related checks
-    // extra for headers
     const Int numEntries = X.LocalHeight () * X.LocalWidth ();
-    const Int bufferSize = (numEntries+1)*sizeof(T);
-
-    void* baseptr = (void *)X.LockedBuffer ();
+    const Int bufferSize = numEntries * sizeof(T);
+    void* baseptr = (void*)X.LockedBuffer ();
     assert (baseptr != NULL);
 
     mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
@@ -194,19 +207,17 @@ void RmaInterface<T>::Put( T alpha, Matrix<T>& Z, Int i, Int j )
         const Int rowShift = Shift( receivingCol, rowAlign, c );
         const Int localHeight = Length( height, colShift, r );
         const Int localWidth = Length( width, rowShift, c );
-        const Int numEntries = localHeight*localWidth;
+        const Int numEntries = localHeight * localWidth;
 
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-            const Int bufferSize = (numEntries+1)*sizeof(T);
+            const Int bufferSize = numEntries*sizeof(T);
             // Pack the header
-            // make variable names rma friendly
 
-            putVector_.resize( bufferSize );
-            byte* sendBuffer = putVector_.data();
+            putVector_[destination].resize( bufferSize );
+            byte* sendBuffer = putVector_[destination].data();
             // Pack the payload
-            // consider ddt here
             T* sendData = reinterpret_cast<T *>(sendBuffer);
             const T* XBuffer = Y.Buffer();
             const Int XLDim = Y.LDim();
@@ -217,15 +228,14 @@ void RmaInterface<T>::Put( T alpha, Matrix<T>& Z, Int i, Int j )
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
             }
-	    //TODO add disp as a parameter?
             mpi::Iput (sendBuffer, bufferSize, destination, bufferSize, window);
-        }
+       	    // clear
+	    putVector_[destination].resize (0);
+	}
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
     }
-    // Free the memory for the put buffer
-    putVector_.clear();
 }
 
 template<typename T>
@@ -274,15 +284,15 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
         const Int rowShift = Shift( receivingCol, rowAlign, c );
         const Int localHeight = Length( height, colShift, r );
         const Int localWidth = Length( width, rowShift, c );
-        const Int numEntries = localHeight*localWidth;
+        const Int numEntries = localHeight * localWidth;
 
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-            const Int bufferSize = (numEntries+1)*sizeof(T);
+            const Int bufferSize = numEntries * sizeof(T);
 
-            getVector_.resize (bufferSize);
-            byte *getBuffer = getVector_.data ();
+            getVector_[destination].resize (bufferSize);
+            byte *getBuffer = getVector_[destination].data ();
 
             mpi::Iget (getBuffer, bufferSize, destination, bufferSize, window);
             //do we need flush here?
@@ -305,13 +315,13 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
                 for (Int s = 0; s < localHeight; ++s)
                     YCol[s] = XCol[s];
             }
+	    // clear
+	    getVector_[destination].resize (0);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
     }
-    // Free the memory for the get buffer
-    getVector_.clear();
 }
 
 // TODO will deal with const interfaces later
@@ -348,52 +358,55 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, mpi::Op &op, Int i, Int j )
     const Int colAlign = (Y.ColAlign() + i) % r;
     const Int rowAlign = (Y.RowAlign() + j) % c;
 
-    // local width and height
-    const Int height = Z.Height();
-    const Int width = Z.Width();
+    // global matrix width and height
+    const Int height = Y.Height();
+    const Int width = Y.Width();
 
-    // put local matrix cells in
-    // correct places in global array
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
+
     for( Int step=0; step<p; ++step )
     {
         const Int colShift = Shift( receivingRow, colAlign, r );
         const Int rowShift = Shift( receivingCol, rowAlign, c );
+	// number of entries in my PE
         const Int localHeight = Length( height, colShift, r );
         const Int localWidth = Length( width, rowShift, c );
-        const Int numEntries = localHeight*localWidth;
+        const Int numEntries = localHeight * localWidth;
 
 	if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-            const Int bufferSize = (numEntries+1)*sizeof(T);
-            // Pack the header
-            // make variable names rma friendly
-            putVector_.resize( bufferSize );
-            byte* sendBuffer = putVector_.data();
+            const Int bufferSize = numEntries * sizeof(T);
             
-	    // consider ddt here
-            T* sendData = reinterpret_cast<T *>(sendBuffer);
-            T* XBuffer = Z.Buffer();
+	    putVector_[destination].resize( bufferSize );
+            byte* sendBuffer = putVector_[destination].data();
+            T* sendData = reinterpret_cast<T*>(sendBuffer);
+            const T* XBuffer = Z.LockedBuffer();
             const Int XLDim = Z.LDim();
 	    // src*alpha
-	    for( Int t=0; t<localWidth; ++t )
+            for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendData[t*localHeight];
                 const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
                 for( Int s=0; s<localHeight; ++s )
-                    thisSendCol[s] += alpha*thisXCol[colShift+s*r];
+                    thisSendCol[s] = alpha*thisXCol[colShift+s*r];
             }
-	    
-            mpi::Iacc (sendBuffer, bufferSize, destination, bufferSize, op, window);
-	    }
-        receivingRow = (receivingRow + 1) % r;
+	   /*
+	    MPI_Accumulate
+             (sendBuffer, bufferSize,
+              MPI_BYTE, destination, 1, //Z.LDim () * sizeof(T),
+              bufferSize, MPI_BYTE, op.op,
+              window);   
+	      */
+	mpi::Iacc (sendBuffer, bufferSize, destination, bufferSize, op, window);
+        // clear
+        putVector_[destination].resize (0);
+	}
+	receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
     }
-    // Free the memory for the put buffer
-    putVector_.clear();
 }
 
 template<typename T>

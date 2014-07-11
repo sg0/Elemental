@@ -49,7 +49,12 @@ public:
 
 private:
     mpi::Window window;
-    std::vector<byte> getVector_, putVector_;
+
+    //std::vector<std::deque<std::vector<byte>>>
+    //    getVector_, putVector_;
+   std::vector<std::vector<byte>>
+        getVector_, putVector_;
+
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     const DistMatrix<T,MC,MR>* GlobalArrayGet_;
     bool toBeAttachedForPut_, toBeAttachedForGet_, 

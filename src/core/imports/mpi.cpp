@@ -515,6 +515,7 @@ void Iput (void *source, int source_size, int target_rank,
 	      target_rank, 1, (MPI_Aint) target_size,
 	      MPI_BYTE, window));
 #endif
+    SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
 void Rput (void *source, int source_size, int target_rank,
@@ -533,6 +534,7 @@ void Rput (void *source, int source_size, int target_rank,
               target_rank, 1, (MPI_Aint) target_size,
               MPI_BYTE, window, &request));
 #endif
+    SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
 void Iget (void *source, int source_size, int target_rank,
@@ -551,6 +553,7 @@ void Iget (void *source, int source_size, int target_rank,
               target_rank, 1, (MPI_Aint) target_size,
               MPI_BYTE, window));
 #endif
+    SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
 void Rget (void *source, int source_size, int target_rank,
@@ -570,6 +573,7 @@ void Rget (void *source, int source_size, int target_rank,
               target_rank, 1, (MPI_Aint) target_size,
               MPI_BYTE, window, &request));
 #endif
+    SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
 void Iacc (void *source, int source_size, int target_rank,
@@ -581,6 +585,7 @@ void Iacc (void *source, int source_size, int target_rank,
               MPI_BYTE, target_rank, 1,
               (MPI_Aint) target_size, MPI_BYTE, op.op,
               window));
+    SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
 void Racc (void *source, int source_size, int target_rank,
@@ -593,6 +598,7 @@ void Racc (void *source, int source_size, int target_rank,
               MPI_BYTE, target_rank, 1,
               (MPI_Aint) target_size, MPI_BYTE, op.op,
               window, &request));
+    SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
 void Flush (int target_rank, Window & window)
