@@ -281,6 +281,9 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 
     const Int colAlign = (X.ColAlign() + i) % r;
     const Int rowAlign = (X.RowAlign() + j) % c;
+    
+    const Int iLocalOffset = Length (i, X.ColShift (), r);
+    const Int jLocalOffset = Length (j, X.RowShift (), c);
 
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
@@ -292,7 +295,7 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
         const Int localHeight = Length( height, colShift, r );
         const Int localWidth = Length( width, rowShift, c );
         const Int numEntries = localHeight * localWidth;
-
+   
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
@@ -301,16 +304,6 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
             getVector_[destination].resize (bufferSize);
             byte *getBuffer = getVector_[destination].data ();
 	    
-            const Int colAlign = (X.ColAlign () + i) % r;
-            const Int rowAlign = (X.RowAlign () + j) % c;
-            const Int colShift = Shift (myRow, colAlign, r);
-            const Int rowShift = Shift (myCol, rowAlign, c);
-
-            const Int localHeight = Length (height, colShift, r);
-            const Int localWidth = Length (width, rowShift, c);
-            const Int iLocalOffset = Length (i, X.ColShift (), r);
-            const Int jLocalOffset = Length (j, X.RowShift (), c);
-
 	    // get
 	    for( Int t=0; t<localWidth; ++t )
 	    {
