@@ -224,9 +224,15 @@ void Rget( void *source, int source_size, int target_rank,
 	Aint disp, int target_size, Window& window, 
 	Request& request);
 void Iacc( void *source, int source_size, int target_rank,
-           Aint disp, int target_size, Op & op, Window & window);
+           Aint disp, int target_size, Op op, Window & window);
 void Racc( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Op &op, Window& window, 
+	Aint disp, int target_size, Op op, Window& window, 
+	Request& request);
+// use mpi::SUM
+void Iacc( void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Window & window);
+void Racc( void *source, int source_size, int target_rank, 
+	Aint disp, int target_size, Window& window, 
 	Request& request);
 // no local flush
 void Iput_nolocalflush( void *source, int source_size, int target_rank, 
@@ -240,11 +246,16 @@ void Rget_nolocalflush( void *source, int source_size, int target_rank,
 	Aint disp, int target_size, Window& window, 
 	Request& request);
 void Iacc_nolocalflush( void *source, int source_size, int target_rank,
-           Aint disp, int target_size, Op & op, Window & window);
+           Aint disp, int target_size, Op op, Window & window);
 void Racc_nolocalflush( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Op &op, Window& window, 
+	Aint disp, int target_size, Op op, Window& window, 
 	Request& request);
-
+// use mpi::SUM
+void Iacc_nolocalflush( void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Window & window);
+void Racc_nolocalflush( void *source, int source_size, int target_rank, 
+	Aint disp, int target_size, Window& window, 
+	Request& request);
 // Synchronization
 void Flush( int target_rank, Window& window );
 void Flush(Window & window);

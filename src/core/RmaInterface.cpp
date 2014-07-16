@@ -345,7 +345,7 @@ void RmaInterface<T>::Get( const Matrix<T>& Z, Int i, Int j )
 // scaled accumulate = Update Y(i:i+height-1,j:j+width-1) += alpha X, 
 // where X is height x width
 template<typename T>
-void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, mpi::Op &op, Int i, Int j )
+void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Acc"))
 
@@ -408,7 +408,7 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, mpi::Op &op, Int i, Int j )
 		// acc
 		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * Y.LDim ()) * sizeof(T);
 		mpi::Iacc_nolocalflush (reinterpret_cast<void*>(sendBuffer + t*localHeight*sizeof(T)), 
-			localHeight * sizeof(T), destination, disp, localHeight * sizeof(T), op, window);	    
+			localHeight * sizeof(T), destination, disp, localHeight * sizeof(T), window);	    
 	    }
 	    // local flush, okay to clear buffers after this
 	    mpi::FlushLocal (destination, window);
@@ -422,7 +422,7 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, mpi::Op &op, Int i, Int j )
 }
 
 template<typename T>
-void RmaInterface<T>::Acc( T alpha, const Matrix<T>& Z, mpi::Op &op, Int i, Int j )
+void RmaInterface<T>::Acc( T alpha, const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Acc"))
 }

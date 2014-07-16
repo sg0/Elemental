@@ -37,8 +37,8 @@ public:
     void Get(       Matrix<T>& Z, Int i, Int j );
     void Get( const Matrix<T>& Z, Int i, Int j );
 
-    void Acc( T alpha,      Matrix<T>& Z, mpi::Op &op, Int i, Int j );
-    void Acc( T alpha, const Matrix<T>& Z, mpi::Op &op, Int i, Int j );
+    void Acc( T alpha,      Matrix<T>& Z, Int i, Int j );
+    void Acc( T alpha, const Matrix<T>& Z, Int i, Int j );
 
     void Flush( Matrix<T>& Z, Int i, Int j );
     void Flush( const Matrix<T>& Z, Int i, Int j );

@@ -571,9 +571,32 @@ void Rget_nolocalflush (void *source, int source_size, int target_rank,
               MPI_BYTE, window, &request));
 #endif
 }
+// use mpi::SUM by default
+void Iacc_nolocalflush (void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
+    SafeMpi (MPI_Accumulate
+             (source, (MPI_Aint) source_size,
+              MPI_BYTE, target_rank, disp,
+              (MPI_Aint) target_size, MPI_BYTE, MPI_SUM,
+              window));
+}
+
+void Racc_nolocalflush (void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Window & window,
+           Request & request)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Raccumulate"))
+    SafeMpi (MPI_Raccumulate
+             (source, (MPI_Aint) source_size,
+              MPI_BYTE, target_rank, disp,
+              (MPI_Aint) target_size, MPI_BYTE, MPI_SUM,
+              window, &request));
+}
 
 void Iacc_nolocalflush (void *source, int source_size, int target_rank,
-           Aint disp, int target_size, Op & op, Window & window)
+           Aint disp, int target_size, Op op, Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
     SafeMpi (MPI_Accumulate
@@ -584,7 +607,7 @@ void Iacc_nolocalflush (void *source, int source_size, int target_rank,
 }
 
 void Racc_nolocalflush (void *source, int source_size, int target_rank,
-           Aint disp, int target_size, Op & op, Window & window,
+           Aint disp, int target_size, Op op, Window & window,
            Request & request)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Raccumulate"))
@@ -684,7 +707,7 @@ void Rget (void *source, int source_size, int target_rank,
 }
 
 void Iacc (void *source, int source_size, int target_rank,
-           Aint disp, int target_size, Op & op, Window & window)
+           Aint disp, int target_size, Op op, Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
     SafeMpi (MPI_Accumulate
@@ -696,7 +719,7 @@ void Iacc (void *source, int source_size, int target_rank,
 }
 
 void Racc (void *source, int source_size, int target_rank,
-           Aint disp, int target_size, Op & op, Window & window,
+           Aint disp, int target_size, Op op, Window & window,
            Request & request)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Raccumulate"))
