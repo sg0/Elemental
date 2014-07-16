@@ -310,7 +310,6 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * X.LDim ()) * sizeof(T);
 		mpi::Iget_nolocalflush (reinterpret_cast<void*>(getBuffer + t*localHeight*sizeof(T)), 
 			localHeight * sizeof(T), destination, disp, localHeight * sizeof(T), window);	    
-
 	    }
 	    // no difference between localflush 
 	    // and flush for Get
@@ -371,7 +370,10 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, Int i, Int j )
     // local matrix width and height
     const Int height = Z.Height();
     const Int width = Z.Width();
-
+	
+    const Int iLocalOffset = Length( i, Y.ColShift (), r );
+    const Int jLocalOffset = Length( j, Y.RowShift (), c );
+    
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
 
@@ -383,9 +385,7 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, Int i, Int j )
 	const Int localHeight = Length( height, colShift, r );
 	const Int localWidth = Length( width, rowShift, c );
 	const Int numEntries = localHeight * localWidth;
-	// each PEs offset is different
-	const Int iLocalOffset = Length( i, Y.ColShift (), r );
-	const Int jLocalOffset = Length( j, Y.RowShift (), c );
+	
 	if( numEntries != 0 )
 	{
 	    const Int destination = receivingRow + r*receivingCol;
@@ -396,19 +396,25 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, Int i, Int j )
 	    T* sendData = reinterpret_cast<T*>(sendBuffer);
 	    const T* XBuffer = Z.LockedBuffer();
 
+	    //src *= scale
 	    for( Int t=0; t<localWidth; ++t )
 	    {
 		T* thisSendCol = &sendData[t*localHeight];
 		const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
 		for( Int s=0; s<localHeight; ++s )
 		    thisSendCol[s] = alpha*thisXCol[colShift+s*r];
-		// acc
+	    }
+	    // acc
+	    for( Int t=0; t<localWidth; ++t )
+	    {
 		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * Y.LDim ()) * sizeof(T);
-		mpi::Iput_nolocalflush (reinterpret_cast<void*>(sendBuffer + t*localHeight*sizeof(T)), 
+		//mpi::Iacc_nolocalflush (reinterpret_cast<void*>(sendBuffer + t*localHeight*sizeof(T)), 
+		//	localHeight * sizeof(T), destination, disp, localHeight * sizeof(T), window);	    
+		mpi::Iacc (reinterpret_cast<void*>(sendBuffer + t*localHeight*sizeof(T)), 
 			localHeight * sizeof(T), destination, disp, localHeight * sizeof(T), window);	    
 	    }
 	    // local flush, okay to clear buffers after this
-	    mpi::FlushLocal (destination, window);
+	    //mpi::FlushLocal (destination, window);
 	    // clear
 	    putVector_[destination].resize (0);
 	}

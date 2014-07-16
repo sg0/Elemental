@@ -37,11 +37,6 @@ namespace mpi {
 #define EL_USE_NONBLOCKING_CONSENSUS
 #endif
 
-// TODO Give this a better name    
-#ifndef EL_PREFER_WAIT_OVER_TEST
-#define EL_PREFER_WAIT_OVER_TEST
-#endif    
-
 // Experimental MPI performance enhancers
 #ifndef EL_MPI_EXPERIMENTAL
 #define EL_MPI_EXPERIMENTAL

@@ -731,6 +731,31 @@ void Racc (void *source, int source_size, int target_rank,
     SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
+void Iacc (void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
+    SafeMpi (MPI_Accumulate
+             (source, (MPI_Aint) source_size,
+              MPI_BYTE, target_rank, disp,
+              (MPI_Aint) target_size, MPI_BYTE, MPI_SUM,
+              window));
+    SafeMpi (MPI_Win_flush_local (target_rank, window));
+}
+
+void Racc (void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Window & window,
+           Request & request)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Raccumulate"))
+    SafeMpi (MPI_Raccumulate
+             (source, (MPI_Aint) source_size,
+              MPI_BYTE, target_rank, disp,
+              (MPI_Aint) target_size, MPI_BYTE, MPI_SUM,
+              window, &request));
+    SafeMpi (MPI_Win_flush_local (target_rank, window));
+}
+
 void FlushLocal (int target_rank, Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::FlushLocal"))
