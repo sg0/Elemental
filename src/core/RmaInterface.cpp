@@ -129,6 +129,7 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
 
     mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
     mpi::WindowLock (window);
+    mpi::Barrier (g.VCComm ());
 }
 
 template<typename T>
@@ -167,6 +168,7 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 
     mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
     mpi::WindowLock (window);
+    mpi::Barrier (g.VCComm ());
 }
 
 template<typename T>
@@ -333,7 +335,8 @@ void RmaInterface<T>::Get( const Matrix<T>& Z, Int i, Int j )
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Get"))
 }
 
-// scaled accumulate - dst = dst + alpha*src
+// scaled accumulate = Update Y(i:i+height-1,j:j+width-1) += alpha X, 
+// where X is height x width
 template<typename T>
 void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, mpi::Op &op, Int i, Int j )
 {
@@ -359,50 +362,57 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, mpi::Op &op, Int i, Int j )
     const Int myProcessCol = g.Col();
     const Int colAlign = (Y.ColAlign() + i) % r;
     const Int rowAlign = (Y.RowAlign() + j) % c;
-
-    // global matrix width and height
-    const Int height = Y.Height();
-    const Int width = Y.Width();
+ 
+    const Int XLDim = Z.LDim();	    
+    // local matrix width and height
+    const Int height = Z.Height();
+    const Int width = Z.Width();
 
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
 
     for( Int step=0; step<p; ++step )
     {
-        const Int colShift = Shift( receivingRow, colAlign, r );
-        const Int rowShift = Shift( receivingCol, rowAlign, c );
+	const Int colShift = Shift( receivingRow, colAlign, r );
+	const Int rowShift = Shift( receivingCol, rowAlign, c );
 	// number of entries in my PE
-        const Int localHeight = Length( height, colShift, r );
-        const Int localWidth = Length( width, rowShift, c );
-        const Int numEntries = localHeight * localWidth;
-
+	const Int localHeight = Length( height, colShift, r );
+	const Int localWidth = Length( width, rowShift, c );
+	const Int numEntries = localHeight * localWidth;
+	// each PEs offset is different
+	const Int iLocalOffset = Length( i, Y.ColShift (), r );
+	const Int jLocalOffset = Length( j, Y.RowShift (), c );
 	if( numEntries != 0 )
-        {
-            const Int destination = receivingRow + r*receivingCol;
-            const Int bufferSize = numEntries * sizeof(T);
-            
+	{
+	    const Int destination = receivingRow + r*receivingCol;
+	    const Int bufferSize = numEntries * sizeof(T);
+
 	    putVector_[destination].resize( bufferSize );
-            byte* sendBuffer = putVector_[destination].data();
-            T* sendData = reinterpret_cast<T*>(sendBuffer);
-            const T* XBuffer = Z.LockedBuffer();
-            const Int XLDim = Z.LDim();
-	    // src*alpha
-            for( Int t=0; t<localWidth; ++t )
-            {
-                T* thisSendCol = &sendData[t*localHeight];
-                const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
-                for( Int s=0; s<localHeight; ++s )
-                    thisSendCol[s] = alpha*thisXCol[colShift+s*r];
-            }
-    
-	mpi::Aint disp = XLDim * sizeof(T);
-	mpi::Iacc (sendBuffer, bufferSize, destination, disp, bufferSize, op, window);
-        // clear
-        putVector_[destination].resize (0);
+	    byte* sendBuffer = putVector_[destination].data();
+	    T* sendData = reinterpret_cast<T*>(sendBuffer);
+	    const T* XBuffer = Z.LockedBuffer();
+
+	    for( Int t=0; t<localWidth; ++t )
+	    {
+		T* thisSendCol = &sendData[t*localHeight];
+		const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
+		for( Int s=0; s<localHeight; ++s )
+		    thisSendCol[s] = alpha*thisXCol[colShift+s*r];
+	    }
+
+	    //TODO change this to Iacc
+	    for( Int t=0; t<localWidth; ++t )
+	    {
+		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * Y.LDim ()) * sizeof(T);
+		mpi::Iput (reinterpret_cast<void*>(sendBuffer + t*localHeight*sizeof(T)), localHeight * sizeof(T), 
+			destination, disp, localHeight * sizeof(T), window);	    
+	    }
+	    // clear
+	    putVector_[destination].resize (0);
 	}
 	receivingRow = (receivingRow + 1) % r;
-        if( receivingRow == 0 )
-            receivingCol = (receivingCol + 1) % c;
+	if( receivingRow == 0 )
+	    receivingCol = (receivingCol + 1) % c;
     }
 }
 
@@ -432,8 +442,8 @@ void RmaInterface<T>::Flush( Matrix<T>& Z, Int i, Int j )
     const Int rowAlign = (Y.RowAlign() + j) % c;
 
     // local width and height
-    const Int height = Z.Height();
-    const Int width = Z.Width();
+    const Int height = Y.Height();
+    const Int width = Y.Width();
 
     // find destination
     Int receivingRow = myProcessRow;
@@ -478,8 +488,8 @@ void RmaInterface<T>::Flush( const Matrix<T>& Z, Int i, Int j )
     const Int rowAlign = (Y.RowAlign() + j) % c;
 
     // local width and height
-    const Int height = Z.Height();
-    const Int width = Z.Width();
+    const Int height = Y.Height();
+    const Int width = Y.Width();
 
     // find destination
     Int receivingRow = myProcessRow;
