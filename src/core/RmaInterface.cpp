@@ -300,12 +300,8 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 
             getVector_[destination].resize (bufferSize);
             byte *getBuffer = getVector_[destination].data ();
-
-	    mpi::Aint disp = X.LDim () * sizeof(T);
-            mpi::Iget (getBuffer, bufferSize, destination, disp, bufferSize, window);
-            //do we need flush here?
-            // Update Y
-            const T *XBuffer = reinterpret_cast<const T*>(getBuffer);
+	    
+	    const T *XBuffer = reinterpret_cast<const T*>(getBuffer);
             const Int colAlign = (X.ColAlign () + i) % r;
             const Int rowAlign = (X.RowAlign () + j) % c;
             const Int colShift = Shift (myRow, colAlign, r);
@@ -316,13 +312,21 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
             const Int iLocalOffset = Length (i, X.ColShift (), r);
             const Int jLocalOffset = Length (j, X.RowShift (), c);
 
-            for (Int t = 0; t < localWidth; ++t)
-            {
-                T *YCol = Z.Buffer (iLocalOffset, jLocalOffset + t);
+	    for( Int t=0; t<localWidth; ++t )
+	    {
+		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * X.LDim ()) * sizeof(T);
+		// get
+		mpi::Iget_nolocalflush (reinterpret_cast<void*>(getBuffer + t*localHeight*sizeof(T)), 
+			localHeight * sizeof(T), destination, disp, localHeight * sizeof(T), window);	    
+		// update local matrix 
+		T *YCol = Z.Buffer (iLocalOffset, jLocalOffset + t);
                 const T *XCol = &XBuffer[t * localHeight];
                 for (Int s = 0; s < localHeight; ++s)
                     YCol[s] = XCol[s];
-            }
+	    }
+            // no difference between localflush 
+	    // and flush for Get
+	    mpi::FlushLocal (destination, window);
 	    // clear
 	    getVector_[destination].resize (0);
         }
@@ -332,7 +336,6 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
     }
 }
 
-// TODO will deal with const interfaces later
 template<typename T>
 void RmaInterface<T>::Get( const Matrix<T>& Z, Int i, Int j )
 {
