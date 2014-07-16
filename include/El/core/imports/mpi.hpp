@@ -212,6 +212,7 @@ void WindowUnlock( Window& window );
 void WindowCreate( void* baseptr, int size, Comm comm, Window& window );
 void WindowFree (Window & window);
 // One-sided operations
+// local flush present
 void Iput( void *source, int source_size, int target_rank, 
 	Aint disp, int target_size, Window& window);
 void Rput( void *source, int source_size, int target_rank, 
@@ -227,9 +228,28 @@ void Iacc( void *source, int source_size, int target_rank,
 void Racc( void *source, int source_size, int target_rank, 
 	Aint disp, int target_size, Op &op, Window& window, 
 	Request& request);
+// no local flush
+void Iput_nolocalflush( void *source, int source_size, int target_rank, 
+	Aint disp, int target_size, Window& window);
+void Rput_nolocalflush( void *source, int source_size, int target_rank, 
+	Aint disp, int target_size, Window& window, 
+	Request& request);
+void Iget_nolocalflush( void *source, int source_size, int target_rank, 
+	Aint disp, int target_size, Window& window);
+void Rget_nolocalflush( void *source, int source_size, int target_rank, 
+	Aint disp, int target_size, Window& window, 
+	Request& request);
+void Iacc_nolocalflush( void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Op & op, Window & window);
+void Racc_nolocalflush( void *source, int source_size, int target_rank, 
+	Aint disp, int target_size, Op &op, Window& window, 
+	Request& request);
+
 // Synchronization
 void Flush( int target_rank, Window& window );
-void Flush (Window & window);
+void Flush(Window & window);
+void FlushLocal( int target_rank, Window& window );
+void FlushLocal(Window & window);
 #endif
 
 // Utilities

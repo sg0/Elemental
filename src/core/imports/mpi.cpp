@@ -500,6 +500,113 @@ void WindowFree (Window & window)
 	SafeMpi (MPI_Win_free (&window));
 }
 
+void Iput_nolocalflush (void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iput"))
+#ifdef EL_ENSURE_PUT_ATOMICITY
+    SafeMpi (MPI_Accumulate
+             (source, (MPI_Aint) source_size, MPI_BYTE,
+              target_rank, disp, (MPI_Aint) target_size,
+              MPI_BYTE, MPI_REPLACE, window));
+#else
+    SafeMpi (MPI_Put
+             (source, (MPI_Aint) source_size, MPI_BYTE,
+	      target_rank, disp, (MPI_Aint) target_size,
+	      MPI_BYTE, window));
+#endif
+}
+
+void Rput_nolocalflush (void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Window & window,
+           Request & request)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Rput"))
+#ifdef EL_ENSURE_PUT_ATOMICITY
+    SafeMpi (MPI_Raccumulate
+             (source, (MPI_Aint) source_size, MPI_BYTE,
+              target_rank, disp, (MPI_Aint) target_size,
+              MPI_BYTE, MPI_REPLACE, window, &request));
+#else
+    SafeMpi (MPI_Rput
+             (source, (MPI_Aint) source_size, MPI_BYTE,
+              target_rank, disp, (MPI_Aint) target_size,
+              MPI_BYTE, window, &request));
+#endif
+}
+
+void Iget_nolocalflush (void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iget"))
+#ifdef EL_ENSURE_GET_ATOMICITY
+    SafeMpi (MPI_Get_accumulate
+             (NULL, 0, MPI_BYTE, source,
+              (MPI_Aint) source_size, MPI_BYTE,
+              target_rank, disp, (MPI_Aint) target_size,
+              MPI_BYTE, MPI_NO_OP, window));
+#else
+    SafeMpi (MPI_Get
+             (source, (MPI_Aint) source_size, MPI_BYTE,
+              target_rank, disp, (MPI_Aint) target_size,
+              MPI_BYTE, window));
+#endif
+}
+
+void Rget_nolocalflush (void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Window & window,
+           Request & request)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Rget"))
+#ifdef EL_ENSURE_GET_ATOMICITY
+    SafeMpi (MPI_Rget_accumulate
+             (NULL, 0, MPI_BYTE, source,
+              (MPI_Aint) source_size, MPI_BYTE,
+              target_rank, disp, (MPI_Aint) target_size,
+              MPI_BYTE, MPI_NO_OP, window, &request));
+#else
+    SafeMpi (MPI_Rget
+             (source, (MPI_Aint) source_size, MPI_BYTE,
+              target_rank, disp, (MPI_Aint) target_size,
+              MPI_BYTE, window, &request));
+#endif
+}
+
+void Iacc_nolocalflush (void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Op & op, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
+    SafeMpi (MPI_Accumulate
+             (source, (MPI_Aint) source_size,
+              MPI_BYTE, target_rank, disp,
+              (MPI_Aint) target_size, MPI_BYTE, op.op,
+              window));
+}
+
+void Racc_nolocalflush (void *source, int source_size, int target_rank,
+           Aint disp, int target_size, Op & op, Window & window,
+           Request & request)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Raccumulate"))
+    SafeMpi (MPI_Raccumulate
+             (source, (MPI_Aint) source_size,
+              MPI_BYTE, target_rank, disp,
+              (MPI_Aint) target_size, MPI_BYTE, op.op,
+              window, &request));
+}
+
+void Flush (int target_rank, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Flush"))
+    SafeMpi (MPI_Win_flush (target_rank, window));
+}
+
+void Flush (Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Flush"))
+    SafeMpi (MPI_Win_flush_all (window));
+}
+
 void Iput (void *source, int source_size, int target_rank,
            Aint disp, int target_size, Window & window)
 {
@@ -601,17 +708,18 @@ void Racc (void *source, int source_size, int target_rank,
     SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
-void Flush (int target_rank, Window & window)
+void FlushLocal (int target_rank, Window & window)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Flush"))
-    SafeMpi (MPI_Win_flush (target_rank, window));
+    DEBUG_ONLY (CallStackEntry cse ("mpi::FlushLocal"))
+    SafeMpi (MPI_Win_flush_local (target_rank, window));
 }
 
-void Flush (Window & window)
+void FlushLocal (Window & window)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Flush"))
-    SafeMpi (MPI_Win_flush_all (window));
+    DEBUG_ONLY (CallStackEntry cse ("mpi::FlushLocal"))
+    SafeMpi (MPI_Win_flush_local_all (window));
 }
+
 #endif
 
 // Various utilities
