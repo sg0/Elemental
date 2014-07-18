@@ -192,7 +192,8 @@ void Translate
 ( Comm origComm, int size, const int* origRanks, 
   Comm newComm,                  int* newRanks );
 
-//MPI-3 one-sided
+// MPI-3 one-sided
+// ===============
 #if MPI_VERSION>=3
 // Utilities
 void SetWindowProp (Window& window, int prop);
@@ -207,55 +208,83 @@ void WindowUnlock( Window& window );
 void WindowCreate( void* baseptr, int size, Comm comm, Window& window );
 void WindowFree (Window & window);
 // One-sided operations
-// local flush present
-void Iput( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Window& window);
-void Rput( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Window& window, 
-	Request& request);
-void Iget( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Window& window);
-void Rget( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Window& window, 
-	Request& request);
-void Iacc( void *source, int source_size, int target_rank,
-           Aint disp, int target_size, Op op, Window & window);
-void Racc( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Op op, Window& window, 
-	Request& request);
-// use mpi::SUM
-void Iacc( void *source, int source_size, int target_rank,
-           Aint disp, int target_size, Window & window);
-void Racc( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Window& window, 
-	Request& request);
-// no local flush
-void Iput_nolocalflush( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Window& window);
-void Rput_nolocalflush( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Window& window, 
-	Request& request);
-void Iget_nolocalflush( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Window& window);
-void Rget_nolocalflush( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Window& window, 
-	Request& request);
-void Iacc_nolocalflush( void *source, int source_size, int target_rank,
-           Aint disp, int target_size, Op op, Window & window);
-void Racc_nolocalflush( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Op op, Window& window, 
-	Request& request);
-// use mpi::SUM
-void Iacc_nolocalflush( void *source, int source_size, int target_rank,
-           Aint disp, int target_size, Window & window);
-void Racc_nolocalflush( void *source, int source_size, int target_rank, 
-	Aint disp, int target_size, Window& window, 
-	Request& request);
+// --------------------
+// put
+// ---
+template<typename R>
+void Iput (const R* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window);
+template<typename R>
+void Iput (const Complex<R>* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window);
+template<typename R>
+void Rput (const R* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window, 
+	   Request & request);
+template<typename R>
+void Rput (const Complex<R>* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window, 
+	   Request & request);
+template<typename T>
+void Iput( T source, int target_rank, Aint disp, Window& window );
+template<typename T>
+void Rput( T source, int target_rank, Aint disp, 
+	Window& window, Request& request );
+// get
+// ---
+template<typename R>
+void Iget (const R* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window);
+template<typename R>
+void Iget (const Complex<R>* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window);
+template<typename R>
+void Rget (const R* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window, 
+	   Request & request);
+template<typename R>
+void Rget (const Complex<R>* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window, 
+	   Request & request);
+template<typename T>
+void Iget( T source, int target_rank, Aint disp, Window& window );
+template<typename T>
+void Rget( T source, int target_rank, Aint disp, 
+	Window& window, Request& request );
+// acc
+// ---
+template<typename R>
+void Iacc (const R* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Op op, Window & window);
+template<typename R>
+void Iacc (const Complex<R>* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Op op, Window & window);
+template<typename R>
+void Racc (const R* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Op op, Window & window,
+           Request & request);
+template<typename R>
+void Racc (const Complex<R>* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Op op, Window & window,
+           Request & request);
+template<typename R>
+void Iacc (const R* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window);
+template<typename R>
+void Racc (const R* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window,
+           Request & request);
+template<typename T>
+void Iacc (const T source, int target_rank, Aint disp, Window & window);
+template<typename T>
+void Racc (const T source, int target_rank, Aint disp, Window & window,
+           Request & request);
 // Synchronization
+// ---------------
 void Flush( int target_rank, Window& window );
-void Flush(Window & window);
+void Flush( Window & window );
 void FlushLocal( int target_rank, Window& window );
-void FlushLocal(Window & window);
+void FlushLocal( Window & window );
 #endif
 
 // Utilities

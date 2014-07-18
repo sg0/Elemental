@@ -162,7 +162,7 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
     //do rma related checks
     const Int numEntries = X.LocalHeight () * X.LocalWidth ();
     const Int bufferSize = numEntries * sizeof(T);
-    void* baseptr = (void*)X.LockedBuffer ();
+    void* baseptr = (void*)(X.LockedBuffer ());
     assert (baseptr != NULL);
 
     mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
@@ -170,7 +170,7 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 }
 
 template<typename T>
-void RmaInterface<T>::Put( T alpha, Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Put( T scale, Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Put"))
 
@@ -203,6 +203,8 @@ void RmaInterface<T>::Put( T alpha, Matrix<T>& Z, Int i, Int j )
 
     const Int iLocalOffset = Length( i, Y.ColShift (), r );
     const Int jLocalOffset = Length( j, Y.RowShift (), c );
+	    
+    const Int YLDim = Y.LDim ();
 
     for( Int step=0; step<p; ++step )
     {
@@ -228,11 +230,11 @@ void RmaInterface<T>::Put( T alpha, Matrix<T>& Z, Int i, Int j )
 		T* thisSendCol = &sendData[t*localHeight];
 		const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
 		for( Int s=0; s<localHeight; ++s )
-		    thisSendCol[s] = alpha*thisXCol[colShift+s*r];
+		    thisSendCol[s] = scale*thisXCol[colShift+s*r];
 		// put
-		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * Y.LDim ()) * sizeof(T);
-		mpi::Iput_nolocalflush (reinterpret_cast<void*>(sendBuffer + t*localHeight*sizeof(T)), 
-			localHeight * sizeof(T), destination, disp, localHeight * sizeof(T), window);	    
+		mpi::Aint disp =  iLocalOffset + (jLocalOffset+t) * YLDim;
+		mpi::Iput ((sendBuffer + t*localHeight), localHeight, 
+			destination, disp, localHeight, window);	    
 	    }
 	    // local flush, okay to clear buffers after this
 	    mpi::FlushLocal (destination, window);
@@ -246,7 +248,7 @@ void RmaInterface<T>::Put( T alpha, Matrix<T>& Z, Int i, Int j )
 }
 
 template<typename T>
-void RmaInterface<T>::Put( T alpha, const Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Put( T scale, const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Put"))
 }
@@ -284,6 +286,8 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
     
     const Int iLocalOffset = Length (i, X.ColShift (), r);
     const Int jLocalOffset = Length (j, X.RowShift (), c);
+	    
+    const Int XLDim = X.LDim ();
 
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
@@ -307,9 +311,9 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 	    // get
 	    for( Int t=0; t<localWidth; ++t )
 	    {
-		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * X.LDim ()) * sizeof(T);
-		mpi::Iget_nolocalflush (reinterpret_cast<void*>(getBuffer + t*localHeight*sizeof(T)), 
-			localHeight * sizeof(T), destination, disp, localHeight * sizeof(T), window);	    
+		mpi::Aint disp =  iLocalOffset + (jLocalOffset+t) * XLDim;
+		mpi::Iget ((getBuffer + t*localHeight), localHeight, 
+			destination, disp, localHeight, window);	    
 	    }
 	    // no difference between localflush 
 	    // and flush for Get
@@ -338,10 +342,10 @@ void RmaInterface<T>::Get( const Matrix<T>& Z, Int i, Int j )
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Get"))
 }
 
-// scaled accumulate = Update Y(i:i+height-1,j:j+width-1) += alpha X, 
+// scaled accumulate = Update Y(i:i+height-1,j:j+width-1) += scale X, 
 // where X is height x width
 template<typename T>
-void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Acc( T scale, Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Acc"))
 
@@ -367,6 +371,7 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, Int i, Int j )
     const Int rowAlign = (Y.RowAlign() + j) % c;
  
     const Int XLDim = Z.LDim();	    
+    const Int YLDim = Y.LDim ();
     // local matrix width and height
     const Int height = Z.Height();
     const Int width = Z.Width();
@@ -402,19 +407,17 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, Int i, Int j )
 		T* thisSendCol = &sendData[t*localHeight];
 		const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
 		for( Int s=0; s<localHeight; ++s )
-		    thisSendCol[s] = alpha*thisXCol[colShift+s*r];
+		    thisSendCol[s] = scale*thisXCol[colShift+s*r];
 	    }
 	    // acc
 	    for( Int t=0; t<localWidth; ++t )
 	    {
-		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * Y.LDim ()) * sizeof(T);
-		//mpi::Iacc_nolocalflush (reinterpret_cast<void*>(sendBuffer + t*localHeight*sizeof(T)), 
-		//	localHeight * sizeof(T), destination, disp, localHeight * sizeof(T), window);	    
-		mpi::Iacc (reinterpret_cast<void*>(sendBuffer + t*localHeight*sizeof(T)), 
-			localHeight * sizeof(T), destination, disp, localHeight * sizeof(T), window);	    
+		mpi::Aint disp =  iLocalOffset + (jLocalOffset+t) * YLDim;
+		mpi::Iacc ((sendBuffer + t*localHeight), localHeight, 
+			destination, disp, localHeight, window);	    
 	    }
 	    // local flush, okay to clear buffers after this
-	    //mpi::FlushLocal (destination, window);
+	    mpi::FlushLocal (destination, window);
 	    // clear
 	    putVector_[destination].resize (0);
 	}
@@ -425,7 +428,7 @@ void RmaInterface<T>::Acc( T alpha, Matrix<T>& Z, Int i, Int j )
 }
 
 template<typename T>
-void RmaInterface<T>::Acc( T alpha, const Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Acc( T scale, const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Acc"))
 }
