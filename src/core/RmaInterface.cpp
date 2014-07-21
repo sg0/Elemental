@@ -412,8 +412,8 @@ void RmaInterface<T>::Acc( T scale, Matrix<T>& Z, Int i, Int j )
 	    // acc
 	    for( Int t=0; t<localWidth; ++t )
 	    {
-		mpi::Aint disp =  iLocalOffset + (jLocalOffset+t) * YLDim;
-		mpi::Iacc ((sendBuffer + t*localHeight), localHeight, 
+		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * YLDim) * sizeof(T);
+		mpi::Iacc ((sendBuffer + t*localHeight*sizeof(T)), localHeight, 
 			destination, disp, localHeight, window);	    
 	    }
 	    // local flush, okay to clear buffers after this

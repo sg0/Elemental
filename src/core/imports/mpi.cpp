@@ -509,12 +509,12 @@ void Iput (const R* source, int origin_count, int target_rank,
 #ifdef EL_ENSURE_PUT_ATOMICITY
     SafeMpi (MPI_Accumulate
              (const_cast<R*>(source), origin_count, TypeMap<R>(),
-              target_rank, disp*sizeof(R), target_count,
+              target_rank, disp, target_count,
               TypeMap<R>(), MPI_REPLACE, window));
 #else
     SafeMpi (MPI_Put
              (const_cast<R*>(source), origin_count, TypeMap<R>(),
-	      target_rank, disp*sizeof(R), target_count,
+	      target_rank, disp, target_count,
 	       TypeMap<R>(), window));
 #endif
 }
@@ -528,24 +528,24 @@ void Iput (const Complex<R>* source, int origin_count, int target_rank,
 #ifdef EL_AVOID_COMPLEX_MPI
     SafeMpi (MPI_Accumulate
              (const_cast<Complex<R>*>(source), 2*origin_count, TypeMap<R>(),
-              target_rank, 2*disp*sizeof(R), 2*target_count,
+              target_rank, disp, 2*target_count,
               TypeMap<R>(), MPI_REPLACE, window));
 #else
     SafeMpi (MPI_Accumulate
              (const_cast<Complex<R>*>(source), origin_count, TypeMap<Complex<R>>(),
-              target_rank, disp*sizeof(Complex<R>), target_count,
+              target_rank, disp, target_count,
               TypeMap<Complex<R>>(), MPI_REPLACE, window));
 #endif
 #else
 #ifdef EL_AVOID_COMPLEX_MPI
     SafeMpi (MPI_Put
              (const_cast<Complex<R>*>(source), 2*origin_count, TypeMap<R>(),
-	      target_rank, 2*disp*sizeof(R), 2*target_count,
+	      target_rank, disp, 2*target_count,
 	       TypeMap<R>(), window));
 #else
     SafeMpi (MPI_Put
              (const_cast<Complex<R>*>(source), origin_count, TypeMap<Complex<R>>(),
-	      target_rank, disp*sizeof(Complex<R>), target_count,
+	      target_rank, disp, target_count,
 	       TypeMap<Complex<R>>(), window));
 #endif
 #endif
@@ -560,12 +560,12 @@ void Rput (const R* source, int origin_count, int target_rank,
 #ifdef EL_ENSURE_PUT_ATOMICITY
     SafeMpi (MPI_Raccumulate
              (const_cast<R*>(source), origin_count, TypeMap<R>(),
-              target_rank, disp*sizeof(R), target_count,
+              target_rank, disp, target_count,
               TypeMap<R>(), MPI_REPLACE, window, &request));
 #else
     SafeMpi (MPI_Rput
              (const_cast<R*>(source), origin_count, TypeMap<R>(),
-	      target_rank, disp*sizeof(R), target_count,
+	      target_rank, disp, target_count,
 	       TypeMap<R>(), window, &request));
 #endif
 }
@@ -580,29 +580,28 @@ void Rput (const Complex<R>* source, int origin_count, int target_rank,
 #ifdef EL_AVOID_COMPLEX_MPI
     SafeMpi (MPI_Raccumulate
              (const_cast<Complex<R>*>(source), 2*origin_count, TypeMap<R>(),
-              target_rank, 2*disp*sizeof(R), 2*target_count,
+              target_rank, disp, 2*target_count,
               TypeMap<R>(), MPI_REPLACE, window, &request));
 #else
     SafeMpi (MPI_Raccumulate
              (const_cast<Complex<R>*>(source), origin_count, TypeMap<Complex<R>>(),
-              target_rank, disp*sizeof(Complex<R>), target_count,
+              target_rank, disp, target_count,
               TypeMap<Complex<R>>(), MPI_REPLACE, window, &request));
 #endif
 #else
 #ifdef EL_AVOID_COMPLEX_MPI
     SafeMpi (MPI_Rput
              (const_cast<Complex<R>*>(source), 2*origin_count, TypeMap<R>(),
-	      target_rank, 2*disp*sizeof(R), 2*target_count,
+	      target_rank, disp, 2*target_count,
 	       TypeMap<R>(), window, &request));
 #else
     SafeMpi (MPI_Rput
              (const_cast<Complex<R>*>(source), origin_count, TypeMap<Complex<R>>(),
-	      target_rank, disp*sizeof(Complex<R>), target_count,
+	      target_rank, disp, target_count,
 	       TypeMap<Complex<R>>(), window, &request));
 #endif
 #endif
 }
-
 template void Iput (const byte* source, int origin_count, int target_rank,
 	           Aint disp, int target_count, Window & window);
 template void Iput (const int* source, int origin_count, int target_rank,
@@ -722,12 +721,12 @@ void Iget (const R* source, int origin_count, int target_rank,
     SafeMpi (MPI_Get_accumulate
              (NULL, 0, TypeMap<R>(), const_cast<R*>(source),
               origin_count, TypeMap<R>(),
-              target_rank, disp*sizeof(R), target_count,
+              target_rank, disp, target_count,
               TypeMap<R>(), MPI_NO_OP, window));
 #else
     SafeMpi (MPI_Get
              (const_cast<R*>(source), origin_count, TypeMap<R>(),
-              target_rank, disp*sizeof(R), target_count,
+              target_rank, disp, target_count,
               TypeMap<R>(), window));
 #endif
 }
@@ -742,25 +741,25 @@ void Iget (const Complex<R>* source, int origin_count, int target_rank,
     SafeMpi (MPI_Get_accumulate
              (NULL, 0, TypeMap<R>(), const_cast<Complex<R>*>(source),
               2*origin_count, TypeMap<R>(),
-              target_rank, 2*disp*sizeof(R), 2*target_count,
+              target_rank, disp, 2*target_count,
               TypeMap<R>(), MPI_NO_OP, window));
 #else
     SafeMpi (MPI_Get_accumulate
              (NULL, 0, TypeMap<Complex<R>>(), const_cast<Complex<R>*>(source),
               origin_count, TypeMap<Complex<R>>(),
-              target_rank, disp*sizeof(Complex<R>), target_count,
+              target_rank, disp, target_count,
               TypeMap<Complex<R>>(), MPI_NO_OP, window));
 #endif
 #else
 #ifdef EL_AVOID_COMPLEX_MPI
     SafeMpi (MPI_Get
              (const_cast<Complex<R>*>(source), 2*origin_count, TypeMap<R>(),
-              target_rank, 2*disp*sizeof(R), 2*target_count,
+              target_rank, disp, 2*target_count,
               TypeMap<R>(), window));
 #else
     SafeMpi (MPI_Get
              (const_cast<Complex<R>*>(source), origin_count, TypeMap<Complex<R>>(),
-              target_rank, disp*sizeof(Complex<R>), target_count,
+              target_rank, disp, target_count,
               TypeMap<Complex<R>>(), window));
 #endif
 #endif
@@ -776,13 +775,13 @@ void Rget (const R* source, int origin_count, int target_rank,
     SafeMpi (MPI_Rget_accumulate
              (NULL, 0, TypeMap<R>(), const_cast<R*>(source),
               origin_count, TypeMap<R>(),
-              target_rank, disp*sizeof(R), target_count,
+              target_rank, disp, target_count,
               TypeMap<R>(), MPI_NO_OP, window, 
 	      &request));
 #else
     SafeMpi (MPI_Rget
              (const_cast<R*>(source), origin_count, TypeMap<R>(),
-              target_rank, disp*sizeof(R), target_count,
+              target_rank, disp, target_count,
               TypeMap<R>(), window, &request));
 #endif
 }
@@ -798,30 +797,29 @@ void Rget (const Complex<R>* source, int origin_count, int target_rank,
     SafeMpi (MPI_Rget_accumulate
              (NULL, 0, TypeMap<R>(), const_cast<Complex<R>*>(source),
               2*origin_count, TypeMap<R>(),
-              target_rank, 2*disp*sizeof(R), 2*target_count,
+              target_rank, disp, 2*target_count,
               TypeMap<R>(), MPI_NO_OP, window, &request));
 #else
     SafeMpi (MPI_Rget_accumulate
              (NULL, 0, TypeMap<Complex<R>>(), const_cast<Complex<R>*>(source),
               origin_count, TypeMap<Complex<R>>(),
-              target_rank, disp*sizeof(Complex<R>), target_count,
+              target_rank, disp, target_count,
               TypeMap<Complex<R>>(), MPI_NO_OP, window, &request));
 #endif
 #else
 #ifdef EL_AVOID_COMPLEX_MPI
     SafeMpi (MPI_Rget
              (const_cast<Complex<R>*>(source), 2*origin_count, TypeMap<R>(),
-              target_rank, 2*disp*sizeof(R), 2*target_count,
+              target_rank, disp, 2*target_count,
               TypeMap<R>(), window, &request));
 #else
     SafeMpi (MPI_Rget
              (const_cast<Complex<R>*>(source), origin_count, TypeMap<Complex<R>>(),
-              target_rank, disp*sizeof(Complex<R>), target_count,
+              target_rank, disp, target_count,
               TypeMap<Complex<R>>(), window, &request));
 #endif
 #endif
 }
-
 template void Iget (const byte* source, int origin_count, int target_rank,
 	           Aint disp, int target_count, Window & window);
 template void Iget (const int* source, int origin_count, int target_rank,
@@ -938,11 +936,22 @@ void Iacc (const R* source, int origin_count, int target_rank,
            Aint disp, int target_count, Op op, Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
-    SafeMpi (MPI_Accumulate
-             (const_cast<R*>(source), origin_count,
-              TypeMap<R>(), target_rank, disp*sizeof(R),
-              target_count, TypeMap<R>(), op.op,
-              window));
+	if (TypeMap<R>() == TypeMap<byte>())
+	{
+	    SafeMpi (MPI_Accumulate
+		    (const_cast<R*>(source), origin_count,
+		     TypeMap<double>(), target_rank, disp,
+		     target_count, TypeMap<double>(), op.op,
+		     window));
+	}
+	else
+	{
+	    SafeMpi (MPI_Accumulate
+		    (const_cast<R*>(source), origin_count,
+		     TypeMap<R>(), target_rank, disp,
+		     target_count, TypeMap<R>(), op.op,
+		     window));
+	}
 }
 
 template<typename R>
@@ -953,13 +962,13 @@ void Iacc (const Complex<R>* source, int origin_count, int target_rank,
 #ifdef EL_AVOID_COMPLEX_MPI
     SafeMpi (MPI_Accumulate
              (const_cast<Complex<R>*>(source), 2*origin_count,
-              TypeMap<R>(), target_rank, disp*sizeof(R),
+              TypeMap<R>(), target_rank, disp,
               2*target_count, TypeMap<R>(), op.op,
               window));
 #else
     SafeMpi (MPI_Accumulate
              (const_cast<Complex<R>*>(source), origin_count,
-              TypeMap<Complex<R>>(), target_rank, disp*sizeof(Complex<R>),
+              TypeMap<Complex<R>>(), target_rank, disp,
               target_count, TypeMap<Complex<R>>(), op.op,
               window));
 #endif
@@ -973,7 +982,7 @@ void Racc (const R* source, int origin_count, int target_rank,
     DEBUG_ONLY (CallStackEntry cse ("mpi::Raccumulate"))
     SafeMpi (MPI_Raccumulate
              (const_cast<R*>(source), origin_count,
-              TypeMap<R>(), target_rank, disp*sizeof(R),
+              TypeMap<R>(), target_rank, disp,
               target_count, TypeMap<R>(), op.op,
               window, &request));
 }
@@ -987,18 +996,17 @@ void Racc (const Complex<R>* source, int origin_count, int target_rank,
 #ifdef EL_AVOID_COMPLEX_MPI
     SafeMpi (MPI_Raccumulate
              (const_cast<Complex<R>*>(source), 2*origin_count,
-              TypeMap<R>(), target_rank, disp*sizeof(R),
+              TypeMap<R>(), target_rank, disp,
               2*target_count, TypeMap<R>(), op.op,
               window, &request));
 #else
     SafeMpi (MPI_Raccumulate
              (const_cast<Complex<R>*>(source), origin_count,
-              TypeMap<Complex<R>>(), target_rank, disp*sizeof(Complex<R>),
+              TypeMap<Complex<R>>(), target_rank, disp,
               target_count, TypeMap<Complex<R>>(), op.op,
               window, &request));
 #endif
 }
-
 template void Iacc (const byte* source, int origin_count, int target_rank,
 	           Aint disp, int target_count, Op op, Window & window);
 template void Iacc (const int* source, int origin_count, int target_rank,
