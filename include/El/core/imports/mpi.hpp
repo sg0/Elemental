@@ -233,17 +233,17 @@ void Rput( T source, int target_rank, Aint disp,
 // get
 // ---
 template<typename R>
-void Iget (const R* source, int origin_count, int target_rank,
+void Iget (R* source, int origin_count, int target_rank,
            Aint disp, int target_count, Window & window);
 template<typename R>
-void Iget (const Complex<R>* source, int origin_count, int target_rank,
+void Iget (Complex<R>* source, int origin_count, int target_rank,
            Aint disp, int target_count, Window & window);
 template<typename R>
-void Rget (const R* source, int origin_count, int target_rank,
+void Rget (R* source, int origin_count, int target_rank,
            Aint disp, int target_count, Window & window, 
 	   Request & request);
 template<typename R>
-void Rget (const Complex<R>* source, int origin_count, int target_rank,
+void Rget (Complex<R>* source, int origin_count, int target_rank,
            Aint disp, int target_count, Window & window, 
 	   Request & request);
 template<typename T>

@@ -50,9 +50,7 @@ public:
 private:
     mpi::Window window;
 
-    //std::vector<std::deque<std::vector<byte>>>
-    //    getVector_, putVector_;
-   std::vector<std::vector<byte>>
+   std::vector<std::vector<T>>
         getVector_, putVector_;
 
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
@@ -60,7 +58,6 @@ private:
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
 	 attached_, detached_;
 };
-
 } // namespace El
 #endif
 #endif // ifndef EL_RMAINTERFACE_HPP
