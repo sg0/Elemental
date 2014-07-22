@@ -514,28 +514,24 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	    const Int destination = receivingRow + r * receivingCol;
 	    const Int bufferSize =
 	      4 * sizeof (Int) + (numEntries + 1) * sizeof (T);
-// TODO the size of request object is set in this function
-// bypassing it means passing same request handle multiple
-// times, we don't care about it in NbC version though(?)
-//#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-	    //const Int numCreated = dataVectors_[destination].size();
-//	    const Int index = 0;//numCreated;
-	    //dataVectors_[destination].resize (numCreated + 1);
-	    //dataVectors_[numCreated].resize (bufferSize);
-//	    dataVectors_[0].resize (bufferSize);
-    	    //dataSendRequests_[destination].push_back (mpi::REQUEST_NULL);
-            //sendingData_[destination].push_back (true);
-//#else
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+	    const Int index = dataVectors_[destination].size();
+	    for (Int i = 0; i < index; ++i)
+		dataVectors_[destination][i].resize ( bufferSize );
+    	    dataVectors_[destination].resize (index + 1);
+	    dataVectors_[destination][index].resize ( bufferSize );
+	    mpi::Request dummy_request;
+#else
 	    const Int index =
 	    ReadyForSend (bufferSize, dataVectors_[destination],
 		    dataSendRequests_[destination],
 		    sendingData_[destination]);
-//#endif
+#endif
 	    DEBUG_ONLY (if
 			(Int (dataVectors_[destination][index].size ()) !=
 			 bufferSize) LogicError ("Error in ReadyForSend");)
-	      // Pack the header
-	      byte *sendBuffer = dataVectors_[destination][index].data ();
+	    // Pack the header
+	    byte *sendBuffer = dataVectors_[destination][index].data ();
 	    byte *head = sendBuffer;
 	    *reinterpret_cast < Int * >(head) = i;
 	    head += sizeof (Int);
@@ -560,13 +556,16 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 		  thisSendCol[s] = thisXCol[colShift + s * r];
 	      }
 	    // Fire off the non-blocking send
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+	    mpi::TaggedISSend
+	      (sendBuffer, bufferSize, destination, DATA_TAG, g.VCComm (),
+	       dummy_request);
+	    mpi::RequestFree (dummy_request);
+#else
 	    mpi::TaggedISSend
 	      (sendBuffer, bufferSize, destination, DATA_TAG, g.VCComm (),
 	       dataSendRequests_[destination][index]);
-//#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-// we won't use this request, so free it
-//	    mpi::RequestFree (dataSendRequests_[destination][index]);
-//#endif
+#endif
 	  }
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
 	all_sends_are_finished = true;
