@@ -389,7 +389,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
       }
 
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-    all_sends_are_finished = '0';
+    //all_sends_are_finished = '0';
 #endif
     const Int p = Z.Grid ().Size ();
     sentEomTo_.resize (p, false);
@@ -747,7 +747,6 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	// spin	
 	while (!DONE)
 	{
-	    HandleLocalToGlobalData ();
 	    if (nb_bar_active)
 	    {
 		// test/wait for IBarrier completion
@@ -762,6 +761,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 		    nb_bar_active = true;
 		}
 	    }
+	    HandleLocalToGlobalData ();
 	}
 #else
             while (!Finished ())
