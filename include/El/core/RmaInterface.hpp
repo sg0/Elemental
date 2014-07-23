@@ -15,9 +15,8 @@
 #ifndef EL_RMAINTERFACE_HPP
 #define EL_RMAINTERFACE_HPP
 
-#if MPI_VERSION>=3
 namespace El {
-
+#if MPI_VERSION>=3
 template<typename T>
 class RmaInterface
 {
@@ -31,8 +30,8 @@ public:
     void Attach(       DistMatrix<T,MC,MR>& Z );
     void Attach( const DistMatrix<T,MC,MR>& Z );
 
-    void Put( T alpha,      Matrix<T>& Z, Int i, Int j );
-    void Put( T alpha, const Matrix<T>& Z, Int i, Int j );
+    void Put( Matrix<T>& Z, Int i, Int j );
+    void Put( const Matrix<T>& Z, Int i, Int j );
 
     void Get(       Matrix<T>& Z, Int i, Int j );
     void Get( const Matrix<T>& Z, Int i, Int j );
@@ -57,7 +56,7 @@ private:
     const DistMatrix<T,MC,MR>* GlobalArrayGet_;
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
 	 attached_, detached_;
-};
+ };
+#endif //MPI-3
 } // namespace El
-#endif
 #endif // ifndef EL_RMAINTERFACE_HPP

@@ -10,7 +10,7 @@
 #pragma once
 #ifndef EL_IMPORTS_MPI_HPP
 #define EL_IMPORTS_MPI_HPP
-
+#include <limits>
 namespace El {
 namespace mpi {
 
@@ -41,7 +41,14 @@ namespace mpi {
 #ifndef EL_MPI_EXPERIMENTAL
 #define EL_MPI_EXPERIMENTAL
 #endif
-    
+
+#ifndef EL_INT_SAFE_CAST
+#define EL_INT_SAFE_CAST(x) \
+    (x < std::numeric_limits<int>::max () && \
+	x > std::numeric_limits<int>::min ())? \
+    static_cast<int>(x): (-99999)
+#endif
+
 struct Comm
 {
     MPI_Comm comm;
@@ -88,10 +95,25 @@ typedef enum
 	PARTIAL_ACC_ORDERING 	= 2,
 	NO_ACC_ORDERING 	= 4
 } acc_order_t;
-
-//TODO update these 
-const int MAX_OUTSTANDING_NB 	= 100000;
-const int FLUSH_FREQUENCY 	= 10000;
+// for ddt
+typedef struct El_strided_s
+{
+    unsigned num;
+    size_t* sizes;
+    MPI_Aint* offsets;
+} El_strided_t;
+typedef struct El_iov_s
+{
+    unsigned count;
+    size_t* sizes;
+    MPI_Aint* offsets;
+} El_iov_t;
+typedef enum
+{
+	FIXED_BLOCK_FIXED_STRIDE	= 1,
+	FIXED_BLOCK_VAR_STRIDE		= 2,
+	UNKNOWN_BLOCK_STRIDE		= 4
+} vector_pattern_t;
 #endif
 typedef MPI_Info Info;
 // Standard constants
@@ -196,11 +218,19 @@ void Translate
 // ===============
 #if MPI_VERSION>=3
 // Utilities
+// ---------
 void SetWindowProp ( Window& window, int prop );
 void CheckBounds ( Window & window, Datatype win_type, Datatype type, 
 size_t count, ptrdiff_t target_offset );
 void RmaProgress ( Comm comm );
+void StridedDatatype (El_strided_t* stride_descr,
+	Datatype old_type, Datatype* new_type,
+	size_t* source_dims);
+void VectorDatatype (El_iov_t * vect_descr,
+	Datatype old_type, Datatype * new_type,
+	vector_pattern_t data_pattern);
 // Window creation/update/delete
+// -----------------------------
 void WindowLock( int rank, Window& window );
 void WindowLock( Window& window );
 void WindowUnlock( int rank, Window& window );

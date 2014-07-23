@@ -501,6 +501,134 @@ void RmaProgress ( Comm comm )
     SafeMpi (MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, 
 		comm.comm, &flag, MPI_STATUS_IGNORE));
 }
+// TODO these functions for DDT creation are 
+// completely untested
+void StridedDatatype (El_strided_t* stride_descr,
+	Datatype old_type, Datatype* new_type,
+	size_t* source_dims)
+{
+    int old_type_size;
+    SafeMpi (MPI_Type_size (old_type, &old_type_size));
+    int *dims = NULL, *sizes = NULL;
+
+    // count of blocks must be non-zero
+    assert (stride_descr->num > 0);
+    // size is NULL
+    assert (stride_descr->sizes != NULL);
+    // offset is NULL
+    assert (stride_descr->offsets != NULL);
+
+    // check for contiguous transfers
+    if ((source_dims == NULL) && (stride_descr->num == 1))
+    {
+	int elem_count = stride_descr->sizes[0] / old_type_size;
+	// derived datatype is not a multiple of original type
+	assert ((stride_descr->sizes[0] % old_type_size == 0));
+	SafeMpi ( MPI_Type_contiguous (elem_count, old_type, new_type) );
+	return;
+    }
+    // offsets should be monotonic increasing
+    for (int i = 1; i < stride_descr->num; i++)
+	assert (stride_descr->offsets[i] >= stride_descr->offsets[i - 1]);
+    /* Notes: 
+     * Sayan: This weird hack is because MPI_Type_create_subarray throws an error when
+     * stride_descr->sizes and source_dims is passed directly (probably type mismatch?) */
+    /* heap */
+    dims = new int[stride_descr->num];
+    sizes = new int[stride_descr->num];
+
+    for (int i = 0; i < stride_descr->num; i++)
+    {
+	dims[i] = EL_INT_SAFE_CAST (source_dims[i]);
+	sizes[i] = EL_INT_SAFE_CAST (stride_descr->sizes[i]);
+    }
+
+    SafeMpi ( MPI_Type_create_subarray (stride_descr->num, reinterpret_cast<const int *>(dims),
+		reinterpret_cast<const int *>(sizes),
+		reinterpret_cast<int *>(stride_descr->offsets), MPI_ORDER_C,
+		old_type, new_type) );
+
+    delete[] dims;
+    delete[] sizes;
+}
+
+void VectorDatatype (El_iov_t * vect_descr,
+	Datatype old_type, Datatype * new_type,
+	vector_pattern_t data_pattern)
+{
+    int old_type_size;
+    int stride;
+    int fixed_block_fixed_stride = 1,  // MPI_Type_vector
+	fixed_block_var_stride = 1;	     // MPI_Type_hindexed_block
+    /* defaults:
+     * var_block_var_stride=1 - MPI_Type_hindexed
+     * var_block_fixed_stride=1 -  MPI_Type_hindexed 
+     */
+    SafeMpi ( MPI_Type_size (old_type, &old_type_size) );
+    // count of blocks must be non-zero
+    assert (vect_descr->count > 0);
+    // size is NULL
+    assert (vect_descr->sizes != NULL);
+    // offset is NULL
+    assert (vect_descr->offsets != NULL);
+    // check for contiguous transfers
+    if (vect_descr->count == 1)
+    {
+	int elem_count = vect_descr->sizes[0] / old_type_size;
+	// derived datatype is not a multiple of original type
+	assert (vect_descr->sizes[0] % old_type_size == 0);
+	SafeMpi ( MPI_Type_contiguous (elem_count, old_type, new_type) );
+	return;
+    }
+    // offsets should be monotonic increasing
+    for (int i = 1; i < vect_descr->count; i++)
+	assert (vect_descr->offsets[i] >= vect_descr->offsets[i - 1]);
+
+    // identify the pattern of strides, fixed or varying
+    if (data_pattern == UNKNOWN_BLOCK_STRIDE)
+    {
+	stride = (vect_descr->offsets[1] - vect_descr->offsets[0]);
+	for (int i = 1; i < vect_descr->count; i++)
+	{
+	    // check for fixed blocklengths and fixed strides
+	    if ((vect_descr->sizes[i] == vect_descr->sizes[i - 1]) &&
+		    (stride ==
+		     (vect_descr->offsets[i] - vect_descr->offsets[i - 1])))
+		fixed_block_fixed_stride++;
+
+	    // check for fixed blocklengths and variable strides
+	    if ((vect_descr->sizes[i] == vect_descr->sizes[i - 1]) &&
+		    !(stride ==
+			(vect_descr->offsets[i] - vect_descr->offsets[i - 1])))
+		fixed_block_var_stride++;
+	}
+    }
+
+    if (data_pattern == FIXED_BLOCK_FIXED_STRIDE)
+	fixed_block_fixed_stride = vect_descr->count;
+
+    if (data_pattern == FIXED_BLOCK_VAR_STRIDE)
+	fixed_block_var_stride = vect_descr->count;
+
+    // check if constant strides, if yes 
+    // then create _type_vector, else 
+    // _type_hindexed 
+    if (fixed_block_fixed_stride == vect_descr->count)
+    {				// _vector
+	int stride = ((vect_descr->offsets[1] - vect_descr->offsets[0])
+		/ old_type_size);
+	int blocklength = vect_descr->sizes[0];
+	SafeMpi ( MPI_Type_vector (vect_descr->count, blocklength,
+		    stride, old_type, new_type) );
+    }
+    else if (fixed_block_var_stride == vect_descr->count)	// _hindexed_block
+	SafeMpi ( MPI_Type_create_hindexed_block (vect_descr->count, vect_descr->sizes[0],
+		    vect_descr->offsets, old_type, new_type) );
+    else				// _hindexed
+	SafeMpi ( MPI_Type_create_hindexed (vect_descr->count,
+		    (const int *) vect_descr->sizes,
+		    vect_descr->offsets, old_type, new_type) );
+}
 
 void WindowFree (Window & window)
 {

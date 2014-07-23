@@ -13,7 +13,7 @@ which can be found in the LICENSE file in the root directory, or at
 http://opensource.org/licenses/BSD-2-Clause
 */
 #include "El-lite.hpp"
-#include <assert.h>
+#include <cassert>
 
 // TODO Complete the const interfaces...
 // TODO RMA related checks pending (e.g bounds checking)...
@@ -168,7 +168,7 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 }
 
 template<typename T>
-void RmaInterface<T>::Put( T scale, Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Put( Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Put"))
 
@@ -227,7 +227,7 @@ void RmaInterface<T>::Put( T scale, Matrix<T>& Z, Int i, Int j )
                 T* thisSendCol = &sendData[t*localHeight];
                 const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
                 for( Int s=0; s<localHeight; ++s )
-                    thisSendCol[s] = scale*thisXCol[colShift+s*r];
+                    thisSendCol[s] = thisXCol[colShift+s*r];
                 // put
                 mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * YLDim) * sizeof(T);
                 mpi::Iput (&sendBuffer[t*localHeight], localHeight,
@@ -248,7 +248,7 @@ void RmaInterface<T>::Put( T scale, Matrix<T>& Z, Int i, Int j )
 }
 
 template<typename T>
-void RmaInterface<T>::Put( T scale, const Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Put( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Put"))
 }
@@ -641,9 +641,7 @@ void RmaInterface<T>::Detach()
                       GlobalArrayPut_->Grid() :
                       GlobalArrayGet_->Grid() );
 
-    // this is causing enormous slowdown 
-    // due to load imbalance
-    //mpi::Barrier( g.VCComm() );
+    mpi::Barrier( g.VCComm() );
 
     attached_ 		= false;
     detached_ 		= true;
