@@ -242,6 +242,9 @@ void RmaInterface<T>::Put( T scale, Matrix<T>& Z, Int i, Int j )
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
     }
+#ifdef EL_EXPLICIT_PROGRESS
+  RmaProgress (g.VCComm ());
+#endif
 }
 
 template<typename T>
@@ -420,6 +423,9 @@ void RmaInterface<T>::Acc( T scale, Matrix<T>& Z, Int i, Int j )
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
     }
+#ifdef EL_EXPLICIT_PROGRESS
+  RmaProgress (g.VCComm ());
+#endif
 }
 
 template<typename T>
@@ -635,7 +641,9 @@ void RmaInterface<T>::Detach()
                       GlobalArrayPut_->Grid() :
                       GlobalArrayGet_->Grid() );
 
-    mpi::Barrier( g.VCComm() );
+    // this is causing enormous slowdown 
+    // due to load imbalance
+    //mpi::Barrier( g.VCComm() );
 
     attached_ 		= false;
     detached_ 		= true;

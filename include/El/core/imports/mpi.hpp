@@ -196,10 +196,10 @@ void Translate
 // ===============
 #if MPI_VERSION>=3
 // Utilities
-void SetWindowProp (Window& window, int prop);
-void CheckBounds (Window & window, Datatype win_type, Datatype type, 
-size_t count, ptrdiff_t target_offset);
-//NOTE assuming MPI_MODE_NOCHECK
+void SetWindowProp ( Window& window, int prop );
+void CheckBounds ( Window & window, Datatype win_type, Datatype type, 
+size_t count, ptrdiff_t target_offset );
+void RmaProgress ( Comm comm );
 // Window creation/update/delete
 void WindowLock( int rank, Window& window );
 void WindowLock( Window& window );

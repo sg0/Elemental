@@ -495,6 +495,13 @@ void CheckBounds (Window & window, Datatype win_type, Datatype type,
     assert (displ + count*extent <= win_type_size);
 }
 
+void RmaProgress ( Comm comm )
+{
+    int flag;
+    SafeMpi (MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, 
+		comm.comm, &flag, MPI_STATUS_IGNORE));
+}
+
 void WindowFree (Window & window)
 {
     SafeMpi (MPI_Win_free (&window));
