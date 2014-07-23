@@ -13,6 +13,8 @@
 */
 #include "El-lite.hpp"
 
+// TODO Fix bug which causes deadlock in NBC version
+// when for small AXPY_DIMs
 namespace El
 {
 
@@ -112,9 +114,6 @@ namespace El
 
     if (mpi::IProbe (mpi::ANY_SOURCE, DATA_TAG, g.VCComm (), status))
       {
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-	  all_sends_are_finished = true;
-#endif
 	// Message exists, so recv and pack    
 	const Int count = mpi::GetCount < byte > (status);
 	DEBUG_ONLY (if (count < Int (4 * sizeof (Int) + sizeof (T)))
@@ -389,6 +388,9 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	globalToLocalMat_ = &Z;
       }
 
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+    all_sends_are_finished = '0';
+#endif
     const Int p = Z.Grid ().Size ();
     sentEomTo_.resize (p, false);
     haveEomFrom_.resize (p, false);
@@ -425,9 +427,6 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	attachedForGlobalToLocal_ = true;
 	globalToLocalMat_ = &X;
       }
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-        all_sends_are_finished = false;
-#endif
     const Int p = X.Grid ().Size ();
     sentEomTo_.resize (p, false);
     haveEomFrom_.resize (p, false);
@@ -484,9 +483,6 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     if (i + X.Height () > Y.Height () || j + X.Width () > Y.Width ())
       LogicError ("Submatrix out of bounds of global matrix");
 
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-    all_sends_are_finished = false;
-#endif
     const Grid & g = Y.Grid ();
     const Int r = g.Height ();
     const Int c = g.Width ();
@@ -567,9 +563,6 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	       dataSendRequests_[destination][index]);
 #endif
 	  }
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-	all_sends_are_finished = true;
-#endif
 	receivingRow = (receivingRow + 1) % r;
 	if (receivingRow == 0)
 	  receivingCol = (receivingCol + 1) % c;
@@ -742,15 +735,16 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     const Grid & g = (attachedForLocalToGlobal_ ?
 	    localToGlobalMat_->Grid () : globalToLocalMat_->
 	    Grid ());
-// TODO Fix bug which causes deadlock in NBC version
-// when for small AXPY_DIMs
+
     if (attachedForLocalToGlobal_)
     {
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
 	bool DONE = false;
 	mpi::Request nb_bar_request;
 	bool nb_bar_active = false;
-	    
+        // nonblocking ssends must have been issued 
+        all_sends_are_finished = '1';
+	// spin	
 	while (!DONE)
 	{
 	    HandleLocalToGlobalData ();
@@ -761,7 +755,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	    }
 	    else
 	    {
-		if (all_sends_are_finished)
+		if (all_sends_are_finished == '1')
 		{
 		    // all ssends are complete, start nonblocking barrier
 		    mpi::IBarrier (g.VCComm (), nb_bar_request);
@@ -788,6 +782,9 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
             mpi::Barrier (g.VCComm ());
     }
 
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+    all_sends_are_finished = '0';
+#endif
     attachedForLocalToGlobal_ = false;
     attachedForGlobalToLocal_ = false;
     recvVector_.clear ();

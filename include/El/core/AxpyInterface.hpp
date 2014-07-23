@@ -49,7 +49,7 @@ private:
   
 //request object for polling on Issends
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-    bool all_sends_are_finished;
+    byte all_sends_are_finished;
 #endif
     bool attachedForLocalToGlobal_, attachedForGlobalToLocal_;
 
