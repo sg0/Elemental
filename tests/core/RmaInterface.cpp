@@ -13,7 +13,7 @@ using namespace El;
 
 #define ITER 		10
 //#define DIM 		1000
-//#define AXPY_DIM 	20
+//#define AXPY_DIM 	100
 #define DIM 		20
 #define AXPY_DIM 	4
 #define ALPHA		2.0
@@ -25,6 +25,7 @@ main (int argc, char *argv[])
     mpi::Comm comm = mpi::COMM_WORLD;
     const Int commRank = mpi::Rank (comm);
     const Int commSize = mpi::Size (comm);
+    double t1, t2, seconds;
 
     assert (AXPY_DIM < DIM);
 
@@ -42,6 +43,7 @@ main (int argc, char *argv[])
 	if (DIM <= 20)
 	    Print (A, "Original distributed A");
 
+	t1 = MPI_Wtime();
 	for (Int k = 0; k < ITER; ++k)
 	{
 	    if (commRank == 0)
@@ -58,17 +60,14 @@ main (int argc, char *argv[])
 	    //       desire at this point.
 	    if (grid.VCRank () == 0)
 	    {
-		mpi::Op op;
-		op.op = MPI_SUM;
 		Matrix < double >B (AXPY_DIM, AXPY_DIM);
 		Identity (B, AXPY_DIM, AXPY_DIM);
-		// AXPY is scaled accumulate as in ARMCI 
-		Rmaint.Acc (ALPHA, B, op, (DIM - AXPY_DIM), (DIM - AXPY_DIM));
+		//Print (B, "Original B");
+		// AXPY is scaled accumulate as in ARMCI
+		Rmaint.Acc (ALPHA, B, (DIM - AXPY_DIM), (DIM - AXPY_DIM));
 		Rmaint.Flush (B, (DIM - AXPY_DIM), (DIM - AXPY_DIM));
+		//Print (B, "Updated B");
 	    }
-	    if (DIM <= 20)
-		Print (A, "Updated distributed A");
-	    // Have process 0 request a copy of the entire distributed matrix
 	    //
 	    // NOTE: Every process is free to Axpy as many submatrices as they
 	    //       desire at this point.
@@ -77,15 +76,27 @@ main (int argc, char *argv[])
 	    {
 		Zeros (C, DIM, DIM);
 		Rmaint.Get (C, 0, 0);
-		Rmaint.Flush (C);
+		Rmaint.Flush ( C );
 	    }
 
-	    // Process 0 can now locally print its copy of A
-	    if (grid.VCRank () == 0 && DIM <= 20)
-		Print (C, "Process 0's local copy of A");
+
 	    // Collectively detach in order to finish filling process 0's request
 	    Rmaint.Detach ();
+
+	    if (DIM <= 20)
+		Print (A, "Updated distributed A");
+	    // Process 0 can now locally print its copy of A
+	    if (grid.VCRank () == 0 && DIM <= 20)
+	    	Print (C, "Process 0's local copy of A");
 	}
+	t2 = MPI_Wtime();
+	seconds = (t2 - t1); ///ITER;
+	double total_secs;
+
+	MPI_Reduce(&seconds, &total_secs, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+
+	if (commRank == 0)
+	    printf("Time taken for AXPY (secs):%lf \n", total_secs);
     }
     catch (std::exception & e)
     {
