@@ -25,11 +25,15 @@ http://opensource.org/licenses/BSD-2-Clause
 #include <cassert>
 using namespace El;
 
-#define ITER 		10
+//#define ITER 		10
+#define ITER 		1
 //#define DIM 		1000
 //#define AXPY_DIM 	100
-#define DIM 		20
-#define AXPY_DIM 	4
+//#define DIM 		20
+//#define AXPY_DIM 	4
+#define DIM 		8
+#define AXPY_DIM 	2
+
 #define ALPHA		2.0
 #define FOP_ROOT 	0
 
@@ -103,7 +107,9 @@ int main (int argc, char *argv[])
 		    {
 			Rmaint.Acc (ALPHA, B, i, j);
 #if DEBUG > 2
-			std::cout << "[" << commRank << "]: AXPY on patch - " << i << " , " << j;
+			std::cout << std::to_string(commRank) + ": AXPY patch: " 
+			    + std::to_string(i) + "," + std::to_string(j) 
+			    << std::endl;
 #endif
 		    }
 		    counter = ReadInc (win, 0, (long) 1);
@@ -124,7 +130,9 @@ int main (int argc, char *argv[])
 		    {
 			Rmaint.Get (C, i, j);
 #if DEBUG > 2
-			std::cout << "[" << commRank << "]: GET from patch - " << i << " , " << j;
+			std::cout << std::to_string(commRank) + ": GET patch: " 
+			    + std::to_string(i) + "," + std::to_string(j) 
+			    << std::endl;
 #endif
 		    }
 		    counter = ReadInc (win, 0, (long) 1);
@@ -135,11 +143,27 @@ int main (int argc, char *argv[])
 	    // Collectively detach in order to finish filling process 0's request
 	    Rmaint.Detach ();
 
-	    if (DIM <= 20)
-		Print (A, "Updated distributed A");
-	    // Process 0 can now locally print its copy of A
-	    if (grid.VCRank () == 0 && DIM <= 20)
-		Print (C, "Process 0's local copy of A");
+#if DEBUG > 1
+	    for (int j = 0; j < commSize; j++)
+	    {
+		if (j == commRank)
+		{
+		    if (DIM <= 20)
+			Print (A, "Updated distributed A");
+		}
+	    }
+	    mpi::Barrier ( comm );
+	    for (int j = 0; j < commSize; j++)
+	    {
+		if (j == commRank)
+		{
+		    // Process 0 can now locally print its copy of A
+		    if (DIM <= 20)
+			Print (C, "Patch of A");
+		}
+	    }
+	    mpi::Barrier ( comm );
+#endif
 	}
 	t2 = MPI_Wtime();
 	seconds = (t2 - t1); ///ITER;
