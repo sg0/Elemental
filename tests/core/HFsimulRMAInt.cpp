@@ -20,12 +20,12 @@ http://opensource.org/licenses/BSD-2-Clause
  * in El, hence this test mixes MPI routines
  * and MPI from El. This is nasty, but at one
  * point would be made better.
+ * This is implemented using MPI-3
  */
 #include "El.hpp"
 #include <cassert>
 using namespace El;
 
-//#define ITER 		10
 #define ITER 		1
 //#define DIM 		1000
 //#define AXPY_DIM 	100
@@ -128,7 +128,8 @@ int main (int argc, char *argv[])
 		{
 		    for (int j = 0; j < DIM; j += AXPY_DIM)
 		    {
-			Rmaint.Get (C, i, j);
+			//Rmaint.Get (C, i, j);			
+			Rmaint.Acc (1.0, C, i, j);
 #if DEBUG > 2
 			std::cout << std::to_string(commRank) + ": GET patch: " 
 			    + std::to_string(i) + "," + std::to_string(j) 
@@ -140,6 +141,7 @@ int main (int argc, char *argv[])
 		next++;
 	    }
 	    // Get doesn't require flush
+	    Rmaint.Flush ( C );
 	    // Collectively detach in order to finish filling process 0's request
 	    Rmaint.Detach ();
 
