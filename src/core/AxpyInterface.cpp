@@ -567,6 +567,21 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	if (receivingRow == 0)
 	  receivingCol = (receivingCol + 1) % c;
       }
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+    // nonblocking ssends have been issued 
+    // send all PEs
+    // this block might be invoked by multiple
+    // processes
+    for (Int rank = 0; rank < p; rank++)
+    {
+	mpi::Request _request;
+	byte sends_are_finished = '1';
+	mpi::TaggedISSend
+	  (&sends_are_finished, sizeof(byte), rank, ALL_ISSENDS_FINISHED, g.VCComm (),
+	   _request);
+	mpi::RequestFree (_request);
+    }
+#endif
   }
 
 // Update Y += alpha X(i:i+height-1,j:j+width-1), where X is the dist-matrix
@@ -739,11 +754,14 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     if (attachedForLocalToGlobal_)
     {
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+	// recv messages with ALL_ISSENDS_FINISHED tag
+	TaggedRecv (&all_sends_are_finished, 1, mpi::ANY_SOURCE,
+                           ALL_ISSENDS_FINISHED, g.VCComm ());
 	bool DONE = false;
 	mpi::Request nb_bar_request;
 	bool nb_bar_active = false;
         // nonblocking ssends must have been issued 
-        all_sends_are_finished = '1';
+        //all_sends_are_finished = '1';
 	// spin	
 	while (!DONE)
 	{
