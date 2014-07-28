@@ -128,8 +128,8 @@ int main (int argc, char *argv[])
 		{
 		    for (int j = 0; j < DIM; j += AXPY_DIM)
 		    {
-			//Rmaint.Get (C, i, j);			
-			Rmaint.Acc (1.0, C, i, j);
+			Rmaint.Get (C, i, j);			
+			//Rmaint.Acc (1.0, C, i, j);
 #if DEBUG > 2
 			std::cout << std::to_string(commRank) + ": GET patch: " 
 			    + std::to_string(i) + "," + std::to_string(j) 
@@ -141,7 +141,7 @@ int main (int argc, char *argv[])
 		next++;
 	    }
 	    // Get doesn't require flush
-	    Rmaint.Flush ( C );
+	    //Rmaint.Flush ( C );
 	    // Collectively detach in order to finish filling process 0's request
 	    Rmaint.Detach ();
 
