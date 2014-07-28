@@ -45,12 +45,12 @@ private:
         DATA_TAG        =1, 
         EOM_TAG         =2, 
         DATA_REQUEST_TAG=3, 
-        DATA_REPLY_TAG  =4
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-	,ALL_ISSENDS_FINISHED  =5;
-#else
-    ;
-#endif
+        DATA_REPLY_TAG  =4;
+//#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+	//,ALL_ISSENDS_FINISHED  =5;
+//#else
+//    ;
+//#endif
   
 //request object for polling on Issends
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)

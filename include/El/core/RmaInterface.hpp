@@ -38,6 +38,7 @@ public:
 
     void Acc( T alpha,      Matrix<T>& Z, Int i, Int j );
     void Acc( T alpha, const Matrix<T>& Z, Int i, Int j );
+    void LocalAcc( T alpha,      Matrix<T>& Z, Int i, Int j );
 
     void Flush( Matrix<T>& Z, Int i, Int j );
     void Flush( const Matrix<T>& Z, Int i, Int j );

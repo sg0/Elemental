@@ -42,6 +42,12 @@ namespace mpi {
 #define EL_MPI_EXPERIMENTAL
 #endif
 
+// Use derived datatypes for strided
+// vector communication patterns
+#ifndef EL_USE_DERIVED_DATATYPE
+#define EL_USE_DERIVED_DATATYPE
+#endif
+
 #ifndef EL_INT_SAFE_CAST
 #define EL_INT_SAFE_CAST(x) \
     (x < std::numeric_limits<int>::max () && \
@@ -223,6 +229,7 @@ void SetWindowProp ( Window& window, int prop );
 void CheckBounds ( Window & window, Datatype win_type, Datatype type, 
 size_t count, ptrdiff_t target_offset );
 void RmaProgress ( Comm comm );
+// strided/vector to datatype
 void StridedDatatype (El_strided_t* stride_descr,
 	Datatype old_type, Datatype* new_type,
 	size_t* source_dims);

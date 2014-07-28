@@ -434,6 +434,90 @@ void RmaInterface<T>::Acc( T scale, const Matrix<T>& Z, Int i, Int j )
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Acc"))
 }
 
+// scaled local accumulate, Z += scale * Get Y(i:i+height-1,j:j+width-1),
+// where Z is local matrix height x width
+template<typename T>
+void RmaInterface<T>::LocalAcc( T scale, Matrix<T>& Z, Int i, Int j )
+{
+    DEBUG_ONLY(CallStackEntry cse("RmaInterface::LocalAcc"))
+    // a call to Attach with a non-const DistMatrix must set
+    // toBeAttachedForGet_ also, if not then it is assumed that
+    // the DistMatrix isn't attached
+    if ( !toBeAttachedForGet_ )
+        LogicError ("Cannot perform this operation as matrix is not attached.");
+
+    const DistMatrix<T> &X = *GlobalArrayGet_;
+
+    const Grid & g = X.Grid ();
+    const Int r = g.Height ();
+    const Int c = g.Width ();
+    const Int p = g.Size ();
+    const Int myRow = g.Row ();
+    const Int myCol = g.Col ();
+    const Int myProcessRow = g.Row();
+    const Int myProcessCol = g.Col();
+
+    // local width and height
+    const Int height = Z.Height();
+    const Int width = Z.Width();
+
+    if (i + height > X.Height () || j + width > X.Width ())
+        LogicError("Submatrix out of bounds of global matrix");
+
+    const Int colAlign = (X.ColAlign() + i) % r;
+    const Int rowAlign = (X.RowAlign() + j) % c;
+
+    const Int iLocalOffset = Length (i, X.ColShift (), r);
+    const Int jLocalOffset = Length (j, X.RowShift (), c);
+
+    const Int XLDim = X.LDim ();
+
+    Int receivingRow = myProcessRow;
+    Int receivingCol = myProcessCol;
+
+    for( Int step=0; step<p; ++step )
+    {
+        const Int colShift = Shift( receivingRow, colAlign, r );
+        const Int rowShift = Shift( receivingCol, rowAlign, c );
+        const Int localHeight = Length( height, colShift, r );
+        const Int localWidth = Length( width, rowShift, c );
+        const Int numEntries = localHeight * localWidth;
+
+        if( numEntries != 0 )
+        {
+            const Int destination = receivingRow + r*receivingCol;
+
+            getVector_[destination].resize ( numEntries );
+            T *getBuffer = getVector_[destination].data ();
+
+            // get
+            for( Int t=0; t<localWidth; ++t )
+            {
+                mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * XLDim) * sizeof(T);
+                mpi::Iget (&getBuffer[t*localHeight], localHeight,
+                           destination, disp, localHeight, window);
+            }
+            // no difference between localflush
+            // and flush for Get
+            mpi::FlushLocal (destination, window);
+            T* getData = reinterpret_cast<T*>(getBuffer);
+            // update local matrix
+            for( Int t=0; t<localWidth; ++t )
+            {
+                T *YCol = Z.Buffer (0,rowShift+t*c);
+                const T *XCol = &getData[t * localHeight];
+                for (Int s = 0; s < localHeight; ++s)
+                    YCol[colShift+s*r] += scale * XCol[s];
+            }
+            // clear
+            getVector_[destination].resize (0);
+        }
+        receivingRow = (receivingRow + 1) % r;
+        if( receivingRow == 0 )
+            receivingCol = (receivingCol + 1) % c;
+    }
+}
+
 template<typename T>
 void RmaInterface<T>::Flush( Matrix<T>& Z, Int i, Int j )
 {
