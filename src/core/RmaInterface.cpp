@@ -405,11 +405,8 @@ void RmaInterface<T>::Acc( Matrix<T>& Z, Int i, Int j )
                 const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
-            }
-            // acc
-            for( Int t=0; t<localWidth; ++t )
-            {
-                mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * YLDim) * sizeof(T);
+		// acc
+		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * YLDim) * sizeof(T);
                 mpi::Iacc (&sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window);
             }
@@ -609,9 +606,8 @@ void RmaInterface<T>::Flush( const Matrix<T>& Z, Int i, Int j )
     }
 }
 
-// Are these only useful when the user wants to
-// get/put the entire DistMatrix to it's local
-// PE/everyone in world ?
+// Perhaps this should be implemented as 
+// flush_all and not flush (rank, window)
 template<typename T>
 void RmaInterface<T>::Flush( Matrix<T>& Z )
 {
