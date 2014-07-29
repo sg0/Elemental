@@ -101,7 +101,9 @@ typedef enum
 	PARTIAL_ACC_ORDERING 	= 2,
 	NO_ACC_ORDERING 	= 4
 } acc_order_t;
+#endif
 // for ddt
+#ifdef EL_USE_DERIVED_DATATYPE
 typedef struct El_strided_s
 {
     unsigned num;

@@ -341,10 +341,10 @@ void RmaInterface<T>::Get( const Matrix<T>& Z, Int i, Int j )
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Get"))
 }
 
-// scaled accumulate = Update Y(i:i+height-1,j:j+width-1) += scale X,
+// accumulate = Update Y(i:i+height-1,j:j+width-1) += X,
 // where X is height x width
 template<typename T>
-void RmaInterface<T>::Acc( T scale, Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Acc( Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Acc"))
 
@@ -399,13 +399,12 @@ void RmaInterface<T>::Acc( T scale, Matrix<T>& Z, Int i, Int j )
             T* sendData = reinterpret_cast<T*>(sendBuffer);
             const T* XBuffer = Z.LockedBuffer();
 
-            //src *= scale
             for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendData[t*localHeight];
                 const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
                 for( Int s=0; s<localHeight; ++s )
-                    thisSendCol[s] = scale*thisXCol[colShift+s*r];
+                    thisSendCol[s] = thisXCol[colShift+s*r];
             }
             // acc
             for( Int t=0; t<localWidth; ++t )
@@ -429,15 +428,15 @@ void RmaInterface<T>::Acc( T scale, Matrix<T>& Z, Int i, Int j )
 }
 
 template<typename T>
-void RmaInterface<T>::Acc( T scale, const Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Acc"))
 }
 
-// scaled local accumulate, Z += scale * Get Y(i:i+height-1,j:j+width-1),
+// local accumulate, Z += Get Y(i:i+height-1,j:j+width-1),
 // where Z is local matrix height x width
 template<typename T>
-void RmaInterface<T>::LocalAcc( T scale, Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::LocalAcc( Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::LocalAcc"))
     // a call to Attach with a non-const DistMatrix must set
@@ -507,7 +506,7 @@ void RmaInterface<T>::LocalAcc( T scale, Matrix<T>& Z, Int i, Int j )
                 T *YCol = Z.Buffer (0,rowShift+t*c);
                 const T *XCol = &getData[t * localHeight];
                 for (Int s = 0; s < localHeight; ++s)
-                    YCol[colShift+s*r] += scale * XCol[s];
+                    YCol[colShift+s*r] += XCol[s];
             }
             // clear
             getVector_[destination].resize (0);

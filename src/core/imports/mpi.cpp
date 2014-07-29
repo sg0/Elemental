@@ -503,6 +503,7 @@ void RmaProgress ( Comm comm )
 }
 // TODO these functions for DDT creation are 
 // completely untested
+#ifdef EL_USE_DERIVED_DATATYPE
 void StridedDatatype (El_strided_t* stride_descr,
 	Datatype old_type, Datatype* new_type,
 	size_t* source_dims)
@@ -547,7 +548,7 @@ void StridedDatatype (El_strided_t* stride_descr,
 		reinterpret_cast<const int *>(sizes),
 		reinterpret_cast<int *>(stride_descr->offsets), MPI_ORDER_C,
 		old_type, new_type) );
-
+    
     delete[] dims;
     delete[] sizes;
 }
@@ -629,6 +630,7 @@ void VectorDatatype (El_iov_t * vect_descr,
 		    (const int *) vect_descr->sizes,
 		    vect_descr->offsets, old_type, new_type) );
 }
+#endif
 
 void WindowFree (Window & window)
 {

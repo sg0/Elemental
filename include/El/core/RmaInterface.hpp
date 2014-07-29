@@ -36,13 +36,13 @@ public:
     void Get(       Matrix<T>& Z, Int i, Int j );
     void Get( const Matrix<T>& Z, Int i, Int j );
 
-    void Acc( T alpha,      Matrix<T>& Z, Int i, Int j );
-    void Acc( T alpha, const Matrix<T>& Z, Int i, Int j );
-    void LocalAcc( T alpha,      Matrix<T>& Z, Int i, Int j );
+    void Acc(       Matrix<T>& Z, Int i, Int j );
+    void Acc( const Matrix<T>& Z, Int i, Int j );
+    void LocalAcc(  Matrix<T>& Z, Int i, Int j );
 
-    void Flush( Matrix<T>& Z, Int i, Int j );
+    void Flush(       Matrix<T>& Z, Int i, Int j );
     void Flush( const Matrix<T>& Z, Int i, Int j );
-    void Flush( Matrix<T>& Z );
+    void Flush(       Matrix<T>& Z );
     void Flush( const Matrix<T>& Z );
 
     void Detach();
@@ -55,6 +55,7 @@ private:
 
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     const DistMatrix<T,MC,MR>* GlobalArrayGet_;
+    
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
 	 attached_, detached_;
  };
