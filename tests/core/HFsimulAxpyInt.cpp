@@ -192,16 +192,16 @@ int main (int argc, char *argv[])
 	MPI_Reduce(&seconds, &total_secs, 1, MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
 
 	if (commRank == 0)
-	    printf("Time taken for AXPY (secs):%lf \n", total_secs);
+	    printf("Time taken (secs):%lf \n", total_secs);
+	
+	// clear window object for FOP
+	MPI_Win_unlock_all (win);
+	MPI_Win_free (&win);
     }
     catch (std::exception & e)
     {
 	ReportException (e);
     }
-
-    // clear window object for FOP
-    MPI_Win_unlock_all (win);
-    MPI_Win_free (&win);
 
     mpi::Finalize ();
     return 0;
