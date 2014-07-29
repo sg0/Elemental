@@ -128,8 +128,8 @@ int main (int argc, char *argv[])
 		{
 		    for (int j = 0; j < DIM; j += AXPY_DIM)
 		    {
-			//Rmaint.Get (C, i, j);			
-			Rmaint.LocalAcc (1.0, C, i, j);
+			Rmaint.Get (C, i, j);			
+			//Rmaint.LocalAcc (1.0, C, i, j);
 #if DEBUG > 2
 			std::cout << std::to_string(commRank) + ": GET patch: " 
 			    + std::to_string(i) + "," + std::to_string(j) 
@@ -144,25 +144,32 @@ int main (int argc, char *argv[])
 	    Rmaint.Detach ();
 
 #if DEBUG > 1
-	    for (int j = 0; j < commSize; j++)
+	    if (DIM <= 20 && commSize < 16)
 	    {
-		if (j == commRank)
+		for (int j = 0; j < commSize; j++)
 		{
-		    if (DIM <= 20)
+		    if (j == commRank)
+		    {
 			Print (A, "Updated distributed A");
+		    }
 		}
-	    }
-	    mpi::Barrier ( comm );
-	    for (int j = 0; j < commSize; j++)
-	    {
-		if (j == commRank)
+		mpi::Barrier ( comm );
+		for (int j = 0; j < commSize; j++)
 		{
-		    // Process 0 can now locally print its copy of A
-		    if (DIM <= 20)
+		    if (j == commRank)
+		    {
+			// Process 0 can now locally print its copy of A
 			Print (C, "Patch of A");
+		    }
 		}
+		mpi::Barrier ( comm );
 	    }
-	    mpi::Barrier ( comm );
+	    else
+	    {
+		if ( commRank == 0 && k == (ITER-1) )
+		    std::cout << "Inifinity norm of local matrix after " 
+			<< k+1 << " iterations: " << InfinityNorm ( C ) << "\n";
+	    }
 #endif
 	}
 	t2 = MPI_Wtime();

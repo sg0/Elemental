@@ -157,14 +157,31 @@ int main (int argc, char *argv[])
 	    }
 	    interface.Detach ();
 #if DEBUG > 1
-	    for (int j = 0; j < commSize; j++)
+	    if (DIM <= 20 && commSize < 16)
 	    {
-		if (j == commRank)
+		for (int j = 0; j < commSize; j++)
 		{
-		    // Process 0 can now locally print its copy of A
-		    if (DIM <= 20)
-			Print (C, "Patch of A");
+		    if (j == commRank)
+		    {
+			Print (A, "Updated distributed A");
+		    }
 		}
+		mpi::Barrier ( comm );
+		for (int j = 0; j < commSize; j++)
+		{
+		    if (j == commRank)
+		    {
+			// Process 0 can now locally print its copy of A
+			Print (C, "Patch of A");
+		    }
+		}
+		mpi::Barrier ( comm );
+	    }
+	    else
+	    {
+		if ( commRank == 0 && k == (ITER-1) )
+		    std::cout << "Inifinity norm of local matrix after " 
+			<< k+1 << " iterations: " << InfinityNorm ( C ) << "\n";
 	    }
 #endif
 	}

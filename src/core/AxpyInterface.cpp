@@ -15,6 +15,8 @@
 
 namespace El
 {
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#else
   template < typename T > bool AxpyInterface < T >::Finished ()
   {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::Finished");
@@ -97,6 +99,7 @@ namespace El
 	haveEomFrom_[source] = true;
       }
   }
+#endif // NO USE OF THESE P2P SYNC FUNCTIONS WHEN NBC IS ACTIVE
 
   template < typename T > void AxpyInterface < T >::HandleLocalToGlobalData ()
   {
@@ -228,10 +231,18 @@ namespace El
 	const Int numEntries = localHeight * localWidth;
 
 	const Int bufferSize = 2 * sizeof (Int) + numEntries * sizeof (T);
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+	const Int index = replyVectors_[source].size();
+	for (Int i = 0; i < index; ++i)
+	    replyVectors_[source][i].resize ( bufferSize );
+	replyVectors_[source].resize (index + 1);
+	replyVectors_[source][index].resize ( bufferSize );
+	mpi::Request dummy_request = mpi::REQUEST_NULL;
+#else
 	const Int index = ReadyForSend (bufferSize, replyVectors_[source],
 					replySendRequests_[source],
 					sendingReply_[source]);
-
+#endif
 	// Pack the reply header
 	byte *sendBuffer = replyVectors_[source][index].data ();
 	byte *sendHead = sendBuffer;
@@ -250,9 +261,15 @@ namespace El
 	  }
 
 	// Fire off non-blocking send
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+	mpi::TaggedISSend
+	  (sendBuffer, bufferSize, source, DATA_REPLY_TAG, g.VCComm (),
+	   dummy_request);
+#else
 	mpi::TaggedISSend
 	  (sendBuffer, bufferSize, source, DATA_REPLY_TAG, g.VCComm (),
 	   replySendRequests_[source][index]);
+#endif
       }
   }
 
@@ -284,6 +301,9 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, DistMatrix<T>& Z )
     }
 
     const Int p = Z.Grid().Size();
+    
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#else
     sentEomTo_.resize( p, false );
     haveEomFrom_.resize( p, false );
 
@@ -291,15 +311,16 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, DistMatrix<T>& Z )
     sendingRequest_.resize( p );
     sendingReply_.resize( p );
 
-    dataVectors_.resize( p );
-    requestVectors_.resize( p );
-    replyVectors_.resize( p );
-
     dataSendRequests_.resize( p );
     requestSendRequests_.resize( p );
     replySendRequests_.resize( p );
 
     eomSendRequests_.resize( p );
+#endif
+
+    dataVectors_.resize( p );
+    requestVectors_.resize( p );
+    replyVectors_.resize( p );
 }
 
 template<typename T>
@@ -320,6 +341,8 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
       }
 
     const Int p = X.Grid ().Size ();
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#else
     sentEomTo_.resize (p, false);
     haveEomFrom_.resize (p, false);
 
@@ -327,16 +350,17 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     sendingRequest_.resize (p);
     sendingReply_.resize (p);
 
-    dataVectors_.resize (p);
-    requestVectors_.resize (p);
-    replyVectors_.resize (p);
-
     dataSendRequests_.resize (p);
     requestSendRequests_.resize (p);
     replySendRequests_.resize (p);
 
     eomSendRequests_.resize (p);
-  }
+#endif
+ 
+    dataVectors_.resize (p);
+    requestVectors_.resize (p);
+    replyVectors_.resize (p);
+ }
 
   template < typename T > AxpyInterface < T >::~AxpyInterface ()
   {
@@ -389,20 +413,24 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 #endif
     const Int p = Z.Grid ().Size ();
     
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#else
+    // eom
     sentEomTo_.resize (p, false);
     haveEomFrom_.resize (p, false);
+    // request objects
     sendingRequest_.resize (p);
     dataSendRequests_.resize (p);
-    
     eomSendRequests_.resize (p);
+    // ready-to-send 
     requestSendRequests_.resize (p);
     replySendRequests_.resize (p);
-    requestVectors_.resize (p);
-
     sendingData_.resize (p);
     sendingReply_.resize (p);
-   
-    dataVectors_.resize (p);
+#endif
+       
+    dataVectors_.resize (p);  
+    requestVectors_.resize (p);  
     replyVectors_.resize (p);
   }
 
@@ -427,23 +455,26 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     all_sends_are_finished = '0';
 #endif
     const Int p = X.Grid ().Size ();
-    
+
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#else
+    // eom   
     sentEomTo_.resize (p, false);
     haveEomFrom_.resize (p, false);
-    
+    // request objects
     dataSendRequests_.resize (p);
     requestSendRequests_.resize (p);
     replySendRequests_.resize (p);
     eomSendRequests_.resize (p);
-    
-    requestVectors_.resize (p);
+    // ready-to-send 
     sendingRequest_.resize (p);
-    
     sendingData_.resize (p);
     sendingReply_.resize (p);
+#endif
 
     dataVectors_.resize (p);
     replyVectors_.resize (p);
+    requestVectors_.resize (p);
    }
 
   template < typename T >
@@ -516,7 +547,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 		dataVectors_[destination][i].resize ( bufferSize );
     	    dataVectors_[destination].resize (index + 1);
 	    dataVectors_[destination][index].resize ( bufferSize );
-	    mpi::Request dummy_request;
+	    mpi::Request dummy_request = mpi::REQUEST_NULL;
 #else
 	    const Int index =
 	    ReadyForSend (bufferSize, dataVectors_[destination],
@@ -556,7 +587,6 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	    mpi::TaggedISSend
 	      (sendBuffer, bufferSize, destination, DATA_TAG, g.VCComm (),
 	       dummy_request);
-	    mpi::RequestFree (dummy_request);
 #else
 	    mpi::TaggedISSend
 	      (sendBuffer, bufferSize, destination, DATA_TAG, g.VCComm (),
@@ -567,22 +597,6 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	if (receivingRow == 0)
 	  receivingCol = (receivingCol + 1) % c;
       }
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-    // nonblocking ssends have been issued 
-    // send all PEs
-    // this block might be invoked by multiple
-    // processes
-    /*
-    for (Int rank = 0; rank < p; rank++)
-    {
-	mpi::Request _request = mpi::REQUEST_NULL;
-	byte sends_are_finished = '1';
-	mpi::TaggedISSend
-	  (&sends_are_finished, sizeof(byte), rank, ALL_ISSENDS_FINISHED, g.VCComm (),
-	   _request);
-    }
-    */
-#endif
   }
 
 // Update Y += alpha X(i:i+height-1,j:j+width-1), where X is the dist-matrix
@@ -607,10 +621,18 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     for (Int rank = 0; rank < p; ++rank)
       {
 	const Int bufferSize = 4 * sizeof (Int);
-
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+	const Int index = requestVectors_[rank].size();
+	for (Int i = 0; i < index; ++i)
+	    requestVectors_[rank][i].resize ( bufferSize );
+	requestVectors_[rank].resize (index + 1);
+	requestVectors_[rank][index].resize ( bufferSize );
+	mpi::Request dummy_request = mpi::REQUEST_NULL;
+#else
 	const Int index = ReadyForSend (bufferSize, requestVectors_[rank],
 					requestSendRequests_[rank],
 					sendingRequest_[rank]);
+#endif
 	// Copy the request header into the send buffer
 	byte *sendBuffer = requestVectors_[rank][index].data ();
 	byte *head = sendBuffer;
@@ -624,11 +646,17 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	head += sizeof (Int);
 
 	// Begin the non-blocking send
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+	mpi::TaggedISSend
+	  (sendBuffer, bufferSize, rank, DATA_REQUEST_TAG, g.VCComm (),
+	   dummy_request);
+#else
 	mpi::TaggedISSend
 	  (sendBuffer, bufferSize, rank, DATA_REQUEST_TAG, g.VCComm (),
 	   requestSendRequests_[rank][index]);
+#endif	
       }
-
+    
     // Receive all of the replies
     Int numReplies = 0;
     while (numReplies < p)
@@ -680,7 +708,9 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
       }
   }
 
-  template < typename T >
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#else
+ template < typename T >
     Int AxpyInterface < T >::ReadyForSend
     (Int sendSize,
      std::deque < std::vector < byte >> &sendVectors,
@@ -716,7 +746,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     
     return numCreated;
   }
-
+  
   template < typename T > void AxpyInterface < T >::UpdateRequestStatuses ()
   {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::UpdateRequestStatuses"))
@@ -741,7 +771,8 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	    sendingReply_[i][j] = !mpi::Test (replySendRequests_[i][j]);
       }
   }
-
+#endif // NO USE OF THESE P2P SYNC FUNCTIONS WHEN NBC IS ACTIVE
+  
   template < typename T > void AxpyInterface < T >::Detach ()
   {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::Detach"))
@@ -755,9 +786,6 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     if (attachedForLocalToGlobal_)
     {
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-	// recv messages with ALL_ISSENDS_FINISHED tag
-	//TaggedRecv (&all_sends_are_finished, 1, mpi::ANY_SOURCE,
-        //                   ALL_ISSENDS_FINISHED, g.VCComm ());
 	bool DONE = false;
 	mpi::Request nb_bar_request;
 	bool nb_bar_active = false;
@@ -797,12 +825,43 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     }
     else
     {
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+	bool DONE = false;
+	mpi::Request nb_bar_request;
+	bool nb_bar_active = false;
+        // nonblocking ssends must have been issued 
+        all_sends_are_finished = '1';
+	// spin till all messages sent have been
+	// received
+	while (!DONE)
+	{
+	    // probes for incoming message requests 
+	    // receives, and posts reply
+	    HandleGlobalToLocalRequest ();
+	    
+	    if (nb_bar_active)
+	    {
+		// test/wait for IBarrier completion
+		DONE = mpi::Test (nb_bar_request);
+	    }
+	    else
+	    {
+		if (all_sends_are_finished == '1')
+		{
+		    // all ssends are complete, start nonblocking barrier
+		    mpi::IBarrier (g.VCComm (), nb_bar_request);
+		    nb_bar_active = true;
+		}
+	    }
+	}
+#else
             while (!Finished ())
             {
                     HandleGlobalToLocalRequest ();
                     HandleEoms ();
             }
             mpi::Barrier (g.VCComm ());
+#endif
     }
 
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
@@ -812,22 +871,23 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     attachedForGlobalToLocal_ = false;
     recvVector_.clear ();
 
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#else
     sentEomTo_.clear ();
     haveEomFrom_.clear ();
 
     sendingData_.clear ();
     sendingRequest_.clear ();
     sendingReply_.clear ();
-
-    dataVectors_.clear ();
-    requestVectors_.clear ();
-    replyVectors_.clear ();
-
+    
     dataSendRequests_.clear ();
     requestSendRequests_.clear ();
     replySendRequests_.clear ();
-
     eomSendRequests_.clear ();
+#endif
+    dataVectors_.clear ();
+    requestVectors_.clear ();
+    replyVectors_.clear ();
   }
 
   template class AxpyInterface < Int >;

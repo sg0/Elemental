@@ -17,7 +17,7 @@ http://opensource.org/licenses/BSD-2-Clause
 
 // TODO Complete the const interfaces...
 // TODO RMA related checks pending (e.g bounds checking)...
-// TODO Consider DDT
+// TODO Use DDT for put/get/acc when EL_USE_DERIVED_TYPE is defined
 // TODO Use DEBUG_ONLY or something that EL provides instead of assert
 #if MPI_VERSION>=3
 namespace El
