@@ -233,11 +233,17 @@ namespace El
 	const Int bufferSize = 2 * sizeof (Int) + numEntries * sizeof (T);
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
 	const Int index = replyVectors_[source].size();
+	replyVectors_[source].resize (index + 1);
+	replyVectors_[source][index].resize ( bufferSize );
+	mpi::Request dummy_request = mpi::REQUEST_NULL;
+	/*
+	const Int index = replyVectors_[source].size();
 	for (Int i = 0; i < index; ++i)
 	    replyVectors_[source][i].resize ( bufferSize );
 	replyVectors_[source].resize (index + 1);
 	replyVectors_[source][index].resize ( bufferSize );
 	mpi::Request dummy_request = mpi::REQUEST_NULL;
+	*/
 #else
 	const Int index = ReadyForSend (bufferSize, replyVectors_[source],
 					replySendRequests_[source],
@@ -543,11 +549,17 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	      4 * sizeof (Int) + (numEntries + 1) * sizeof (T);
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
 	    const Int index = dataVectors_[destination].size();
+	    dataVectors_[destination].resize (index + 1);
+	    dataVectors_[destination][index].resize ( bufferSize );
+	    mpi::Request dummy_request = mpi::REQUEST_NULL;
+	    /*
+	    const Int index = dataVectors_[destination].size();
 	    for (Int i = 0; i < index; ++i)
 		dataVectors_[destination][i].resize ( bufferSize );
     	    dataVectors_[destination].resize (index + 1);
 	    dataVectors_[destination][index].resize ( bufferSize );
 	    mpi::Request dummy_request = mpi::REQUEST_NULL;
+	    */
 #else
 	    const Int index =
 	    ReadyForSend (bufferSize, dataVectors_[destination],

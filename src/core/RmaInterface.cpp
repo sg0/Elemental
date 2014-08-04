@@ -863,7 +863,7 @@ void RmaInterface<T>::Detach()
                       GlobalArrayPut_->Grid() :
                       GlobalArrayGet_->Grid() );
 
-    // mpi::Barrier( g.VCComm() );
+    mpi::Barrier( g.VCComm() );
 
     attached_ 		= false;
     detached_ 		= true;
