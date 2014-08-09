@@ -19,6 +19,7 @@ http://opensource.org/licenses/BSD-2-Clause
 // TODO RMA related checks pending (e.g bounds checking)...
 // TODO Use DDT for put/get/acc when EL_USE_DERIVED_TYPE is defined
 // TODO Use DEBUG_ONLY or something that EL provides instead of assert
+// TODO Add a logic in Flush to return immediately if Get is used
 #if MPI_VERSION>=3
 namespace El
 {
@@ -28,7 +29,8 @@ RmaInterface<T>::RmaInterface()
     : GlobalArrayPut_(0), GlobalArrayGet_(0),
     putVector_(0), getVector_(0), window (MPI_WIN_NULL),
     toBeAttachedForPut_(false), toBeAttachedForGet_(false),
-    attached_(false), detached_(false)
+    attached_(false), detached_(false), preceeding_get_(false),
+    preceeding_put_(false)
 { }
 
 template<typename T>
@@ -40,6 +42,8 @@ RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
     detached_ 		= false;
     toBeAttachedForGet_ = true;
     toBeAttachedForPut_ = true;
+    preceeding_put_     = false;
+    preceeding_get_     = false;
     GlobalArrayPut_ 	= &Z;
     GlobalArrayGet_ 	= &Z;
     window 	    	= MPI_WIN_NULL;
@@ -58,6 +62,8 @@ RmaInterface<T>::RmaInterface( const DistMatrix<T>& X )
     detached_ 		= false;
     toBeAttachedForGet_ = true;
     toBeAttachedForPut_ = false;
+    preceeding_put_     = false;
+    preceeding_get_     = false;
     GlobalArrayGet_ 	= &X;
     GlobalArrayPut_ 	= 0;
     window 	    	= MPI_WIN_NULL;

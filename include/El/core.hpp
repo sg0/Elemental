@@ -149,5 +149,6 @@ template<typename T,Dist U=MC,Dist V=MR> class BlockDistMatrix;
 #include "El/core/random/impl.hpp"
 #include "El/core/AxpyInterface.hpp"
 #include "El/core/RmaInterface.hpp"
+#include "El/core/AxpyInterface2.0.hpp"
 
 #endif // ifndef EL_CORE_HPP

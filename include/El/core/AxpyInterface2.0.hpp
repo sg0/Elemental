@@ -1,102 +1,89 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
-   Copyright (c) 2011, The University of Texas at Austin
-   All rights reserved.
-
-   Authors:
-   This interface is mainly due to Martin Schatz, but it was put into its
-   current form by Jack Poulson.
-
-   This file is part of Elemental and is under the BSD 2-Clause License, 
-   which can be found in the LICENSE file in the root directory, or at 
+   This file is part of Elemental and is under the BSD 2-Clause License,
+   which can be found in the LICENSE file in the root directory, or at
    http://opensource.org/licenses/BSD-2-Clause
 */
 #pragma once
-#ifndef EL_AXPYINTERFACE_HPP
-#define EL_AXPYINTERFACE_HPP
+#ifndef EL_AXPYINTERFACE2_HPP
+#define EL_AXPYINTERFACE2_HPP
 
 namespace El {
-
-namespace AxpyTypeNS {
-enum AxpyType { LOCAL_TO_GLOBAL, GLOBAL_TO_LOCAL };
-}
-using namespace AxpyTypeNS;
-
 template<typename T>
-class AxpyInterface
-{   
+class AxpyInterface2
+{
 public:
-    AxpyInterface();
-    ~AxpyInterface();
-   
-    AxpyInterface( AxpyType type,       DistMatrix<T,MC,MR>& Z );
-    AxpyInterface( AxpyType type, const DistMatrix<T,MC,MR>& Z ); 
+    AxpyInterface2();
+    ~AxpyInterface2();
 
-    void Attach( AxpyType type,       DistMatrix<T,MC,MR>& Z ); 
-    void Attach( AxpyType type, const DistMatrix<T,MC,MR>& Z ); 
+    AxpyInterface2(       DistMatrix<T,MC,MR>& Z );
+    AxpyInterface2( const DistMatrix<T,MC,MR>& Z );
 
-    void Axpy( T alpha,       Matrix<T>& Z, Int i, Int j );
-    void Axpy( T alpha, const Matrix<T>& Z, Int i, Int j );
+    void Attach(       DistMatrix<T,MC,MR>& Z );
+    void Attach( const DistMatrix<T,MC,MR>& Z );
+
+    void Put( Matrix<T>& Z, Int i, Int j );
+    void Put( const Matrix<T>& Z, Int i, Int j );
+
+    void Get(       Matrix<T>& Z, Int i, Int j );
+
+    void Acc(       Matrix<T>& Z, Int i, Int j );
+    void Acc( const Matrix<T>& Z, Int i, Int j );
+    void LocalAcc(  Matrix<T>& Z, Int i, Int j );
+
+    void Flush( Matrix<T>& Z, Int i, Int j );
+    void Flush( const Matrix<T>& Z, Int i, Int j );
+    void Flush(       Matrix<T>& Z );
+    void Flush( const Matrix<T>& Z );
+    
+    void LocalFlush( Matrix<T>& Z, Int i, Int j );
+    void LocalFlush( const Matrix<T>& Z, Int i, Int j );
 
     void Detach();
 
 private:
+   
     static const Int 
-        DATA_TAG        =1, 
-        EOM_TAG         =2, 
-        DATA_REQUEST_TAG=3, 
-        DATA_REPLY_TAG  =4;
-  
-//request object for polling on Issends
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-    byte all_sends_are_finished;
-#endif
-    bool attachedForLocalToGlobal_, attachedForGlobalToLocal_;
-
-    DistMatrix<T,MC,MR>* localToGlobalMat_;
-    const DistMatrix<T,MC,MR>* globalToLocalMat_;
-
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-#else
-    std::vector<bool> sentEomTo_, haveEomFrom_;
-    std::vector<mpi::Request> eomSendRequests_;
-
-    std::vector<std::deque<bool>> 
-        sendingData_, sendingRequest_, sendingReply_;
+        DATA_PUT_TAG   =1, 
+        DATA_GET_TAG   =2,
+        DATA_ACC_TAG   =3,
+        DATA_LCC_TAG   =4;
+     
+    /* Meta */
     std::vector<std::deque<mpi::Request>> 
-        dataSendRequests_, requestSendRequests_, replySendRequests_;
-#endif
+	dataRequests_;
+    std::vector<std::deque<bool>>  
+	dataRequestStatuses_;
+    std::vector<std::deque<T *>> 
+	matrixBase_; 
+    std::vector<std::deque< Int >> 
+	opKind_; 
+    /* Data */
+    std::vector<std::deque<std::vector<T>>>
+        getVectors_, putVectors_;
+ 
+    DistMatrix<T,MC,MR>* GlobalArrayPut_;
+    DistMatrix<T,MC,MR>* GlobalArrayGet_;
     
-    std::vector<byte> recvVector_;
-    std::vector<std::deque<std::vector<byte>>>
-        dataVectors_, requestVectors_, replyVectors_;
+    bool toBeAttachedForPut_, toBeAttachedForGet_, 
+	 attached_, detached_, sends_complete_;
+     
+   Int GetIndexForMatrix ( Matrix<T>& Z, const Int rank );
+   void ProgressMatrix ( Matrix<T>& Z, const Int rank );
+   Int GetMatrixType ( Matrix<T>& Z );
+   
+   Int NextIndex (Int dataSize, 
+	   std::deque<std::vector<T>> &dataVectors,
+	   std::deque<mpi::Request> &requests,
+	   std::deque<bool> &requestStatus,
+	   std::deque<Int> &opKind,
+	   Int op,
+	   std::deque<T *> &matrixBase,
+	   T * base);
     
-    byte sendDummy_, recvDummy_;
-
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-#else
-    // Check if we are done with this attachment's work
-    bool Finished();
-    // Progress functions
-    void UpdateRequestStatuses();
-    void HandleEoms();
-    void StartSendingEoms();
-    void FinishSendingEoms();
-
-    Int ReadyForSend
-    ( Int sendSize,
-      std::deque<std::vector<byte>>& sendVectors,
-      std::deque<mpi::Request>& requests, 
-      std::deque<bool>& requestStatuses );
-#endif
-
-    void HandleLocalToGlobalData();
-    void HandleGlobalToLocalRequest();
-
-    void AxpyLocalToGlobal( T alpha, const Matrix<T>& X, Int i, Int j );
-    void AxpyGlobalToLocal( T alpha,       Matrix<T>& Y, Int i, Int j );
+    void HandleLocalToGlobalData( Matrix<T>& Z, Int i, Int j );
+    void HandleGlobalToLocalData( Matrix<T>& Z, Int i, Int j );
+    void HandleLocalToGlobalAcc(  Matrix<T>& Z, Int i, Int j );
+    void HandleGlobalToLocalAcc(  Matrix<T>& Z, Int i, Int j );
 };
-
 } // namespace El
-
-#endif // ifndef EL_AXPYINTERFACE_HPP
+#endif // ifndef EL_AXPYINTERFACE2_HPP

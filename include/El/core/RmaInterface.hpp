@@ -56,7 +56,8 @@ private:
     const DistMatrix<T,MC,MR>* GlobalArrayGet_;
     
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
-	 attached_, detached_;
+	 attached_, detached_, preceeding_put_,
+	 preceeding_get_;
  };
 #endif //MPI-3
 } // namespace El
