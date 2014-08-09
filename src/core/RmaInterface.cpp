@@ -174,6 +174,20 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 }
 
 template<typename T>
+Int RmaInterface<T>::NextIndex
+( Int dataSize, 
+  std::deque <std::vector<T>> &dataVectors )
+{
+    DEBUG_ONLY (CallStackEntry cse ("RmaInterface::NextIndex"))
+    const Int Index = Int(dataVectors.size ());
+
+    dataVectors.resize (Index + 1);
+    dataVectors[Index].resize (dataSize);
+    
+    return Index;
+}
+
+template<typename T>
 void RmaInterface<T>::Put( Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Put"))
@@ -222,9 +236,10 @@ void RmaInterface<T>::Put( Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
+	    const Int index = RmaInterface<T>::NextIndex ( numEntries, 
+		    putVector_[destination] );
 
-            putVector_[destination].resize( numEntries );
-            T* sendBuffer = putVector_[destination].data();
+            T* sendBuffer = putVector_[destination][index].data();
             T* sendData = reinterpret_cast<T*>(sendBuffer);
             T* XBuffer = Z.Buffer();
 
@@ -242,7 +257,7 @@ void RmaInterface<T>::Put( Matrix<T>& Z, Int i, Int j )
             // local flush, okay to clear buffers after this
             mpi::FlushLocal (destination, window);
             // clear
-            putVector_[destination].resize (0);
+            putVector_[destination][index].resize (0);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -302,9 +317,9 @@ void RmaInterface<T>::Put( const Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-
-            putVector_[destination].resize( numEntries );
-            T* sendBuffer = putVector_[destination].data();
+	    const Int index = RmaInterface<T>::NextIndex ( numEntries, 
+		    putVector_[destination] );
+            T* sendBuffer = putVector_[destination][index].data();
             T* sendData = reinterpret_cast<T*>(sendBuffer);
             const T* XBuffer = Z.LockedBuffer();
 
@@ -322,7 +337,7 @@ void RmaInterface<T>::Put( const Matrix<T>& Z, Int i, Int j )
             // local flush, okay to clear buffers after this
             mpi::FlushLocal (destination, window);
             // clear
-            putVector_[destination].resize (0);
+            putVector_[destination][index].resize (0);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -383,9 +398,9 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-
-            getVector_[destination].resize ( numEntries );
-            T *getBuffer = getVector_[destination].data ();
+	    const Int index = RmaInterface<T>::NextIndex ( numEntries, 
+		    getVector_[destination] );
+            T *getBuffer = getVector_[destination][index].data ();
 
             // get
             for( Int t=0; t<localWidth; ++t )
@@ -407,7 +422,7 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
                     YCol[colShift+s*r] = XCol[s];
             }
             // clear
-            getVector_[destination].resize (0);
+            getVector_[destination][index].resize (0);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -467,9 +482,10 @@ void RmaInterface<T>::Acc( Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
+	    const Int index = RmaInterface<T>::NextIndex ( numEntries, 
+		    putVector_[destination] );
 
-            putVector_[destination].resize( numEntries );
-            T* sendBuffer = putVector_[destination].data();
+            T* sendBuffer = putVector_[destination][index].data();
             T* sendData = reinterpret_cast<T*>(sendBuffer);
             T* XBuffer = Z.Buffer();
 
@@ -487,7 +503,7 @@ void RmaInterface<T>::Acc( Matrix<T>& Z, Int i, Int j )
             // local flush, okay to clear buffers after this
             mpi::FlushLocal (destination, window);
             // clear
-            putVector_[destination].resize (0);
+            putVector_[destination][index].resize (0);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -548,9 +564,9 @@ void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-
-            putVector_[destination].resize( numEntries );
-            T* sendBuffer = putVector_[destination].data();
+	    const Int index = RmaInterface<T>::NextIndex ( numEntries, 
+		    putVector_[destination] );
+            T* sendBuffer = putVector_[destination][index].data();
             T* sendData = reinterpret_cast<T*>(sendBuffer);
             const T* XBuffer = Z.LockedBuffer();
 
@@ -568,7 +584,7 @@ void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
             // local flush, okay to clear buffers after this
             mpi::FlushLocal (destination, window);
             // clear
-            putVector_[destination].resize (0);
+            putVector_[destination][index].resize (0);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -631,9 +647,9 @@ void RmaInterface<T>::LocalAcc( Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-
-            getVector_[destination].resize ( numEntries );
-            T *getBuffer = getVector_[destination].data ();
+	    const Int index = RmaInterface<T>::NextIndex ( numEntries, 
+		    getVector_[destination] );
+            T *getBuffer = getVector_[destination][index].data ();
 
             // get
             for( Int t=0; t<localWidth; ++t )
@@ -655,7 +671,7 @@ void RmaInterface<T>::LocalAcc( Matrix<T>& Z, Int i, Int j )
                     YCol[colShift+s*r] += XCol[s];
             }
             // clear
-            getVector_[destination].resize (0);
+            getVector_[destination][index].resize (0);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )

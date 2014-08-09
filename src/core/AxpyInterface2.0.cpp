@@ -106,7 +106,8 @@ Int AxpyInterface2<T>::NextIndex
 {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface2::NextIndex"))
     const Int Index = Int(requests.size ());
-
+    
+    dataVectors.resize (Index + 1);
     dataVectors[Index].resize (dataSize);
     requests.push_back (mpi::REQUEST_NULL);
     requestStatus.push_back (true);

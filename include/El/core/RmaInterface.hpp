@@ -49,7 +49,7 @@ public:
 private:
     mpi::Window window;
 
-   std::vector<std::vector<T>>
+    std::vector<std::deque<std::vector<T>>>
         getVector_, putVector_;
 
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
@@ -58,7 +58,10 @@ private:
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
 	 attached_, detached_, preceeding_put_,
 	 preceeding_get_;
- };
+
+    Int NextIndex ( Int dataSize, 
+	    std::deque <std::vector<T>> &dataVectors );
+};
 #endif //MPI-3
 } // namespace El
 #endif // ifndef EL_RMAINTERFACE_HPP
