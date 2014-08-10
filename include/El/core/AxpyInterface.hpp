@@ -56,16 +56,13 @@ private:
     DistMatrix<T,MC,MR>* localToGlobalMat_;
     const DistMatrix<T,MC,MR>* globalToLocalMat_;
 
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-#else
     std::vector<bool> sentEomTo_, haveEomFrom_;
     std::vector<mpi::Request> eomSendRequests_;
-
+    
     std::vector<std::deque<bool>> 
         sendingData_, sendingRequest_, sendingReply_;
     std::vector<std::deque<mpi::Request>> 
         dataSendRequests_, requestSendRequests_, replySendRequests_;
-#endif
     
     std::vector<byte> recvVector_;
     std::vector<std::deque<std::vector<byte>>>
@@ -73,8 +70,6 @@ private:
     
     byte sendDummy_, recvDummy_;
 
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-#else
     // Check if we are done with this attachment's work
     bool Finished();
     // Progress functions
@@ -88,7 +83,6 @@ private:
       std::deque<std::vector<byte>>& sendVectors,
       std::deque<mpi::Request>& requests, 
       std::deque<bool>& requestStatuses );
-#endif
 
     void HandleLocalToGlobalData();
     void HandleGlobalToLocalRequest();
