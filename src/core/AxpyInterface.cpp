@@ -732,8 +732,9 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
         // progress my issends 
 	for (int i = 0; i < dataSendRequests_[me].size(); i++)
 	{
+	    if ( !mpi::Test ( dataSendRequests_[me][i] ))
         	mpi::Wait ( dataSendRequests_[me][i] );	
-		sendingData_[me][i] = false;
+	    sendingData_[me][i] = false;
 	}
 	// nonblocking ssends must have been issued 
         all_sends_are_finished = '1';

@@ -69,8 +69,8 @@ private:
      
    Int GetIndexForMatrix ( Matrix<T>& Z, const Int rank );
    void ProgressMatrix ( Matrix<T>& Z, const Int rank );
-   Int GetMatrixType ( Matrix<T>& Z );
-   
+   Int GetMatrixType ( Matrix<T>& Z, const Int rank );
+
    Int NextIndex (Int dataSize, 
 	   std::deque<std::vector<T>> &dataVectors,
 	   std::deque<mpi::Request> &requests,

@@ -188,7 +188,8 @@ void AxpyInterface2<T>::Put( Matrix<T>& Z, Int i, Int j )
             }
 	    // put request 
 	    mpi::TaggedISSend (sendBuffer, numEntries, destination, 
-			DATA_PUT_TAG, g.VCComm (), dataRequests_[destination][index]);
+			DATA_PUT_TAG, g.VCComm (), 
+			dataRequests_[destination][index]);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -339,7 +340,8 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
             }
 	    // acc request 
 	    mpi::TaggedISSend (sendBuffer, numEntries, destination, 
-			DATA_ACC_TAG, g.VCComm (), dataRequests_[destination][index]);
+			DATA_ACC_TAG, g.VCComm (), 
+			dataRequests_[destination][index]);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -358,7 +360,7 @@ void AxpyInterface2<T>::LocalAcc( Matrix<T>& Z, Int i, Int j )
     // the DistMatrix isn't attached
     if ( !toBeAttachedForGet_ )
         LogicError ("Cannot perform this operation as matrix is not attached.");
-if( i < 0 || j < 0 )
+    if( i < 0 || j < 0 )
         LogicError("Submatrix offsets must be non-negative");
 
     const DistMatrix<T> &X = *GlobalArrayGet_;
@@ -381,9 +383,6 @@ if( i < 0 || j < 0 )
 
     const Int colAlign = (X.ColAlign() + i) % r;
     const Int rowAlign = (X.RowAlign() + j) % c;
-
-    const Int iLocalOffset = Length (i, X.ColShift (), r);
-    const Int jLocalOffset = Length (j, X.RowShift (), c);
 
     const Int XLDim = X.LDim ();
 
@@ -418,7 +417,7 @@ if( i < 0 || j < 0 )
             // get request
 	    mpi::TaggedRecv (getBuffer, numEntries, source, 
 		    DATA_LCC_TAG, g.VCComm ());
-            // update local matrix
+            // acc to local matrix
             for( Int t=0; t<localWidth; ++t )
             {
                 T *YCol = Z.Buffer (0,rowShift+t*c);
@@ -441,18 +440,18 @@ Int AxpyInterface2<T>::GetIndexForMatrix ( Matrix<T>& Z, const Int rank )
     dit = std::find ( matrixBase_[rank].begin(), 
 	    matrixBase_[rank].end(), Z.LockedBuffer ());
     const Int index = (dit - matrixBase_[rank].begin());
-    assert (index != matrixBase_[rank].size ());
+    //std::cout << "matrixBase size: " << matrixBase_[rank].size () << "\n";
+    assert ( index != matrixBase_[rank].size () );
 
     return index;
 }
 
 // get operation associated with a matrix 
-// operation direction will be same for all ranks
 template<typename T>
-Int AxpyInterface2<T>::GetMatrixType ( Matrix<T>& Z )
+Int AxpyInterface2<T>::GetMatrixType ( Matrix<T>& Z, const Int rank )
 {
-    const Int index = GetIndexForMatrix ( Z, 0 );
-    return opKind_[0][index];
+    const Int index = GetIndexForMatrix ( Z, rank );
+    return opKind_[rank][index];
 }
 
 // progress communication for a particular matrix
@@ -478,21 +477,13 @@ void AxpyInterface2<T>::LocalFlush( Matrix<T>& Z, Int i, Int j )
     if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
         LogicError("Must initiate transfer before flushing.");
 
-    // local flush has no meaning for global to local
-    // transfers
-    Int type = GetMatrixType ( Z );
-    if ( type == DATA_GET_TAG || type == DATA_LCC_TAG )
-    {
-	Flush ( Z, i, j );
-	return;
-    }
-
     DistMatrix<T>& Y = *GlobalArrayPut_;
 
     const Grid& g = Y.Grid();
     const Int r = g.Height();
     const Int c = g.Width();
     const Int p = g.Size();
+    
     const Int myProcessRow = g.Row();
     const Int myProcessCol = g.Col();
     const Int colAlign = (Y.ColAlign() + i) % r;
@@ -516,7 +507,14 @@ void AxpyInterface2<T>::LocalFlush( Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-            ProgressMatrix ( Z, destination );
+	    // local flush has no meaning for global to local
+	    Int type = GetMatrixType ( Z, destination );
+	    if ( type == DATA_GET_TAG || type == DATA_LCC_TAG )
+	    {
+		Flush ( Z, i, j );
+		return;
+	    }
+	    ProgressMatrix ( Z, destination );
         }
 
         receivingRow = (receivingRow + 1) % r;
@@ -528,47 +526,80 @@ void AxpyInterface2<T>::LocalFlush( Matrix<T>& Z, Int i, Int j )
 // flush ensures local and remote completion
 // this interface assumes a send has been issued
 // and will post a matching receive and progress
-template<typename T>
+    template<typename T>
 void AxpyInterface2<T>::Flush( Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Flush"))
-    if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
-        LogicError("Must initiate transfer before flushing.");
-    // ensure local completion for local to 
-    // global transfers
-    Int type = GetMatrixType ( Z );
-    switch ( type )
-    {
-	case DATA_PUT_TAG:
-	    {
-		LocalFlush ( Z, i, j );
-		HandleLocalToGlobalData ( Z, i, j );
-		break;
-	    }
-	case DATA_ACC_TAG:
-	    {
-		LocalFlush ( Z, i, j );
-		HandleLocalToGlobalAcc ( Z, i, j );
-		break;
-	    }
-	case DATA_GET_TAG:
-	    {
-		HandleGlobalToLocalData ( Z, i, j );
-		break;
-	    }
-	case DATA_LCC_TAG:
-	    {
-		HandleGlobalToLocalAcc ( Z, i, j );
-		break;
-	    }
+	if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
+	    LogicError("Must initiate transfer before flushing.");
 
+    DistMatrix<T>& Y = *GlobalArrayPut_;
+    const Grid& g = Y.Grid();
+    const Int r = g.Height();
+    const Int c = g.Width();
+    const Int p = g.Size();
+
+    const Int myProcessRow = g.Row();
+    const Int myProcessCol = g.Col();
+    const Int colAlign = (Y.ColAlign() + i) % r;
+    const Int rowAlign = (Y.RowAlign() + j) % c;
+
+    // local width and height
+    const Int height = Z.Height();
+    const Int width = Z.Width();
+
+    // find destination
+    Int receivingRow = myProcessRow;
+    Int receivingCol = myProcessCol;
+    for( Int step=0; step<p; ++step )
+    {
+	const Int colShift = Shift( receivingRow, colAlign, r );
+	const Int rowShift = Shift( receivingCol, rowAlign, c );
+	const Int localHeight = Length( height, colShift, r );
+	const Int localWidth = Length( width, rowShift, c );
+	const Int numEntries = localHeight*localWidth;
+
+	if( numEntries != 0 )
+	{
+	    const Int destination = receivingRow + r*receivingCol;
+	    // ensure local completion for local to 
+	    // global transfers
+	    const Int type = GetMatrixType ( Z, destination );
+	    switch ( type )
+	    {
+		case DATA_PUT_TAG:
+		    {
+			ProgressMatrix ( Z, destination );
+			HandleLocalToGlobalData ( Z, i, j );
+			break;
+		    }
+		case DATA_ACC_TAG:
+		    {
+			ProgressMatrix ( Z, destination );
+			HandleLocalToGlobalAcc ( Z, i, j );
+			break;
+		    }
+		case DATA_GET_TAG:
+		    {
+			HandleGlobalToLocalData ( Z, i, j );
+			break;
+		    }
+		case DATA_LCC_TAG:
+		    {
+			HandleGlobalToLocalAcc ( Z, i, j );
+			break;
+		    }
+	    }
+	}
+	receivingRow = (receivingRow + 1) % r;
+	if( receivingRow == 0 )
+	    receivingCol = (receivingCol + 1) % c;
     }
 }
 
 template<typename T>
 void AxpyInterface2<T>::Flush( Matrix<T>& Z )
 {
-
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Flush"))
     Flush ( Z, 0, 0 );	
 }
@@ -592,8 +623,6 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z, Int i, Int j )
     const Int myProcessCol = g.Col();
     const Int colAlign = (Y.ColAlign() + i) % r;
     const Int rowAlign = (Y.RowAlign() + j) % c;
-    std::vector < std::vector<T> > putVector;
-    putVector.resize (p);
 
     const Int XLDim = Z.LDim();
     // local matrix width and height
@@ -617,10 +646,19 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z, Int i, Int j )
 	if( numEntries != 0 )
 	{
 	    const Int destination = receivingRow + r*receivingCol;
-
-	    putVector[destination].resize( numEntries );
-	    T* sendBuffer = putVector[destination].data();
-	    T* XBuffer = Z.Buffer();
+            T* XBuffer = Z.Buffer();
+     	    const Int index =
+	    NextIndex (numEntries, putVectors_[destination],
+		    dataRequests_[destination],
+		    dataRequestStatuses_[destination],
+		    opKind_[destination],
+		    DATA_PUT_TAG,
+		    matrixBase_[destination], 
+		    XBuffer);
+	    DEBUG_ONLY (if
+			(Int (putVectors_[destination][index].size ()) !=
+			 numEntries) LogicError ("Error in NextIndex");)
+	    T *sendBuffer = putVectors_[destination][index].data ();
 
 	    for( Int t=0; t<localWidth; ++t )
 	    {
@@ -660,8 +698,6 @@ void AxpyInterface2<T>::HandleGlobalToLocalAcc ( Matrix<T>& Z, Int i, Int j )
     const Int myProcessCol = g.Col();
     const Int colAlign = (Y.ColAlign() + i) % r;
     const Int rowAlign = (Y.RowAlign() + j) % c;
-    std::vector < std::vector<T> > putVector;
-    putVector.resize (p);
 
     const Int XLDim = Z.LDim();
     // local matrix width and height
@@ -685,11 +721,19 @@ void AxpyInterface2<T>::HandleGlobalToLocalAcc ( Matrix<T>& Z, Int i, Int j )
 	if( numEntries != 0 )
 	{
 	    const Int destination = receivingRow + r*receivingCol;
-
-	    putVector[destination].resize( numEntries );
-	    T* sendBuffer = putVector[destination].data();
-	    T* XBuffer = Z.Buffer();
-
+            T* XBuffer = Z.Buffer();
+     	    const Int index =
+	    NextIndex (numEntries, putVectors_[destination],
+		    dataRequests_[destination],
+		    dataRequestStatuses_[destination],
+		    opKind_[destination],
+		    DATA_PUT_TAG,
+		    matrixBase_[destination], 
+		    XBuffer);
+	    DEBUG_ONLY (if
+			(Int (putVectors_[destination][index].size ()) !=
+			 numEntries) LogicError ("Error in NextIndex");)
+	    T *sendBuffer = putVectors_[destination][index].data ();
 	    for( Int t=0; t<localWidth; ++t )
 	    {
 		T* thisSendCol = &sendBuffer[t*localHeight];
@@ -757,9 +801,19 @@ void AxpyInterface2<T>::HandleLocalToGlobalData ( Matrix<T>& Z, Int i, Int j )
 	if( numEntries != 0 )
 	{
 	    const Int destination = receivingRow + r*receivingCol;
-
-	    getVector[destination].resize ( numEntries );
-	    T *getBuffer = getVector[destination].data ();
+            T* XBuffer = Z.Buffer();
+     	    const Int index =
+	    NextIndex (numEntries, putVectors_[destination],
+		    dataRequests_[destination],
+		    dataRequestStatuses_[destination],
+		    opKind_[destination],
+		    DATA_GET_TAG,
+		    matrixBase_[destination], 
+		    XBuffer);
+	    DEBUG_ONLY (if
+			(Int (getVectors_[destination][index].size ()) !=
+			 numEntries) LogicError ("Error in NextIndex");)
+	    T *getBuffer = getVectors_[destination][index].data ();
 
 	    mpi::TaggedRecv (getBuffer, numEntries, destination, 
 		    DATA_PUT_TAG, g.VCComm ());
@@ -772,7 +826,6 @@ void AxpyInterface2<T>::HandleLocalToGlobalData ( Matrix<T>& Z, Int i, Int j )
 		    YCol[colShift+s*r] = XCol[s];
 	    }
 	    // clear
-	    getVector[destination].resize (0);
 	    ProgressMatrix ( Z, destination );
 	}
 	receivingRow = (receivingRow + 1) % r;
@@ -801,8 +854,6 @@ void AxpyInterface2<T>::HandleLocalToGlobalAcc ( Matrix<T>& Z, Int i, Int j )
     const Int myCol = g.Col ();
     const Int myProcessRow = g.Row();
     const Int myProcessCol = g.Col();
-    std::vector < std::vector<T> > getVector;
-    getVector.resize (p);
 
     // local width and height
     const Int height = Z.Height();
@@ -830,9 +881,19 @@ void AxpyInterface2<T>::HandleLocalToGlobalAcc ( Matrix<T>& Z, Int i, Int j )
 	if( numEntries != 0 )
 	{
 	    const Int destination = receivingRow + r*receivingCol;
-
-	    getVector[destination].resize ( numEntries );
-	    T *getBuffer = getVector[destination].data ();
+            T* XBuffer = Z.Buffer();
+     	    const Int index =
+	    NextIndex (numEntries, putVectors_[destination],
+		    dataRequests_[destination],
+		    dataRequestStatuses_[destination],
+		    opKind_[destination],
+		    DATA_GET_TAG,
+		    matrixBase_[destination], 
+		    XBuffer);
+	    DEBUG_ONLY (if
+			(Int (getVectors_[destination][index].size ()) !=
+			 numEntries) LogicError ("Error in NextIndex");)
+	    T *getBuffer = getVectors_[destination][index].data ();
 
 	    mpi::TaggedRecv (getBuffer, numEntries, destination, 
 		    DATA_ACC_TAG, g.VCComm ());
@@ -845,7 +906,6 @@ void AxpyInterface2<T>::HandleLocalToGlobalAcc ( Matrix<T>& Z, Int i, Int j )
 		    YCol[colShift+s*r] += XCol[s];
 	    }
 	    // clear
-	    getVector[destination].resize (0);
 	    ProgressMatrix ( Z, destination );
 	}
 	receivingRow = (receivingRow + 1) % r;
