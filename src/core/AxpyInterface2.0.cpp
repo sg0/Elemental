@@ -10,13 +10,15 @@ http://opensource.org/licenses/BSD-2-Clause
 // TODO bring back const interfaces
 // TODO localflush
 // TODO error checks
+// TODO fix progress function and call it in appropriate places
 namespace El
 {
 template<typename T>
 AxpyInterface2<T>::AxpyInterface2()
     : GlobalArrayPut_(0), GlobalArrayGet_(0),
-    putVectors_(0), getVectors_(0), dataRequests_(0), matrixBase_(0),
-    dataRequestStatuses_(0), toBeAttachedForPut_(false), 
+    sendVectors_(0), recvVectors_(0), sendRequests_(0), recvRequests_(0),
+    matrixBase_(0), sendRequestStatuses_(0), requestRequestStatuses_(0),
+    recvRequestStatuses_(0), toBeAttachedForPut_(false), 
     toBeAttachedForGet_(false), attached_(false), 
     detached_(false)
 { }
@@ -34,11 +36,13 @@ AxpyInterface2<T>::AxpyInterface2( DistMatrix<T>& Z )
     GlobalArrayGet_ 	= &Z;
 
     const Int p = Z.Grid ().Size();
-    putVectors_.resize( p );
-    getVectors_.resize( p );
-    dataRequests_.resize (p);
-    dataRequestStatuses_.resize (p);    
+    sendVectors_.resize( p );
+    recvVectors_.resize( p );
+    sendRequests_.resize (p);
+    recvRequests_.resize (p);
     requestRequests_.resize (p);
+    sendRequestStatuses_.resize (p);    
+    recvRequestStatuses_.resize (p);    
     requestRequestStatuses_.resize (p);    
     matrixBase_.resize (p);
 }
@@ -87,15 +91,17 @@ void AxpyInterface2<T>::Attach( DistMatrix<T>& Z )
     const Grid& g = Z.Grid();
     const Int p = g.Size ();
 
-    if (putVectors_.size() != p)
+    if (sendVectors_.size() != p)
     {
-	getVectors_.resize( p );
-	putVectors_.resize( p );
-	dataRequests_.resize (p);
-	dataRequestStatuses_.resize (p);
-	matrixBase_.resize (p);
+	recvVectors_.resize( p );
+	sendVectors_.resize( p );
+	sendRequests_.resize (p);
+	recvRequests_.resize (p);
 	requestRequests_.resize (p);
+	sendRequestStatuses_.resize (p);
+	recvRequestStatuses_.resize (p);
 	requestRequestStatuses_.resize (p);    
+	matrixBase_.resize (p);
     }
 }
 
@@ -113,7 +119,7 @@ Int AxpyInterface2<T>::NextIndex
     dataVectors.resize (Index + 1);
     dataVectors[Index].resize (dataSize);
     requests.push_back (mpi::REQUEST_NULL);
-    requestStatus.push_back (true);
+    requestStatus.push_back ( true );
     // stores Matrix base address by index
     matrixBase.push_back (base_address);
     
@@ -168,16 +174,16 @@ void AxpyInterface2<T>::Put( Matrix<T>& Z, Int i, Int j )
             const Int destination = receivingRow + r*receivingCol;
             T* XBuffer = Z.Buffer();
      	    const Int index =
-	    NextIndex (numEntries, putVectors_[destination],
-		    dataRequests_[destination],
-		    dataRequestStatuses_[destination],
+	    NextIndex (numEntries, sendVectors_[destination],
+		    sendRequests_[destination],
+		    sendRequestStatuses_[destination],
 		    matrixBase_[destination],
 		    XBuffer);
 
 	    DEBUG_ONLY (if
-			(Int (putVectors_[destination][index].size ()) !=
+			(Int (sendVectors_[destination][index].size ()) !=
 			 numEntries) LogicError ("Error in NextIndex");)
-	    T *sendBuffer = putVectors_[destination][index].data ();
+	    T *sendBuffer = sendVectors_[destination][index].data ();
 
             for( Int t=0; t<localWidth; ++t )
             {
@@ -189,7 +195,7 @@ void AxpyInterface2<T>::Put( Matrix<T>& Z, Int i, Int j )
 	    // put request 
 	    mpi::TaggedISSend (sendBuffer, numEntries, destination, 
 			DATA_PUT_TAG, g.VCComm (), 
-			dataRequests_[destination][index]);
+			sendRequests_[destination][index]);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -208,8 +214,9 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 	    LogicError ("Cannot perform this operation as matrix is not attached.");
     DistMatrix<T>& X = *GlobalArrayGet_;
 
-    const Int height = X.Height ();
-    const Int width = X.Width ();
+    const Int height = Z.Height ();
+    const Int width = Z.Width ();
+    
     if (i + height > X.Height () || j + width > X.Width ())
 	LogicError ("Invalid AxpyGlobalToLocal submatrix");
 
@@ -222,20 +229,20 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 
     T* XBuffer = Z.Buffer();
     // Send out the requests to all processes in the grid
-    // 0 byte send, no need to cancel or post matching 
-    // receive
+    // 0 byte send
     for (Int rank = 0; rank < p; ++rank)
     {
 	const Int bufferSize = 0;
 	const Int index =
-	    NextIndex (0, putVectors_[rank],
+	    NextIndex (bufferSize, sendVectors_[rank],
 		    requestRequests_[rank],
 		    requestRequestStatuses_[rank],
 		    matrixBase_[rank],
 		    XBuffer);
-
+	
 	// Copy the request header into the send buffer
-	T *sendBuffer = putVectors_[rank][index].data ();
+	T *sendBuffer = sendVectors_[rank][index].data ();
+
 	// Begin the non-blocking send
 	mpi::TaggedISSend (sendBuffer, bufferSize, rank, REQUEST_GET_TAG, g.VCComm (),
 		requestRequests_[rank][index]);
@@ -250,9 +257,8 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 		(mpi::ANY_SOURCE, DATA_GET_TAG, g.VCComm (), status))
 	{
 	    const Int source = status.MPI_SOURCE;
-
 	    // Ensure that we have a recv buffer
-	    const Int count = mpi::GetCount < byte > (status);
+	    const Int count = mpi::GetCount <T> (status);
 	    recvVector_.resize (count);
 	    T *recvBuffer = recvVector_.data ();
 
@@ -334,16 +340,16 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
             const Int destination = receivingRow + r*receivingCol;
             T* XBuffer = Z.Buffer();
      	    const Int index =
-	    NextIndex (numEntries, putVectors_[destination],
-		    dataRequests_[destination],
-		    dataRequestStatuses_[destination],
+	    NextIndex (numEntries, sendVectors_[destination],
+		    sendRequests_[destination],
+		    sendRequestStatuses_[destination],
 		    matrixBase_[destination],
 		    XBuffer);
 
 	    DEBUG_ONLY (if
-			(Int (putVectors_[destination][index].size ()) !=
+			(Int (sendVectors_[destination][index].size ()) !=
 			 numEntries) LogicError ("Error in NextIndex");)
-	    T *sendBuffer = putVectors_[destination][index].data ();
+	    T *sendBuffer = sendVectors_[destination][index].data ();
 
             for( Int t=0; t<localWidth; ++t )
             {
@@ -352,10 +358,10 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
             }
-	    // acc request 
+	    // send nonblocking sends 
 	    mpi::TaggedISSend (sendBuffer, numEntries, destination, 
 			DATA_ACC_TAG, g.VCComm (), 
-			dataRequests_[destination][index]);
+			sendRequests_[destination][index]);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -363,37 +369,107 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
     }
 }
 
-// get index of a matrix for a particular process 
-template<typename T>
-Int AxpyInterface2<T>::GetIndexForMatrix ( Matrix<T>& Z, int rank )
-{
-    typename std::deque<T *>::iterator dit;
-    dit = std::find ( matrixBase_[rank].begin(), 
-	    matrixBase_[rank].end(), Z.LockedBuffer ());
-    const Int index = (dit - matrixBase_[rank].begin());
-    //std::cout << "matrixBase size: " << matrixBase_[rank].size () << "\n";
-    assert ( index != matrixBase_[rank].size () );
-    
-    return index;
-}
-
 // progress communication for a particular matrix
-// this could be used to progress sends and recvs
+// progress requests
 template<typename T>
-void AxpyInterface2<T>::ProgressMatrix ( Matrix<T>& Z, int rank )
+bool AxpyInterface2<T>::TestRequests ( Matrix<T>& Z )
 {
     DistMatrix<T>& Y = *GlobalArrayGet_;
     const Grid& g = Y.Grid();
     const Int p = g.Size();
-    const Int index = GetIndexForMatrix ( Z, rank );
+    
+    Int index;
+    typename std::deque<T *>::iterator dit;
 
-    if ( !dataRequestStatuses_[rank][index] ) // nothing to do
-	return;
-    // wait
-    mpi::Wait ( dataRequests_[rank][index] );
-    dataRequestStatuses_[rank][index] = false;
-    getVectors_[rank][index].resize (0);
-    putVectors_[rank][index].resize (0);
+    for (int rank = 0; rank < p; ++rank)
+    {
+	dit = std::find ( matrixBase_[rank].begin(), 
+		matrixBase_[rank].end(), Z.LockedBuffer ());
+	index = (dit - matrixBase_[rank].begin());
+	
+	if ( index == matrixBase_[rank].size () )
+	    continue;
+    	if ( requestRequestStatuses_[rank].size() == 0 )
+	    continue;
+	if ( !requestRequestStatuses_[rank][index] ) // nothing to do
+	    continue;
+	
+	// test all send requests related to matrix
+	requestRequestStatuses_[rank][index] = !mpi::Test ( requestRequests_[rank][index] );
+	if ( requestRequestStatuses_[rank][index] )
+	    return false;
+    }
+    return true;
+}
+
+// progress sends
+template<typename T>
+bool AxpyInterface2<T>::TestSends ( Matrix<T>& Z )
+{
+    DistMatrix<T>& Y = *GlobalArrayPut_;
+    const Grid& g = Y.Grid();
+    const Int p = g.Size();
+    
+    Int index;
+    typename std::deque<T *>::iterator dit;
+
+    for (int rank = 0; rank < p; ++rank)
+    {
+	dit = std::find ( matrixBase_[rank].begin(), 
+		matrixBase_[rank].end(), Z.LockedBuffer ());
+	index = (dit - matrixBase_[rank].begin());
+	
+	if ( index == matrixBase_[rank].size () )
+	    continue;
+    	if ( sendRequestStatuses_[rank].size() == 0 )
+	    continue;
+    	if ( !sendRequestStatuses_[rank][index] ) // nothing to do
+	    continue;
+	
+	// test all sends related to matrix
+	sendRequestStatuses_[rank][index] = !mpi::Test ( sendRequests_[rank][index] );
+	if ( sendRequestStatuses_[rank][index] )
+	    return false;
+
+	// if test is true, then it is safe to free buffer
+	sendVectors_[rank][index].resize (0);
+    }
+    return true;
+}
+
+// progress recvs
+template<typename T>
+bool AxpyInterface2<T>::TestRecvs ( Matrix<T>& Z )
+{
+    DistMatrix<T>& Y = *GlobalArrayGet_;
+    const Grid& g = Y.Grid();
+    const Int p = g.Size();
+    
+    Int index;
+    typename std::deque<T *>::iterator dit;
+
+    for (int rank = 0; rank < p; ++rank)
+    {
+	dit = std::find ( matrixBase_[rank].begin(), 
+		matrixBase_[rank].end(), Z.LockedBuffer ());
+	index = (dit - matrixBase_[rank].begin());
+	
+	if ( index == matrixBase_[rank].size () )
+	    continue;
+    	if ( recvRequestStatuses_[rank].size() == 0 )
+	    continue;
+	if ( !recvRequestStatuses_[rank][index] ) // nothing to do
+	    continue;
+	
+	// test all receives related to matrix
+	recvRequestStatuses_[rank][index] = !mpi::Test ( recvRequests_[rank][index] );
+	if ( recvRequestStatuses_[rank][index] )
+	    return false;
+	
+	// if test is true, then it is safe to free buffer
+	recvVectors_[rank][index].resize (0);
+    }
+    return true;
 }
 
 // flush ensures local and remote completion
@@ -403,35 +479,57 @@ template<typename T>
 void AxpyInterface2<T>::Flush( Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Flush"))
-	if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
-	    LogicError("Must initiate transfer before flushing.");
-    
-    DistMatrix<T>& Y = *GlobalArrayGet_;
-    const Grid& g = Y.Grid();
-    mpi::Status status;
+    if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
+	LogicError("Must initiate transfer before flushing.");
 
-    if ( mpi::IProbe (mpi::ANY_SOURCE, mpi::ANY_TAG, g.VCComm (), status) )
+    DistMatrix<T>& Y = *GlobalArrayPut_;
+    const Grid& g = Y.Grid();
+    
+    mpi::Status status;
+	
+    bool DONE = false;
+    mpi::Request nb_bar_request;
+    bool nb_bar_active = false;
+
+    while ( !DONE )
     {
-	switch (status.MPI_TAG)
+	// similar to HandleXYZ functions in original AxpyInterface
+	if ( mpi::IProbe (mpi::ANY_SOURCE, mpi::ANY_TAG, g.VCComm (), status) )
 	{
-	    case DATA_PUT_TAG:
-		{
-		    const Int count = mpi::GetCount <T> (status);
-		    HandleLocalToGlobalData ( Z, i, j, count, status.MPI_SOURCE );
-		    break;
-		}
-	    case DATA_ACC_TAG:
-		{
-		    const Int count = mpi::GetCount <T> (status);
-		    HandleLocalToGlobalAcc ( Z, i, j, count, status.MPI_SOURCE );
-		    break;
-		}
-	    case REQUEST_GET_TAG:
-		{
-		    const Int count = mpi::GetCount <T> (status);
-		    HandleGlobalToLocalData ( Z, i, j, count, status.MPI_SOURCE );
-		    break;
-		}
+	    switch (status.MPI_TAG)
+	    {
+		case DATA_PUT_TAG:
+		    {
+			const Int count = mpi::GetCount <T> (status);
+			HandleLocalToGlobalData ( Z, i, j, count, status.MPI_SOURCE );
+			break;
+		    }
+		case DATA_ACC_TAG:
+		    {
+			const Int count = mpi::GetCount <T> (status);
+			HandleLocalToGlobalAcc ( Z, i, j, count, status.MPI_SOURCE );
+			break;
+		    }
+		case REQUEST_GET_TAG:
+		    {
+			const Int count = mpi::GetCount <T> (status);
+			HandleGlobalToLocalData ( Z, i, j, count, status.MPI_SOURCE );
+			break;
+		    }
+	    }
+	}
+	if ( nb_bar_active )
+	{
+	    DONE = mpi::Test ( nb_bar_request );
+	}
+	else
+	{
+	    // all sends (data or request) are complete
+	    if ( TestSends( Z ) && TestRecvs( Z ) && TestRequests( Z ) )
+	    {
+		mpi::IBarrier ( g.VCComm(), nb_bar_request );
+		nb_bar_active = true;
+	    }
 	}
     }
 }
@@ -459,14 +557,15 @@ void AxpyInterface2<T>::HandleLocalToGlobalData ( Matrix<T>& Z, Int i, Int j,
 
     DEBUG_ONLY (if (count < Int (sizeof (T)))
 	    LogicError ("Count was too small");)
-	T* Buffer = Z.Buffer();
+    
     getVector_.resize (count);
     DEBUG_ONLY (if
 	    (Int (getVector_.size ()) != count) LogicError ("Not enough space allocated");)
 
-	T *getBuffer = getVector_.data ();
+    T *getBuffer = getVector_.data ();
+    // post receive
     mpi::TaggedRecv (getBuffer, count, source, DATA_PUT_TAG, g.VCComm ());
-
+    
     // Update Y
     const T *XBuffer = reinterpret_cast < const T * >(getBuffer);
     const Int colAlign = (Y.ColAlign () + i) % r;
@@ -486,9 +585,8 @@ void AxpyInterface2<T>::HandleLocalToGlobalData ( Matrix<T>& Z, Int i, Int j,
 	for (Int s = 0; s < localHeight; ++s)
 	    YCol[s] = XCol[s];
     }
-    getVector_.resize ( 0 );
     // Free the memory
-    //ProgressMatrix ( Z, source );
+    getVector_.resize ( 0 );
 }
 
 // replica of above function except this accumulates
@@ -502,42 +600,44 @@ void AxpyInterface2<T>::HandleLocalToGlobalAcc ( Matrix<T>& Z, Int i, Int j,
     const Int c = g.Width ();
     const Int myRow = g.Row ();
     const Int myCol = g.Col ();
-    int height = Z.Height();
-    int width = Z.Width();
+    const int height = Z.Height();
+    const int width = Z.Width();
+    // data buffer
     std::vector<T> getVector_;
 
-    	DEBUG_ONLY (if (count < Int (sizeof (T)))
-		LogicError ("Count was too small");)
-	T* Buffer = Z.Buffer();
-        getVector_.resize (count);
-	DEBUG_ONLY (if
-		(Int (getVector_.size ()) != count) LogicError ("Not enough space allocated");)
-	
-	T *getBuffer = getVector_.data ();
-	mpi::TaggedRecv (getBuffer, count, source, DATA_ACC_TAG, g.VCComm ());
+    DEBUG_ONLY (if (count < Int (sizeof (T)))
+	    LogicError ("Count was too small");)
+    // data buffer resize
+    getVector_.resize (count);
 
-	// Update Y
-	const T *XBuffer = reinterpret_cast < const T * >(getBuffer);
-	const Int colAlign = (Y.ColAlign () + i) % r;
-	const Int rowAlign = (Y.RowAlign () + j) % c;
-	const Int colShift = Shift (myRow, colAlign, r);
-	const Int rowShift = Shift (myCol, rowAlign, c);
+    DEBUG_ONLY (if
+	    (Int (getVector_.size ()) != count) LogicError ("Not enough space allocated");)
 
-	const Int localHeight = Length (height, colShift, r);
-	const Int localWidth = Length (width, rowShift, c);
-	const Int iLocalOffset = Length (i, Y.ColShift (), r);
-	const Int jLocalOffset = Length (j, Y.RowShift (), c);
+    T *getBuffer = getVector_.data ();
+    // post receive
+    mpi::TaggedRecv (getBuffer, count, source, DATA_ACC_TAG, g.VCComm ());
+    
+    // Update Y
+    const T *XBuffer = reinterpret_cast < const T * >(getBuffer);
+    const Int colAlign = (Y.ColAlign () + i) % r;
+    const Int rowAlign = (Y.RowAlign () + j) % c;
+    const Int colShift = Shift (myRow, colAlign, r);
+    const Int rowShift = Shift (myCol, rowAlign, c);
 
-	for (Int t = 0; t < localWidth; ++t)
-	{
-	    T *YCol = Y.Buffer (iLocalOffset, jLocalOffset + t);
-	    const T *XCol = &XBuffer[t * localHeight];
-	    for (Int s = 0; s < localHeight; ++s)
-		YCol[s] += XCol[s];
-	}
-        getVector_.resize ( 0 );
-	// Free the memory
-	//ProgressMatrix ( Z, source );
+    const Int localHeight = Length (height, colShift, r);
+    const Int localWidth = Length (width, rowShift, c);
+    const Int iLocalOffset = Length (i, Y.ColShift (), r);
+    const Int jLocalOffset = Length (j, Y.RowShift (), c);
+
+    for (Int t = 0; t < localWidth; ++t)
+    {
+	T *YCol = Y.Buffer (iLocalOffset, jLocalOffset + t);
+	const T *XCol = &XBuffer[t * localHeight];
+	for (Int s = 0; s < localHeight; ++s)
+	    YCol[s] += XCol[s];
+    }
+    // Free the memory
+    getVector_.resize ( 0 );
 }
 
 // handle request for data, post a matching issend
@@ -547,7 +647,7 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z, Int i, Int j,
 {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::HandleGlobalToLocalData"))
 
-	if( i < 0 || j < 0 )
+    if( i < 0 || j < 0 )
 	    LogicError("Submatrix offsets must be non-negative");
     if ( !toBeAttachedForGet_ )
 	LogicError("Local matrix cannot be updated");
@@ -561,7 +661,10 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z, Int i, Int j,
     const Int myProcessCol = g.Col();
     const Int colAlign = (Y.ColAlign() + i) % r;
     const Int rowAlign = (Y.RowAlign() + j) % c;
+    // data buffer    
     std::vector<T> putVector_;
+    // dummy vector for 0 byte receive
+    std::vector<T> dummyVector_;
 
     const Int XLDim = Z.LDim();
     // local matrix width and height
@@ -577,10 +680,18 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z, Int i, Int j,
     const Int iLocalOffset = Length (i, Y.ColShift (), r);
     const Int jLocalOffset = Length (j, Y.RowShift (), c);
 
-    DEBUG_ONLY (if (count < Int (sizeof (T)))
+    const Int numEntries = (localHeight * localWidth);
+
+    DEBUG_ONLY (if (numEntries < Int (sizeof (T)))
 	    LogicError ("Count was too small");)
 
-    putVector_.resize (count);
+    // data/dummy buffers resize    
+    putVector_.resize ( numEntries );
+    dummyVector_.resize ( 0 );
+    T *dummyBuffer = dummyVector_.data ();
+    // post request for get
+    mpi::TaggedRecv (dummyBuffer, count, source, REQUEST_GET_TAG, g.VCComm ());
+
     DEBUG_ONLY (if
 	    (Int (putVector_.size ()) != count) LogicError ("Not enough space allocated");)
 
@@ -594,12 +705,10 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z, Int i, Int j,
     }
 
     // Fire off non-blocking send
-    mpi::TaggedSend (sendBuffer, count, source, 
-	    DATA_GET_TAG, g.VCComm ());
-    // clear
-    //ProgressMatrix ( Z, source );
+    mpi::TaggedSend (sendBuffer, count, source, DATA_GET_TAG, g.VCComm ());
 
     putVector_.resize ( 0 );
+    dummyVector_.resize ( 0 );
 }
 
 // detach collectively 
@@ -607,9 +716,9 @@ template<typename T>
 void AxpyInterface2<T>::Detach()
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Detach"))
-	// destructor will call detach again...
-	if (detached_)
-	    return;
+    // destructor will call detach again...
+    if (detached_)
+	return;
     if( !attached_ )
 	LogicError("Must attach before detaching.");
 
@@ -627,12 +736,15 @@ void AxpyInterface2<T>::Detach()
     GlobalArrayPut_ 	= 0;
     GlobalArrayGet_ 	= 0;
 
-    putVectors_.clear();
-    getVectors_.clear();
+    sendVectors_.clear();
+    recvVectors_.clear();
 
-    dataRequests_.clear();
-    dataRequestStatuses_.clear();
+    sendRequests_.clear();
+    recvRequests_.clear();
     requestRequests_.clear();
+    
+    sendRequestStatuses_.clear();
+    recvRequestStatuses_.clear();
     requestRequestStatuses_.clear();    
     
     matrixBase_.clear();

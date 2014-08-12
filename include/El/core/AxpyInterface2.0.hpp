@@ -47,17 +47,21 @@ private:
         DATA_ACC_TAG   	  =3,
         REQUEST_GET_TAG   =4;
      
-    /* Meta */
+    /* Request objects for send, recv and request op */
     std::vector<std::deque<mpi::Request>> 
-	dataRequests_, requestRequests_;
+	sendRequests_, requestRequests_, 
+	recvRequests_;
+    /* Request statuses for send, recv and request op */
     std::vector<std::deque<bool>>  
-	dataRequestStatuses_, 
+	sendRequestStatuses_, 
+	recvRequestStatuses_, 
 	requestRequestStatuses_;
+    /* Stores matrix base addresses */
      std::vector<std::deque<T *>>  
 	matrixBase_;
-    /* Data */
+    /* Receive and Send vectors */
     std::vector<std::deque<std::vector<T>>>
-        getVectors_, putVectors_;
+        recvVectors_, sendVectors_;
  
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     DistMatrix<T,MC,MR>* GlobalArrayGet_;
@@ -72,12 +76,13 @@ private:
 	    std::deque <T *> &matrixBase,
 	    T * base_address );
 
-    Int GetIndexForMatrix ( Matrix<T>& Z, int rank );
-    void ProgressMatrix ( Matrix<T>& Z, int rank );
+    bool TestRequests ( Matrix<T>& Z );
+    bool TestSends    ( Matrix<T>& Z );
+    bool TestRecvs    ( Matrix<T>& Z );
 
-    void HandleLocalToGlobalData( Matrix<T>& Z, Int i, Int j, 
+    void HandleGlobalToLocalData( Matrix<T>& Z, Int i, Int j,
 	    Int count, Int source );
-    void HandleGlobalToLocalData( Matrix<T>& Z, Int i, Int j, 
+    void HandleLocalToGlobalData( Matrix<T>& Z, Int i, Int j, 
 	    Int count, Int source );
     void HandleLocalToGlobalAcc(  Matrix<T>& Z, Int i, Int j, 
 	    Int count, Int source );
