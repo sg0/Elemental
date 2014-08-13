@@ -50,19 +50,25 @@ private:
     /* Request objects for send, recv and request op */
     std::vector<std::deque<mpi::Request>> 
 	sendRequests_, requestRequests_, 
-	recvRequests_;
+	recvRequests_, replyRequests_;
+    
     /* Request statuses for send, recv and request op */
     std::vector<std::deque<bool>>  
 	sendRequestStatuses_, 
 	recvRequestStatuses_, 
-	requestRequestStatuses_;
+	requestRequestStatuses_,
+	replyRequestStatuses_;
+    
     /* Stores matrix base addresses */
      std::vector<std::deque<T *>>  
 	matrixBase_;
+    
     /* Receive and Send vectors */
     std::vector<std::deque<std::vector<T>>>
-        recvVectors_, sendVectors_;
- 
+        recvVectors_, sendVectors_, 
+	replyVectors_, requestVectors_;
+
+    // need to add const here...
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     DistMatrix<T,MC,MR>* GlobalArrayGet_;
    
@@ -75,13 +81,23 @@ private:
 	    std::deque <bool> &requestStatus,
 	    std::deque <T *> &matrixBase,
 	    T * base_address );
+    // note: this is just a placeholder
+    // would be replaced soon
+    Int NextIndex ( Int dataSize, 
+	    std::deque <std::vector<T>> &dataVectors,
+	    std::deque <mpi::Request> &requests,
+	    std::deque <bool> &requestStatus,
+	    std::deque <T *> &matrixBase,
+	    const T * base_address );
 
+    /* Test */
+    // probably we need const interfaces also?
     bool TestRequests ( Matrix<T>& Z );
+    bool TestReplies  ( Matrix<T>& Z );
     bool TestSends    ( Matrix<T>& Z );
     bool TestRecvs    ( Matrix<T>& Z );
 
-    void HandleGlobalToLocalData( Matrix<T>& Z, Int i, Int j,
-	    Int count, Int source );
+    void HandleGlobalToLocalData( Matrix<T>& Z, Int i, Int j );
     void HandleLocalToGlobalData( Matrix<T>& Z, Int i, Int j, 
 	    Int count, Int source );
     void HandleLocalToGlobalAcc(  Matrix<T>& Z, Int i, Int j, 
