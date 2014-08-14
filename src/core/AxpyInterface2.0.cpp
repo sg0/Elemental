@@ -9,8 +9,6 @@ http://opensource.org/licenses/BSD-2-Clause
 // TODO Use DDT for put/get/acc when EL_USE_DERIVED_TYPE is defined
 // TODO bring back const interfaces
 // TODO localflush
-// TODO error checks
-// TODO fix progress function and call it in appropriate places
 namespace El
 {
 template<typename T>
@@ -354,7 +352,7 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
         const Int localWidth = Length( width, rowShift, c );
         const Int numEntries = localHeight * localWidth;
 	
-        if( numEntries != 0 )
+        if( numEntries != 0  )
         {
             const Int destination = receivingRow + r*receivingCol;
             T* XBuffer = Z.Buffer();
@@ -369,7 +367,6 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
 			(Int (sendVectors_[destination][index].size ()) !=
 			 numEntries) LogicError ("Error in NextIndex");)
 	    T *sendBuffer = sendVectors_[destination][index].data ();
-
             for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendBuffer[t*localHeight];
@@ -377,11 +374,17 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
             }
-	    // send nonblocking sends 
+	    // Fire off nonblocking sends 
+	    /*
 	    mpi::TaggedISSend (sendBuffer, numEntries, destination, 
-			DATA_ACC_TAG, g.VCComm (), 
-			sendRequests_[destination][index]);
-        }
+	    	DATA_ACC_TAG, g.VCComm (), 
+	   	sendRequests_[destination][index]);
+		*/
+	    mpi::TaggedPackedISSend ( sendBuffer, numEntries*sizeof(T), 
+		    destination, DATA_ACC_TAG, g.VCComm (), 
+		    sendRequests_[destination][index], i, j );
+
+	}
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
@@ -570,7 +573,7 @@ void AxpyInterface2<T>::Flush( Matrix<T>& Z, Int i, Int j )
 		case DATA_ACC_TAG:
 		    {
 			const Int count = mpi::GetCount <T> (status);
-			HandleLocalToGlobalAcc ( Z, i, j, count, status.MPI_SOURCE );
+			HandleLocalToGlobalAcc ( Z, count, status.MPI_SOURCE );
 			break;
 		    }
 		case REQUEST_GET_TAG:
@@ -654,8 +657,7 @@ void AxpyInterface2<T>::HandleLocalToGlobalData ( Matrix<T>& Z, Int i, Int j,
 
 // replica of above function except this accumulates
 template < typename T > 
-void AxpyInterface2<T>::HandleLocalToGlobalAcc ( Matrix<T>& Z, Int i, Int j, 
-	Int count, Int source )
+void AxpyInterface2<T>::HandleLocalToGlobalAcc ( Matrix<T>& Z, Int count, Int source )
 {
     DistMatrix<T> &Y = *GlobalArrayPut_;
     const Grid & g = Y.Grid ();
@@ -677,9 +679,12 @@ void AxpyInterface2<T>::HandleLocalToGlobalAcc ( Matrix<T>& Z, Int i, Int j,
 	    (Int (getVector_.size ()) != count) LogicError ("Not enough space allocated");)
 
     T *getBuffer = getVector_.data ();
+    Int i, j;
     // post receive
-    mpi::TaggedRecv (getBuffer, count, source, DATA_ACC_TAG, g.VCComm ());
-    
+    //mpi::TaggedRecv (getBuffer, count, source, DATA_ACC_TAG, g.VCComm ());
+    mpi::TaggedRecvUnpack ( getBuffer, count * sizeof(T), 
+	    source, DATA_ACC_TAG, g.VCComm (), &i, &j );
+
     // Update Y
     const T *XBuffer = reinterpret_cast < const T * >(getBuffer);
     const Int colAlign = (Y.ColAlign () + i) % r;

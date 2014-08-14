@@ -100,8 +100,7 @@ private:
     void HandleGlobalToLocalData( Matrix<T>& Z, Int i, Int j );
     void HandleLocalToGlobalData( Matrix<T>& Z, Int i, Int j, 
 	    Int count, Int source );
-    void HandleLocalToGlobalAcc(  Matrix<T>& Z, Int i, Int j, 
-	    Int count, Int source );
+    void HandleLocalToGlobalAcc(  Matrix<T>& Z, Int count, Int source );
 };
 } // namespace El
 #endif // ifndef EL_AXPYINTERFACE2_HPP

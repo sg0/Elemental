@@ -148,6 +148,7 @@ const ErrorHandler ERRORS_RETURN = MPI_ERRORS_RETURN;
 const ErrorHandler ERRORS_ARE_FATAL = MPI_ERRORS_ARE_FATAL;
 const Group GROUP_EMPTY = MPI_GROUP_EMPTY;
 const Request REQUEST_NULL = MPI_REQUEST_NULL;
+
 const Op MAX = MPI_MAX;
 const Op MIN = MPI_MIN;
 const Op MAXLOC = MPI_MAXLOC;
@@ -228,15 +229,17 @@ void Translate
 // Utilities
 // ---------
 void SetWindowProp ( Window& window, int prop );
-void CheckBounds ( Window & window, Datatype win_type, Datatype type, 
+void CheckBounds ( Window & window, mpi::Datatype win_type, mpi::Datatype type, 
 size_t count, ptrdiff_t target_offset );
 void RmaProgress ( Comm comm );
+void PackCoordinates ( Int & i, Int & j, void *buffer, Int bufferSize, Comm comm );
+void UnpackCoordinates ( Int *i, Int *j, void *buffer, Int bufferSize, Comm comm );
 // strided/vector to datatype
 void StridedDatatype (El_strided_t* stride_descr,
-	Datatype old_type, Datatype* new_type,
+	mpi::Datatype old_type, mpi::Datatype* new_type,
 	size_t* source_dims);
 void VectorDatatype (El_iov_t * vect_descr,
-	Datatype old_type, Datatype * new_type,
+	mpi::Datatype old_type, mpi::Datatype * new_type,
 	vector_pattern_t data_pattern);
 // Window creation/update/delete
 // -----------------------------
@@ -403,6 +406,12 @@ void TaggedISSend( T b, int to, int tag, Comm comm, Request& request );
 // If the send count is one and the tag is irrelevant
 template<typename T>
 void ISSend( T b, int to, Comm comm, Request& request );
+// Issend and Recv or MPI_PACKED
+// -----------------------------
+void TaggedPackedISSend
+( void* buf, Int bytes, int to, int tag, Comm comm, Request& request, Int i, Int j );
+void TaggedRecvUnpack
+( void* buf, Int bytes, int from, int tag, Comm comm, Int *i, Int *j );
 
 // Recv
 // ----
