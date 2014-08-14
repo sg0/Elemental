@@ -501,28 +501,8 @@ void RmaProgress ( Comm comm )
     SafeMpi (MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, 
 		comm.comm, &flag, MPI_STATUS_IGNORE));
 }
-
-void PackCoordinates ( Int & i, Int & j, int *position, 
-	void *buffer, Int bufferSize, Comm comm )
-{
-    SafeMpi ( MPI_Pack (&i, 1, MPI_INT, buffer, 
-		bufferSize, position, comm.comm) );
-    SafeMpi ( MPI_Pack (&j, 1, MPI_INT, buffer, 
-		bufferSize, position, comm.comm) );
-}
-
-void UnpackCoordinates ( Int *i, Int *j, int *position,
-	void *buffer, Int bufferSize, Comm comm )
-{
-    SafeMpi ( MPI_Unpack (buffer, bufferSize, position, 
-		i, 1, MPI_INT, comm.comm) );
-    SafeMpi ( MPI_Unpack (buffer, bufferSize, position, 
-		j, 1, MPI_INT, comm.comm) );
-}
-
 // TODO these functions for DDT creation are 
 // completely untested
-#ifdef EL_USE_DERIVED_DATATYPE
 void StridedDatatype (El_strided_t* stride_descr,
 	Datatype old_type, Datatype* new_type,
 	size_t* source_dims)
@@ -567,7 +547,7 @@ void StridedDatatype (El_strided_t* stride_descr,
 		reinterpret_cast<const int *>(sizes),
 		reinterpret_cast<int *>(stride_descr->offsets), MPI_ORDER_C,
 		old_type, new_type) );
-    
+
     delete[] dims;
     delete[] sizes;
 }
@@ -649,7 +629,6 @@ void VectorDatatype (El_iov_t * vect_descr,
 		    (const int *) vect_descr->sizes,
 		    vect_descr->offsets, old_type, new_type) );
 }
-#endif
 
 void WindowFree (Window & window)
 {
@@ -1988,39 +1967,6 @@ template void TaggedISSend (Complex < double >b, int to,
                             int tag, Comm comm,
                             Request & request);
 
-// Issend and Recv for MPI_PACKED
-// ------------------------------
-void TaggedPackedISSend
-( void* buf, Int bytes, int to, int tag, Comm comm, Request& request, int i, int j )
-{
-    DEBUG_ONLY (CallStackEntry cse ("mpi::ISSend"))
-    int position = 0;
-    // pack coordinates
-    PackCoordinates ( i, j, &position, buf, bytes, comm );
-    // Fire off nonblocking sends
-    SafeMpi
-    (MPI_Issend
-     ( buf, bytes,
-      MPI_PACKED, to, tag, comm.comm,
-      &request));
-}
-
-void TaggedRecvUnpack
-( void* buf, Int bytes, int from, int tag, Comm comm, int *i, int *j )
-{
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Recv")) 
-    Status status;
-    // receive
-    SafeMpi (MPI_Recv
-             ( buf, bytes, MPI_PACKED, from, tag,
-              comm.comm, &status));
-    // unpack coordinates
-    int position = 0;
-    UnpackCoordinates ( i, j, &position, buf, bytes, comm );
-}
-
-// Recv
-// ----
 template < typename R >
 void TaggedRecv (R * buf, int count, int from,
                  int tag, Comm comm)

@@ -232,8 +232,7 @@ void SetWindowProp ( Window& window, int prop );
 void CheckBounds ( Window & window, mpi::Datatype win_type, mpi::Datatype type, 
 size_t count, ptrdiff_t target_offset );
 void RmaProgress ( Comm comm );
-void PackCoordinates ( Int & i, Int & j, void *buffer, Int bufferSize, Comm comm );
-void UnpackCoordinates ( Int *i, Int *j, void *buffer, Int bufferSize, Comm comm );
+
 // strided/vector to datatype
 void StridedDatatype (El_strided_t* stride_descr,
 	mpi::Datatype old_type, mpi::Datatype* new_type,
@@ -406,12 +405,6 @@ void TaggedISSend( T b, int to, int tag, Comm comm, Request& request );
 // If the send count is one and the tag is irrelevant
 template<typename T>
 void ISSend( T b, int to, Comm comm, Request& request );
-// Issend and Recv or MPI_PACKED
-// -----------------------------
-void TaggedPackedISSend
-( void* buf, Int bytes, int to, int tag, Comm comm, Request& request, Int i, Int j );
-void TaggedRecvUnpack
-( void* buf, Int bytes, int from, int tag, Comm comm, Int *i, Int *j );
 
 // Recv
 // ----
