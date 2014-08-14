@@ -48,16 +48,16 @@ private:
         DATA_REPLY_TAG  =4;
   
 //request object for polling on Issends
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-    byte all_sends_are_finished;
-#endif
     bool attachedForLocalToGlobal_, attachedForGlobalToLocal_;
 
     DistMatrix<T,MC,MR>* localToGlobalMat_;
     const DistMatrix<T,MC,MR>* globalToLocalMat_;
 
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#else
     std::vector<bool> sentEomTo_, haveEomFrom_;
     std::vector<mpi::Request> eomSendRequests_;
+#endif    
     
     std::vector<std::deque<bool>> 
         sendingData_, sendingRequest_, sendingReply_;
@@ -74,10 +74,13 @@ private:
     bool Finished();
     // Progress functions
     void UpdateRequestStatuses();
+#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+    bool ReturnRequestStatuses();
+#else
     void HandleEoms();
     void StartSendingEoms();
     void FinishSendingEoms();
-
+#endif
     Int ReadyForSend
     ( Int sendSize,
       std::deque<std::vector<byte>>& sendVectors,
@@ -92,5 +95,4 @@ private:
 };
 
 } // namespace El
-
 #endif // ifndef EL_AXPYINTERFACE_HPP
