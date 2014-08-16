@@ -46,7 +46,7 @@ private:
         DATA_GET_TAG      =2,
         DATA_ACC_TAG   	  =3,
         REQUEST_GET_TAG   =4,
-	IJ_TAG		  =5;
+	COORD_IJ_TAG      =5;
      
     /* Request objects for send, recv and request op */
     std::vector<std::deque<mpi::Request>> 
@@ -82,41 +82,31 @@ private:
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
 	 attached_, detached_;
      
-    Int NextIndex ( Int dataSize, 
+    Int NextIndex ( Int rank, Int dataSize, 
 	    std::deque <std::vector<T>> &dataVectors,
 	    std::deque <mpi::Request> &requests,
 	    std::deque <bool> &requestStatus,
-	    std::deque <T *> &matrixBase,
 	    T * base_address );
     // note: this is just a placeholder
     // would be replaced soon
-    Int NextIndex ( Int dataSize, 
+    Int NextIndex ( Int rank, Int dataSize, 
 	    std::deque <std::vector<T>> &dataVectors,
 	    std::deque <mpi::Request> &requests,
 	    std::deque <bool> &requestStatus,
-	    std::deque <T *> &matrixBase,
 	    const T * base_address );
 
     Int NextIndex
-	( Int i, Int j, Int dataSize, 
-	  std::deque <std::vector<Int>> &coordVectors,
+	( Int rank, Int i, Int j, Int dataSize, 
 	  std::deque <std::vector<T>> &dataVectors,
 	  std::deque <mpi::Request> &requestData,
 	  std::deque <bool> &requestDataStatus,
-	  std::deque <mpi::Request> &requestCoord,
-	  std::deque <bool> &requestCoordStatus,
-	  std::deque <T *> &matrixBase,
 	  T * base_address);
 
     Int NextIndex
-	( Int i, Int j, Int dataSize, 
-	  std::deque <std::vector<Int>> &coordVectors,
+	( Int rank, Int i, Int j, Int dataSize, 
 	  std::deque <std::vector<T>> &dataVectors,
 	  std::deque <mpi::Request> &requestData,
 	  std::deque <bool> &requestDataStatus,
-	  std::deque <mpi::Request> &requestCoord,
-	  std::deque <bool> &requestCoordStatus,
-	  std::deque <T *> &matrixBase,
 	  const T * base_address);
 
     /* Test */

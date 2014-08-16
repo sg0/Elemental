@@ -128,10 +128,10 @@ void AxpyInterface2<T>::Attach( DistMatrix<T>& Z )
 
 template<typename T>
 Int AxpyInterface2<T>::NextIndex
-( Int dataSize, std::deque <std::vector<T>> &dataVectors,
+( Int rank, Int dataSize, 
+  std::deque <std::vector<T>> &dataVectors,
   std::deque <mpi::Request> &requests,
   std::deque <bool> &requestStatus,
-  std::deque <T *> &matrixBase,
   T * base_address )
 {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface2::NextIndex"))
@@ -144,21 +144,17 @@ Int AxpyInterface2<T>::NextIndex
     requestStatus.push_back ( true );
     
     // stores Matrix base address by index
-    matrixBase.push_back (base_address);
+    matrixBase_[rank].push_back (base_address);
     
     return Index;
 }
 
 template<typename T>
 Int AxpyInterface2<T>::NextIndex
-( Int i, Int j, Int dataSize, 
-  std::deque <std::vector<Int>> &coordVectors,
+( Int rank, Int i, Int j, Int dataSize, 
   std::deque <std::vector<T>> &dataVectors,
   std::deque <mpi::Request> &requestData,
   std::deque <bool> &requestDataStatus,
-  std::deque <mpi::Request> &requestCoord,
-  std::deque <bool> &requestCoordStatus,
-  std::deque <T *> &matrixBase,
   T * base_address) 
 {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface2::NextIndex"))
@@ -167,19 +163,19 @@ Int AxpyInterface2<T>::NextIndex
     dataVectors.resize (Index + 1);
     dataVectors[Index].resize (dataSize);
 
-    coordVectors.resize (Index + 1);
-    coordVectors[Index].resize (2);
-    coordVectors[Index][0] = i;
-    coordVectors[Index][1] = j;
+    coordVectors_[rank].resize (Index + 1);
+    coordVectors_[rank][Index].resize (2);
+    coordVectors_[rank][Index][0] = i;
+    coordVectors_[rank][Index][1] = j;
     
     requestData.push_back (mpi::REQUEST_NULL);
     requestDataStatus.push_back ( true );
     
-    requestCoord.push_back (mpi::REQUEST_NULL);
-    requestCoordStatus.push_back ( true );
+    sendIJRequests_[rank].push_back (mpi::REQUEST_NULL);
+    sendIJRequestStatuses_[rank].push_back ( true );
     
     // stores Matrix base address by index
-    matrixBase.push_back (base_address);
+    matrixBase_[rank].push_back (base_address);
     
     return Index;
 }
@@ -232,21 +228,17 @@ void AxpyInterface2<T>::Put( Matrix<T>& Z, Int i, Int j )
             const Int destination = receivingRow + r*receivingCol;
             T* XBuffer = Z.Buffer();
      	    const Int index =
-	    NextIndex (i, j, numEntries, 
-		    coordVectors_[destination],
+	    NextIndex (destination, i, j, numEntries, 
 		    sendVectors_[destination],
 		    sendRequests_[destination],
 		    sendRequestStatuses_[destination],
-		    sendIJRequests_[destination],
-		    sendIJRequestStatuses_[destination],
-		    matrixBase_[destination],
 		    XBuffer);
 
 	    DEBUG_ONLY (if
 			(Int (sendVectors_[destination][index].size ()) !=
 			 numEntries) LogicError ("Error in NextIndex");)
-	    T *sendBuffer = sendVectors_[destination][index].data ();
 
+	    T *sendBuffer = sendVectors_[destination][index].data ();
             for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendBuffer[t*localHeight];
@@ -258,9 +250,10 @@ void AxpyInterface2<T>::Put( Matrix<T>& Z, Int i, Int j )
 	    mpi::TaggedISSend (sendBuffer, numEntries, destination, 
 			DATA_PUT_TAG, g.VCComm (), 
 			sendRequests_[destination][index]);
+	
 	    // send coordinates
 	    Int *coord = coordVectors_[destination][index].data ();
-	    mpi::TaggedISSend (coord, 2, destination, IJ_TAG, g.VCComm (), 
+	    mpi::TaggedISend (coord, 2, destination, COORD_IJ_TAG, g.VCComm (), 
 		    sendIJRequests_[destination][index]);
 	}
         receivingRow = (receivingRow + 1) % r;
@@ -295,35 +288,28 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 
     T* XBuffer = Z.Buffer();
     // Send out the requests to all processes in the grid
-    // 0 byte send
     for (Int rank = 0; rank < p; ++rank)
     {
-	const Int bufferSize = 0;
+	// we just use the request objects for progress
 	const Int index =
-	    NextIndex (i, j, bufferSize, 
-		    coordVectors_[rank],
+	    NextIndex (rank, i, j, 1, 
 		    requestVectors_[rank],
 		    requestRequests_[rank],
 		    requestRequestStatuses_[rank],
-		    sendIJRequests_[rank],
-		    sendIJRequestStatuses_[rank],
-		    matrixBase_[rank],
 		    XBuffer);
-	
-	// Copy the request header into the send buffer
-	T *requestBuffer = requestVectors_[rank][index].data ();
-
-	// Fire off non-blocking send
-	mpi::TaggedISSend (requestBuffer, bufferSize, rank, 
-		REQUEST_GET_TAG, g.VCComm (),
+	// send request
+	T *requestBuffer = requestVectors_[rank][index].data();
+	mpi::TaggedISSend (requestBuffer, 1, rank, 
+		REQUEST_GET_TAG, g.VCComm(),
 		requestRequests_[rank][index]);
-
+    		
 	// send coordinates
 	Int *coord = coordVectors_[rank][index].data ();
-	mpi::TaggedISSend (coord, 2, rank, 
-		IJ_TAG, g.VCComm (), 
+	mpi::TaggedISend (coord, 2, rank, 
+		COORD_IJ_TAG, g.VCComm (), 
 		sendIJRequests_[rank][index]);
     }
+
     // Receive all of the replies
     Int numReplies = 0;
     while (numReplies < p)
@@ -362,7 +348,7 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 		    YCol[colShift + s * r] = XCol[s];
 	    }
 	    ++numReplies;
-	    recvVector_.resize ( 0 );
+	    recvVector_.clear();
 	}
     }
 }
@@ -401,7 +387,7 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
 
-    const Int YLDim = Y.LDim ();
+    const Int YLDim = Y.LDim();
 
     for( Int step=0; step<p; ++step )
     {
@@ -417,20 +403,16 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
             const Int destination = receivingRow + r*receivingCol;
             T* XBuffer = Z.Buffer();
      	    const Int index =
-	    NextIndex (i, j, numEntries, 
-		    coordVectors_[destination],
+	    NextIndex (destination, i, j, numEntries, 
 		    sendVectors_[destination],
 		    sendRequests_[destination],
 		    sendRequestStatuses_[destination],
-		    sendIJRequests_[destination],
-		    sendIJRequestStatuses_[destination],
-		    matrixBase_[destination],
 		    XBuffer);
 
 	    DEBUG_ONLY (if
 			(Int (sendVectors_[destination][index].size ()) !=
 			 numEntries) LogicError ("Error in NextIndex");)
-            
+	    	
 	    T *sendBuffer = sendVectors_[destination][index].data ();
 	    for( Int t=0; t<localWidth; ++t )
             {
@@ -442,13 +424,13 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
 
 	    // send data 
 	    mpi::TaggedISSend (sendBuffer, numEntries, destination, 
-	    	DATA_ACC_TAG, g.VCComm (), 
+	    	DATA_ACC_TAG, g.VCComm(), 
 	   	sendRequests_[destination][index]);
-	    	
+
 	    // send coordinates
-	    Int *coord = coordVectors_[destination][index].data ();
-	    mpi::TaggedISSend (coord, 2, destination, 
-		    IJ_TAG, g.VCComm (), 
+	    Int *coord = coordVectors_[destination][index].data();
+	    mpi::TaggedISend (coord, 2, destination, 
+		    COORD_IJ_TAG, g.VCComm(), 
 		    sendIJRequests_[destination][index]);
 	}
         receivingRow = (receivingRow + 1) % r;
@@ -472,10 +454,10 @@ bool AxpyInterface2<T>::TestRequests ( Matrix<T>& Z )
     for (int rank = 0; rank < p; ++rank)
     {
 	dit = std::find ( matrixBase_[rank].begin(), 
-		matrixBase_[rank].end(), Z.LockedBuffer ());
+		matrixBase_[rank].end(), Z.LockedBuffer());
 	index = (dit - matrixBase_[rank].begin());
 	
-	if ( index == matrixBase_[rank].size () )
+	if ( index == matrixBase_[rank].size() )
 	    continue;
     	if ( requestRequestStatuses_[rank].size() == 0 )
 	    continue;
@@ -488,7 +470,7 @@ bool AxpyInterface2<T>::TestRequests ( Matrix<T>& Z )
 		return false;
 	}
 	// okay to deallocate
-	requestVectors_[rank][index].resize( 0 );
+	requestVectors_[rank][index].clear();
     }
     return true;
 }
@@ -507,10 +489,10 @@ bool AxpyInterface2<T>::TestSends ( Matrix<T>& Z )
     for (int rank = 0; rank < p; ++rank)
     {
 	dit = std::find ( matrixBase_[rank].begin(), 
-		matrixBase_[rank].end(), Z.LockedBuffer ());
+		matrixBase_[rank].end(), Z.LockedBuffer());
 	index = (dit - matrixBase_[rank].begin());
 	
-	if ( index == matrixBase_[rank].size () )
+	if ( index == matrixBase_[rank].size() )
 	    continue;
     	if ( sendRequestStatuses_[rank].size() == 0 )
 	    continue;
@@ -525,7 +507,7 @@ bool AxpyInterface2<T>::TestSends ( Matrix<T>& Z )
 	}
 
 	// if test is true, then it is safe to free buffer
-	sendVectors_[rank][index].resize (0);
+	sendVectors_[rank][index].clear();
     }
     return true;
 }
@@ -544,10 +526,10 @@ bool AxpyInterface2<T>::TestRecvs ( Matrix<T>& Z )
     for (int rank = 0; rank < p; ++rank)
     {
 	dit = std::find ( matrixBase_[rank].begin(), 
-		matrixBase_[rank].end(), Z.LockedBuffer ());
+		matrixBase_[rank].end(), Z.LockedBuffer());
 	index = (dit - matrixBase_[rank].begin());
 	
-	if ( index == matrixBase_[rank].size () )
+	if ( index == matrixBase_[rank].size() )
 	    continue;
     	if ( recvRequestStatuses_[rank].size() == 0 )
 	    continue;
@@ -562,7 +544,7 @@ bool AxpyInterface2<T>::TestRecvs ( Matrix<T>& Z )
 	}
 	
 	// if test is true, then it is safe to free buffer
-	recvVectors_[rank][index].resize (0);
+	recvVectors_[rank][index].clear();
     }
     return true;
 }
@@ -581,10 +563,10 @@ bool AxpyInterface2<T>::TestReplies ( Matrix<T>& Z )
     for (int rank = 0; rank < p; ++rank)
     {
 	dit = std::find ( matrixBase_[rank].begin(), 
-		matrixBase_[rank].end(), Z.LockedBuffer ());
+		matrixBase_[rank].end(), Z.LockedBuffer());
 	index = (dit - matrixBase_[rank].begin());
 	
-	if ( index == matrixBase_[rank].size () )
+	if ( index == matrixBase_[rank].size() )
 	    continue;
     	if ( replyRequestStatuses_[rank].size() == 0 )
 	    continue;
@@ -599,7 +581,7 @@ bool AxpyInterface2<T>::TestReplies ( Matrix<T>& Z )
 	}
 
 	// if test is true, then it is safe to free buffer
-	replyVectors_[rank][index].resize (0);
+	replyVectors_[rank][index].clear();
     }
     return true;
 }
@@ -618,10 +600,10 @@ bool AxpyInterface2<T>::TestSendsCoord ( Matrix<T>& Z )
     for (int rank = 0; rank < p; ++rank)
     {
 	dit = std::find ( matrixBase_[rank].begin(), 
-		matrixBase_[rank].end(), Z.LockedBuffer ());
+		matrixBase_[rank].end(), Z.LockedBuffer());
 	index = (dit - matrixBase_[rank].begin());
 	
-	if ( index == matrixBase_[rank].size () )
+	if ( index == matrixBase_[rank].size() )
 	    continue;
     	if ( sendIJRequestStatuses_[rank].size() == 0 )
 	    continue;
@@ -635,7 +617,7 @@ bool AxpyInterface2<T>::TestSendsCoord ( Matrix<T>& Z )
 		return false;
 	}
 	// if test is true, then it is safe to free buffer
-	coordVectors_[rank][index].resize (0);
+	coordVectors_[rank][index].clear();
     }
     return true;
 }
@@ -661,7 +643,7 @@ void AxpyInterface2<T>::Flush( Matrix<T>& Z, Int i, Int j )
     while ( !DONE )
     {
 	// similar to HandleXYZ functions in original AxpyInterface
-	if ( mpi::IProbe (mpi::ANY_SOURCE, mpi::ANY_TAG, g.VCComm (), status) )
+	if ( mpi::IProbe (mpi::ANY_SOURCE, mpi::ANY_TAG, g.VCComm(), status) )
 	{
 	    switch (status.MPI_TAG)
 	    {
@@ -693,10 +675,10 @@ void AxpyInterface2<T>::Flush( Matrix<T>& Z, Int i, Int j )
 	    // check if all sends (data or request) are 
 	    // complete for a particular matrix
 	    if ( TestSends( Z ) 
-		    && TestRecvs( Z ) 
+	    	    && TestRecvs( Z ) 
 	    	    && TestRequests( Z ) 
-		    && TestReplies ( Z ) 
-		    && TestSendsCoord ( Z ) )
+	    	    && TestReplies ( Z ) 
+	    	    && TestSendsCoord ( Z ) )
 	    {
 		mpi::IBarrier ( g.VCComm(), nb_bar_request );
 		nb_bar_active = true;
@@ -724,38 +706,38 @@ void AxpyInterface2<T>::HandleLocalToGlobalData ( Matrix<T>& Z, Int count, Int s
     const Int myCol = g.Col ();
     int height = Z.Height();
     int width = Z.Width();
+    // data vector
     std::vector<T> getVector_;
-    std::vector<Int> getCoord_;
+    getVector_.resize (count);
 
     DEBUG_ONLY (if (count < Int (sizeof (T)))
 	    LogicError ("Count was too small");)
-    
-    getVector_.resize (count);
-    getCoord_.resize (2);
-    
-    DEBUG_ONLY (if
-	    (Int (getVector_.size ()) != count) LogicError ("Not enough space allocated");)
+    DEBUG_ONLY (if (Int (getVector_.size ()) != count) 
+	    LogicError ("Not enough space allocated");)
 
-    T *getBuffer = getVector_.data ();
-    // post receive
-    mpi::TaggedRecv (getBuffer, count, source, DATA_PUT_TAG, g.VCComm ());
-        
     // post receive for coordinates
-    Int *coord = getCoord_.data();
-    mpi::TaggedRecv (coord, 2, source, IJ_TAG, g.VCComm ());
-    Int i = coord[0]; Int j = coord[1];
-   
+    Int coord[2];
+    mpi::TaggedRecv (coord, 2, source, 
+	    COORD_IJ_TAG, g.VCComm());
+    Int i = coord[0]; 
+    Int j = coord[1];
+ 
+    // post receive for data
+    T *getBuffer = getVector_.data();
+    mpi::TaggedRecv (getBuffer, count, source, 
+	    DATA_PUT_TAG, g.VCComm());
+        
     // Update Y
     const T *XBuffer = reinterpret_cast < const T * >(getBuffer);
-    const Int colAlign = (Y.ColAlign () + i) % r;
-    const Int rowAlign = (Y.RowAlign () + j) % c;
+    const Int colAlign = (Y.ColAlign() + i) % r;
+    const Int rowAlign = (Y.RowAlign() + j) % c;
     const Int colShift = Shift (myRow, colAlign, r);
     const Int rowShift = Shift (myCol, rowAlign, c);
 
     const Int localHeight = Length (height, colShift, r);
     const Int localWidth = Length (width, rowShift, c);
-    const Int iLocalOffset = Length (i, Y.ColShift (), r);
-    const Int jLocalOffset = Length (j, Y.RowShift (), c);
+    const Int iLocalOffset = Length (i, Y.ColShift(), r);
+    const Int jLocalOffset = Length (j, Y.RowShift(), c);
 
     for (Int t = 0; t < localWidth; ++t)
     {
@@ -765,8 +747,7 @@ void AxpyInterface2<T>::HandleLocalToGlobalData ( Matrix<T>& Z, Int count, Int s
 	    YCol[s] = XCol[s];
     }
     // Free the memory
-    getVector_.resize ( 0 );
-    getCoord_.resize ( 0 );
+    getVector_.clear();
 }
 
 // replica of above function except this accumulates
@@ -781,41 +762,39 @@ void AxpyInterface2<T>::HandleLocalToGlobalAcc ( Matrix<T>& Z, Int count, Int so
     const Int myCol = g.Col ();
     const int height = Z.Height();
     const int width = Z.Width();
+
     // data buffer
-    std::vector< T > getVector_;
-    std::vector<Int> getCoord_;
+    std::vector<T> getVector_;
+    getVector_.resize (count);
 
     DEBUG_ONLY (if (count < Int (sizeof (T)))
 	    LogicError ("Count was too small");)
-    // data buffer resize
-    getVector_.resize (count);
-    getCoord_.resize (2);
 
-    DEBUG_ONLY (if
-	    (Int (getVector_.size ()) != count) LogicError ("Not enough space allocated");)
-
-    
-    // post receive for data
-    T *getBuffer = getVector_.data ();
-    mpi::TaggedRecv (getBuffer, count, source, 
-	    DATA_ACC_TAG, g.VCComm ());
+    DEBUG_ONLY (if (Int (getVector_.size ()) != count) 
+	    LogicError ("Not enough space allocated");)
     
     // post receive for coordinates
-    Int *coord = getCoord_.data();
-    mpi::TaggedRecv (coord, 2, source, IJ_TAG, g.VCComm ());
+    Int coord[2];
+    mpi::TaggedRecv (coord, 2, source, 
+	    COORD_IJ_TAG, g.VCComm());
     Int i = coord[0]; Int j = coord[1];
     
+    // post receive for data
+    T *getBuffer = getVector_.data();
+    mpi::TaggedRecv (getBuffer, count, source, 
+	    DATA_ACC_TAG, g.VCComm());
+
     // Update Y
     const T *XBuffer = reinterpret_cast < const T * >(getBuffer);
-    const Int colAlign = (Y.ColAlign () + i) % r;
-    const Int rowAlign = (Y.RowAlign () + j) % c;
+    const Int colAlign = (Y.ColAlign() + i) % r;
+    const Int rowAlign = (Y.RowAlign() + j) % c;
     const Int colShift = Shift (myRow, colAlign, r);
     const Int rowShift = Shift (myCol, rowAlign, c);
 
     const Int localHeight = Length (height, colShift, r);
     const Int localWidth = Length (width, rowShift, c);
-    const Int iLocalOffset = Length (i, Y.ColShift (), r);
-    const Int jLocalOffset = Length (j, Y.RowShift (), c);
+    const Int iLocalOffset = Length (i, Y.ColShift(), r);
+    const Int jLocalOffset = Length (j, Y.RowShift(), c);
 
     for (Int t = 0; t < localWidth; ++t)
     {
@@ -825,8 +804,7 @@ void AxpyInterface2<T>::HandleLocalToGlobalAcc ( Matrix<T>& Z, Int count, Int so
 	    YCol[s] += XCol[s];
     }
     // Free the memory
-    getVector_.resize ( 0 );
-    getCoord_.resize ( 0 );
+    getVector_.clear();
 }
 
 // handle request for data, post a matching issend
@@ -845,21 +823,23 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z )
     const Int p = g.Size();
     const Int myRow = g.Row();
     const Int myCol = g.Col();
-	
-    // dummy vector for 0 byte receive
-    std::vector<T> dummyVector_;
-    std::vector<Int> getCoord_;
-    
+
     mpi::Status status;
 
     if (mpi::IProbe (mpi::ANY_SOURCE, REQUEST_GET_TAG, g.VCComm (), status))
     {
 	const Int source = status.MPI_SOURCE;
-	getCoord_.resize (2);
-	    
+	// dummy var for receiving request
+	// we don't use this anyway
+	T dummy_=0;
+	// post receive request for get
+	mpi::TaggedRecv (&dummy_, 1, source, 
+		REQUEST_GET_TAG, g.VCComm());
+    
 	// post receive for coordinates
-	Int *coord = getCoord_.data();
-	mpi::TaggedRecv (coord, 2, source, IJ_TAG, g.VCComm ());
+	Int coord[2];
+	mpi::TaggedRecv (coord, 2, source, 
+		COORD_IJ_TAG, g.VCComm());
     	Int i = coord[0]; Int j = coord[1];
  
 	const Int colAlign = (Y.ColAlign() + i) % r;
@@ -883,26 +863,18 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z )
 	DEBUG_ONLY (if (numEntries < Int (sizeof (T)))
 		LogicError ("Count was too small");)
 
-	// dummy buffers resize    
-	dummyVector_.resize ( 0 );
-	T *dummyBuffer = dummyVector_.data ();
-	// post receive request for get
-	mpi::TaggedRecv (dummyBuffer, 0, source, 
-		REQUEST_GET_TAG, g.VCComm ());
-
 	T* XBuffer = Z.Buffer();
 	const Int index =
-	    NextIndex (numEntries, replyVectors_[source],
+	    NextIndex (source, numEntries, replyVectors_[source],
 		    replyRequests_[source],
 		    replyRequestStatuses_[source],
-		    matrixBase_[source],
 		    XBuffer);
 
 	DEBUG_ONLY (if
 		(Int (replyVectors_[source][index].size ()) !=
 		 numEntries) LogicError ("Error in NextIndex");)
+	
 	T *replyBuffer = replyVectors_[source][index].data ();
-
 	for (Int t = 0; t < localWidth; ++t)
 	{
 	    T *sendCol = &replyBuffer[t * localHeight];
@@ -912,10 +884,8 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z )
 
 	// Fire off non-blocking send
 	mpi::TaggedISSend (replyBuffer, numEntries, source, 
-		DATA_GET_TAG, g.VCComm (), replyRequests_[source][index]);
-
-	dummyVector_.resize ( 0 );
-	getCoord_.resize ( 0 );
+		DATA_GET_TAG, g.VCComm (), 
+		replyRequests_[source][index]);
     }
 }
 
