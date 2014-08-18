@@ -252,6 +252,7 @@ void RmaInterface<T>::Put( Matrix<T>& Z, Int i, Int j )
                 mpi::Iput (&sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window);
             }
+	    mpi::FlushLocal (destination, window);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -327,6 +328,7 @@ void RmaInterface<T>::Put( const Matrix<T>& Z, Int i, Int j )
                 mpi::Iput (&sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window);
             }
+	    mpi::FlushLocal (destination, window);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -485,6 +487,7 @@ void RmaInterface<T>::Acc( Matrix<T>& Z, Int i, Int j )
                 mpi::Iacc (&sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window);
             }
+	    mpi::FlushLocal (destination, window);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -561,6 +564,7 @@ void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
                 mpi::Iacc (&sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window);
             }
+	    mpi::FlushLocal (destination, window);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
