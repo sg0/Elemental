@@ -47,33 +47,19 @@ private:
         DATA_ACC_TAG   	  =3,
         REQUEST_GET_TAG   =4,
 	COORD_IJ_TAG      =5;
-     
-    /* Request objects for send, recv and request op */
-    std::vector<std::deque<mpi::Request>> 
-	sendRequests_, requestRequests_, 
-	recvRequests_, replyRequests_,
-	sendIJRequests_;
-    
-    /* Request statuses for send, recv and request op */
-    std::vector<std::deque<bool>>  
-	sendRequestStatuses_, 
-	recvRequestStatuses_, 
-	requestRequestStatuses_,
-	replyRequestStatuses_,
-	sendIJRequestStatuses_;
-    
-    /* Stores matrix base addresses */
-     std::vector<std::deque<T *>>  
-	matrixBase_;
 
-     /* Stores i, j coordinates */
-    std::vector<std::deque<std::vector<Int>>>
-	coordVectors_;
-    
-    /* Receive and Send vectors */
-    std::vector<std::deque<std::vector<T>>>
-        recvVectors_, sendVectors_, 
-	replyVectors_, requestVectors_;
+    struct matrix_params_
+    {
+	T *base_;
+	std::vector<std::deque<std::vector<T>>>
+	    data_;
+	std::vector<std::deque<mpi::Request>> 
+	    requests_;
+	std::vector<std::deque<bool>> 
+	    statuses_;
+    };
+        	
+    std::vector<struct matrix_params_> matrices_;
 
     // need to add const here...
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
@@ -82,44 +68,29 @@ private:
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
 	 attached_, detached_;
      
-    Int NextIndex ( Int rank, Int dataSize, 
-	    std::deque <std::vector<T>> &dataVectors,
-	    std::deque <mpi::Request> &requests,
-	    std::deque <bool> &requestStatus,
-	    T * base_address );
-    // note: this is just a placeholder
-    // would be replaced soon
-    Int NextIndex ( Int rank, Int dataSize, 
-	    std::deque <std::vector<T>> &dataVectors,
-	    std::deque <mpi::Request> &requests,
-	    std::deque <bool> &requestStatus,
-	    const T * base_address );
-
-    Int NextIndex
-	( Int rank, Int i, Int j, Int dataSize, 
-	  std::deque <std::vector<T>> &dataVectors,
-	  std::deque <mpi::Request> &requestData,
-	  std::deque <bool> &requestDataStatus,
-	  T * base_address);
-
-    Int NextIndex
-	( Int rank, Int i, Int j, Int dataSize, 
-	  std::deque <std::vector<T>> &dataVectors,
-	  std::deque <mpi::Request> &requestData,
-	  std::deque <bool> &requestDataStatus,
-	  const T * base_address);
-
+    Int NextIndex ( 
+	Int target,
+	Int dataSize, 
+	T * base_address,
+	Int *matrix_index);
+ 
+    Int NextIndex ( 
+	Int target,
+	Int dataSize, 
+	const T * base_address,
+	Int *matrix_index);
+    
     /* Test */
-    // probably we need const interfaces also?
     bool TestRequests      ( Matrix<T>& Z );
-    bool TestReplies       ( Matrix<T>& Z );
-    bool TestSends         ( Matrix<T>& Z );
-    bool TestRecvs    	   ( Matrix<T>& Z );
-    bool TestSendsCoord    ( Matrix<T>& Z );
+    bool TestRequests      ( const Matrix<T>& Z );
 
     void HandleGlobalToLocalData( Matrix<T>& Z );
     void HandleLocalToGlobalData( Matrix<T>& Z, Int count, Int source );
     void HandleLocalToGlobalAcc(  Matrix<T>& Z, Int count, Int source );
+
+    void HandleGlobalToLocalData( const Matrix<T>& Z );
+    void HandleLocalToGlobalData( const Matrix<T>& Z, Int count, Int source );
+    void HandleLocalToGlobalAcc(  const Matrix<T>& Z, Int count, Int source );
 };
 } // namespace El
 #endif // ifndef EL_AXPYINTERFACE2_HPP
