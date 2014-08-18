@@ -37,7 +37,6 @@ public:
 
     void Acc(       Matrix<T>& Z, Int i, Int j );
     void Acc( const Matrix<T>& Z, Int i, Int j );
-    void LocalAcc(  Matrix<T>& Z, Int i, Int j );
 
     void Flush(       Matrix<T>& Z, Int i, Int j );
     void Flush( const Matrix<T>& Z, Int i, Int j );
@@ -52,9 +51,6 @@ private:
     std::vector<std::deque<std::vector<T>>>
         getVector_, putVector_;
 
-    std::vector<std::deque<bool>> 
-        putStatus_, getStatus_;
-
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     const DistMatrix<T,MC,MR>* GlobalArrayGet_;
     
@@ -62,8 +58,7 @@ private:
 	 attached_, detached_;
 
     Int NextIndex ( Int dataSize, 
-	    std::deque <std::vector<T>> &dataVectors,
-	    std::deque<bool> &statuses);
+	    std::deque <std::vector<T>> &dataVectors );
 };
 #endif //MPI-3
 } // namespace El
