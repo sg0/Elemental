@@ -48,6 +48,7 @@ private:
         REQUEST_GET_TAG   =4,
 	COORD_IJ_TAG      =5;
 
+    // struct for passing data
     struct matrix_params_
     {
 	T *base_;
@@ -61,6 +62,20 @@ private:
         	
     std::vector<struct matrix_params_> matrices_;
 
+    // struct for passing coordinates
+    struct coord_params_
+    {
+	T *base_;
+	std::vector<std::deque<std::array<Int, 2>>>
+	    coord_;
+	std::vector<std::deque<mpi::Request>> 
+	    requests_;
+	std::vector<std::deque<bool>> 
+	    statuses_;
+    };
+        	
+    std::vector<struct coord_params_> coords_;
+
     // need to add const here...
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     DistMatrix<T,MC,MR>* GlobalArrayGet_;
@@ -68,22 +83,37 @@ private:
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
 	 attached_, detached_;
      
-    Int NextIndex ( 
+    Int NextIndexMatrix ( 
 	Int target,
 	Int dataSize, 
 	T * base_address,
 	Int *matrix_index);
  
-    Int NextIndex ( 
+    Int NextIndexMatrix ( 
 	Int target,
 	Int dataSize, 
 	const T * base_address,
 	Int *matrix_index);
-    
+ 
+    Int NextIndexCoord (
+	Int i, Int j,
+	Int target,
+	T * base_address,
+	Int *matrix_index);
+ 
+    Int NextIndexCoord ( 
+	Int i, Int j,
+	Int target,
+	const T * base_address,
+	Int *matrix_index);
+   
     /* Test */
-    bool TestRequests      ( Matrix<T>& Z );
-    bool TestRequests      ( const Matrix<T>& Z );
-
+    bool TestMatrix      ( Matrix<T>& Z );
+    bool TestMatrix      ( const Matrix<T>& Z );
+    
+    bool TestCoord      ( Matrix<T>& Z );
+    bool TestCoord      ( const Matrix<T>& Z );
+ 
     void HandleGlobalToLocalData( Matrix<T>& Z );
     void HandleLocalToGlobalData( Matrix<T>& Z, Int count, Int source );
     void HandleLocalToGlobalAcc(  Matrix<T>& Z, Int count, Int source );
