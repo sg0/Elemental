@@ -52,15 +52,18 @@ private:
     std::vector<std::deque<std::vector<T>>>
         getVector_, putVector_;
 
+    std::vector<std::deque<bool>> 
+        putStatus_, getStatus_;
+
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     const DistMatrix<T,MC,MR>* GlobalArrayGet_;
     
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
-	 attached_, detached_, preceeding_put_,
-	 preceeding_get_;
+	 attached_, detached_;
 
     Int NextIndex ( Int dataSize, 
-	    std::deque <std::vector<T>> &dataVectors );
+	    std::deque <std::vector<T>> &dataVectors,
+	    std::deque<bool> &statuses);
 };
 #endif //MPI-3
 } // namespace El
