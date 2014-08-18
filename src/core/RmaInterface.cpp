@@ -276,8 +276,8 @@ void RmaInterface<T>::Put( Matrix<T>& Z, Int i, Int j )
                            destination, disp, localHeight, window);
             }
             // local flush, okay to clear buffers after this
-            mpi::FlushLocal (destination, window);
-	    putStatus_[destination][index] = false;
+            //mpi::FlushLocal (destination, window);
+	    //putStatus_[destination][index] = false;
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -354,8 +354,8 @@ void RmaInterface<T>::Put( const Matrix<T>& Z, Int i, Int j )
                            destination, disp, localHeight, window);
             }
             // local flush, okay to clear buffers after this
-            mpi::FlushLocal (destination, window);
-	    putStatus_[destination][index] = false;
+            //mpi::FlushLocal (destination, window);
+	    //putStatus_[destination][index] = false;
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -430,7 +430,7 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
             // no difference between localflush
             // and flush for Get
             mpi::FlushLocal (destination, window);
-	    getStatus_[destination][index] = false;
+	    //getStatus_[destination][index] = false;
             // update local matrix
             for( Int t=0; t<localWidth; ++t )
             {
@@ -516,8 +516,8 @@ void RmaInterface<T>::Acc( Matrix<T>& Z, Int i, Int j )
                            destination, disp, localHeight, window);
             }
             // local flush, okay to clear buffers after this
-            mpi::FlushLocal (destination, window);
-	    putStatus_[destination][index] = false;
+            //mpi::FlushLocal (destination, window);
+	    //putStatus_[destination][index] = false;
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -596,8 +596,8 @@ void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
                            destination, disp, localHeight, window);
             }
             // local flush, okay to clear buffers after this
-            mpi::FlushLocal (destination, window);
-	    putStatus_[destination][index] = false;
+            //mpi::FlushLocal (destination, window);
+	    //putStatus_[destination][index] = false;
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )

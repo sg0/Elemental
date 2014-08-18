@@ -48,6 +48,16 @@ namespace mpi {
 #define EL_USE_DERIVED_DATATYPE
 #endif
 
+// explicit progress for RMA
+//#ifndef EL_EXPLICIT_PROGRESS
+//#define EL_EXPLICIT_PROGRESS 
+//#endif
+
+// no acc ordering
+//#ifndef EL_NO_ACC_ORDERING
+//#define EL_NO_ACC_ORDERING
+//#endif
+
 #ifndef EL_INT_SAFE_CAST
 #define EL_INT_SAFE_CAST(x) \
     (x < std::numeric_limits<int>::max () && \
