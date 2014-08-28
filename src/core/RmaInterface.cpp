@@ -257,6 +257,8 @@ void RmaInterface<T>::Put( Matrix<T>& Z, Int i, Int j )
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
     }
+// Note: This as of now does not progress
+// RMA routines
 #ifdef EL_EXPLICIT_PROGRESS
   RmaProgress (g.VCComm ());
 #endif

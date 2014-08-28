@@ -813,6 +813,7 @@ template < typename T > void AxpyInterface < T >::Detach ()
 		}
 	    }
 	}
+	mpi::Barrier (g.VCComm ());
 #else
             while (!Finished ())
             {
@@ -850,6 +851,7 @@ template < typename T > void AxpyInterface < T >::Detach ()
 		}
 	    }
 	}
+	mpi::Barrier (g.VCComm ());
 #else
             while (!Finished ())
             {
@@ -859,7 +861,7 @@ template < typename T > void AxpyInterface < T >::Detach ()
             mpi::Barrier (g.VCComm ());
 #endif
     }
-
+             
     attachedForLocalToGlobal_ = false;
     attachedForGlobalToLocal_ = false;
     recvVector_.clear();

@@ -8,7 +8,6 @@ http://opensource.org/licenses/BSD-2-Clause
 
 // TODO Use DDT for put/get/acc when EL_USE_DERIVED_TYPE is defined
 // TODO bring back const interfaces
-// TODO localflush
 namespace El
 {
 template<typename T>
@@ -367,7 +366,7 @@ void AxpyInterface2<T>::Put( Matrix<T>& Z, Int i, Int j )
                     thisSendCol[s] = thisXCol[colShift+s*r];
             }
 	    // put request 
-	    mpi::TaggedISSend (sendBuffer, numEntries, destination, 
+	    mpi::TaggedISend (sendBuffer, numEntries, destination, 
 			DATA_PUT_TAG, g.VCComm (), 
 			matrices_[matrix_index].requests_[destination][dindex]);
 		    
@@ -412,28 +411,14 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
     const Int p = g.Size ();
 
     std::vector<T> recvVector_;
-
-    Int matrix_index, coord_index;
+    Int coord_index;
 
     T* XBuffer = Z.Buffer();
     // Send out the requests to all processes in the grid
     for (Int rank = 0; rank < p; ++rank)
     {
-	// we just use the request objects for progress
-	const Int dindex =
-	    NextIndexMatrix (rank,
-		    1, 
-		    XBuffer,
-		    &matrix_index);
-	DEBUG_ONLY (if (Int (matrices_[matrix_index].data_[rank][dindex].size ()) !=
-			 1) LogicError ("Error in NextIndexMatrix");)
-	// send request
-	T *requestBuffer = matrices_[matrix_index].data_[rank][dindex].data();
-	mpi::TaggedISend (requestBuffer, 1, rank, 
-		REQUEST_GET_TAG, g.VCComm(),
-		matrices_[matrix_index].requests_[rank][dindex]);
-    			    
-	// send coordinates
+	// send coordinates, no need to send a separate
+	// request object
 	const Int cindex =
 		NextIndexCoord (i, j,
 			rank,
@@ -442,7 +427,7 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 	Int *coord = reinterpret_cast<Int *>(coords_[coord_index].coord_[rank][cindex].data ());
         coord[0] = i; coord[1] = j;
 	mpi::TaggedISend (coord, 2, rank, 
-		COORD_IJ_TAG, g.VCComm (), 
+		REQUEST_GET_TAG, g.VCComm (), 
 		coords_[coord_index].requests_[rank][cindex]);
     }
 
@@ -562,7 +547,7 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
                     thisSendCol[s] = thisXCol[colShift+s*r];
             }
 
-	    mpi::TaggedISSend (sendBuffer, numEntries, destination, 
+	    mpi::TaggedISend (sendBuffer, numEntries, destination, 
 	    	DATA_ACC_TAG, g.VCComm(), 
 	   	matrices_[matrix_index].requests_[destination][dindex]);
 	
@@ -877,17 +862,11 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z )
     if (mpi::IProbe (mpi::ANY_SOURCE, REQUEST_GET_TAG, g.VCComm (), status))
     {
 	const Int source = status.MPI_SOURCE;
-	// dummy var for receiving request
-	// we don't use this anyway
-	T dummy_[1];
-	// post receive request for get
-	mpi::TaggedRecv (dummy_, 1, source, 
-		REQUEST_GET_TAG, g.VCComm());
-    
+
 	// post receive for coordinates
 	Int coord[2] = {-1, -1};
 	mpi::TaggedRecv (coord, 2, source, 
-		COORD_IJ_TAG, g.VCComm());
+		REQUEST_GET_TAG, g.VCComm());
     	Int i = coord[0]; Int j = coord[1];
  
 	const Int colAlign = (Y.ColAlign() + i) % r;
@@ -931,7 +910,7 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z )
 	}
 
 	// Fire off non-blocking send
-	mpi::TaggedISSend (replyBuffer, numEntries, source, 
+	mpi::TaggedISend (replyBuffer, numEntries, source, 
 		DATA_GET_TAG, g.VCComm (), 
 		matrices_[matrix_index].requests_[source][index]);
     }
