@@ -673,44 +673,7 @@ void RmaInterface<T>::Flush( Matrix<T>& Z )
     if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
         LogicError("Must initiate transfer before flushing.");
 
-    DistMatrix<T>& Y = *GlobalArrayPut_;
-            
-    //do rma related checks
-    const Grid& g = Y.Grid();
-    const Int r = g.Height();
-    const Int c = g.Width();
-    const Int p = g.Size();
-    const Int myProcessRow = g.Row();
-    const Int myProcessCol = g.Col();
-    // i = j = 0 - leftmost coordinates of DistMatrix
-    const Int colAlign = Y.ColAlign() % r;
-    const Int rowAlign = Y.RowAlign() % c;
-
-    // local width and height
-    const Int height = Z.Height();
-    const Int width = Z.Width();
-
-    // find destination
-    Int receivingRow = myProcessRow;
-    Int receivingCol = myProcessCol;
-    for( Int step=0; step<p; ++step )
-    {
-        const Int colShift = Shift( receivingRow, colAlign, r );
-        const Int rowShift = Shift( receivingCol, rowAlign, c );
-        const Int localHeight = Length( height, colShift, r );
-        const Int localWidth = Length( width, rowShift, c );
-        const Int numEntries = localHeight*localWidth;
-
-        if( numEntries != 0 )
-        {
-            const Int destination = receivingRow + r*receivingCol;
-            mpi::Flush ( destination, window );
-        }
-
-        receivingRow = (receivingRow + 1) % r;
-        if( receivingRow == 0 )
-            receivingCol = (receivingCol + 1) % c;
-    }
+    mpi::Flush ( window );
 }
 
 template<typename T>
@@ -718,48 +681,10 @@ void RmaInterface<T>::Flush( const Matrix<T>& Z )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Flush"))
 
-    if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
-        LogicError("Must initiate transfer before flushing.");
+	if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
+	    LogicError("Must initiate transfer before flushing.");
 
-    // rma checks, see if Z is not NULL, etc
-    const DistMatrix<T>& Y = *GlobalArrayGet_;
-
-    //do rma related checks
-    const Grid& g = Y.Grid();
-    const Int r = g.Height();
-    const Int c = g.Width();
-    const Int p = g.Size();
-    const Int myProcessRow = g.Row();
-    const Int myProcessCol = g.Col();
-    // i = j = 0 - leftmost coordinates of DistMatrix
-    const Int colAlign = Y.ColAlign() % r;
-    const Int rowAlign = Y.RowAlign() % c;
-
-    // local width and height
-    const Int height = Z.Height();
-    const Int width = Z.Width();
-
-    // find destination
-    Int receivingRow = myProcessRow;
-    Int receivingCol = myProcessCol;
-    for( Int step=0; step<p; ++step )
-    {
-        const Int colShift = Shift( receivingRow, colAlign, r );
-        const Int rowShift = Shift( receivingCol, rowAlign, c );
-        const Int localHeight = Length( height, colShift, r );
-        const Int localWidth = Length( width, rowShift, c );
-        const Int numEntries = localHeight*localWidth;
-
-        if( numEntries != 0 )
-        {
-            const Int destination = receivingRow + r*receivingCol;
-            mpi::Flush ( destination, window );
-        }
-
-        receivingRow = (receivingRow + 1) % r;
-        if( receivingRow == 0 )
-            receivingCol = (receivingCol + 1) % c;
-    }
+    mpi::Flush ( window );
 }
 
 template<typename T>

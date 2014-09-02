@@ -355,7 +355,6 @@ bool Testany( int count, Request* requests );
 bool Testany( int count, Request* requests, int& indx );
 bool Testany( int count, Request* requests, int& indx, Status& status );
 bool IProbe( int source, int tag, Comm comm, Status& status );
-void RequestFree( Request& request );
 template<typename T>
 int GetCount( Status& status );
 

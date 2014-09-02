@@ -21,6 +21,19 @@ public:
     void Attach(       DistMatrix<T,MC,MR>& Z );
     void Attach( const DistMatrix<T,MC,MR>& Z );
 
+    // nonblocking update routines
+    void Iput( Matrix<T>& Z, Int i, Int j );
+    void Iput( const Matrix<T>& Z, Int i, Int j );
+
+    void Iget(       Matrix<T>& Z, Int i, Int j );
+
+    void Iacc(       Matrix<T>& Z, Int i, Int j );
+    void Iacc( const Matrix<T>& Z, Int i, Int j );
+
+    void Flush(       Matrix<T>& Z );
+    void Flush( const Matrix<T>& Z );
+    
+    // blocking update routines
     void Put( Matrix<T>& Z, Int i, Int j );
     void Put( const Matrix<T>& Z, Int i, Int j );
 
@@ -28,14 +41,6 @@ public:
 
     void Acc(       Matrix<T>& Z, Int i, Int j );
     void Acc( const Matrix<T>& Z, Int i, Int j );
-
-    void Flush( Matrix<T>& Z, Int i, Int j );
-    void Flush( const Matrix<T>& Z, Int i, Int j );
-    void Flush(       Matrix<T>& Z );
-    void Flush( const Matrix<T>& Z );
-    
-    void LocalFlush( Matrix<T>& Z, Int i, Int j );
-    void LocalFlush( const Matrix<T>& Z, Int i, Int j );
 
     void Detach();
 
@@ -113,7 +118,9 @@ private:
     
     bool TestCoord      ( Matrix<T>& Z );
     bool TestCoord      ( const Matrix<T>& Z );
- 
+
+    // these are only used for nonblocking
+    // update rountines
     void HandleGlobalToLocalData( Matrix<T>& Z );
     void HandleLocalToGlobalData( Matrix<T>& Z, Int count, Int source );
     void HandleLocalToGlobalAcc(  Matrix<T>& Z, Int count, Int source );
