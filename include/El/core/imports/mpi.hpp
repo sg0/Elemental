@@ -343,10 +343,12 @@ void Barrier( Comm comm );
 #if MPI_VERSION>=3
 void IBarrier( Comm comm, Request& request );
 #endif
+void RequestFree( Request& request );
 void Wait( Request& request );
 void Wait( Request& request, Status& status );
 //TODO add another function for getting statuses
-void WaitAny( int count, Request *requests, int *indx );
+void WaitAny (int numRequests, Request * requests, Int * index);
+
 void WaitAll( int numRequests, Request* requests );
 void WaitAll( int numRequests, Request* requests, Status* statuses );
 bool Test( Request& request );

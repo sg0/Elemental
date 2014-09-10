@@ -298,426 +298,10 @@ Int AxpyInterface2<T>::NextIndexCoord (
     return numCreated;
 }
 
-// blocking update routines
-template<typename T>
-void AxpyInterface2<T>::Put( Matrix<T>& Z, Int i, Int j )
-{
-    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Put"))
-
-    if( i < 0 || j < 0 )
-        LogicError("Submatrix offsets must be non-negative");
-    if ( !toBeAttachedForPut_ )
-        LogicError("Global matrix cannot be updated");
-
-    DistMatrix<T>& Y = *GlobalArrayPut_;
-    //do boundary checks
-    if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
-        LogicError("Submatrix out of bounds of global matrix");
-
-    const Grid& g = Y.Grid();
-    const Int r = g.Height();
-    const Int c = g.Width();
-    const Int p = g.Size();
-    const Int myProcessRow = g.Row();
-    const Int myProcessCol = g.Col();
-    const Int colAlign = (Y.ColAlign() + i) % r;
-    const Int rowAlign = (Y.RowAlign() + j) % c;
-
-    const Int XLDim = Z.LDim();
-    // local matrix width and height
-    const Int height = Z.Height();
-    const Int width = Z.Width();
-
-    Int receivingRow = myProcessRow;
-    Int receivingCol = myProcessCol;
-
-    const Int YLDim = Y.LDim ();
-	
-    Int matrix_index, coord_index;
-
-    for( Int step=0; step<p; ++step )
-    {
-        const Int colShift = Shift( receivingRow, colAlign, r );
-        const Int rowShift = Shift( receivingCol, rowAlign, c );
-        // number of entries in my PE
-        const Int localHeight = Length( height, colShift, r );
-        const Int localWidth = Length( width, rowShift, c );
-        const Int numEntries = localHeight * localWidth;
-	
-        if( numEntries != 0 )
-        {
-            const Int destination = receivingRow + r*receivingCol;
-            T* XBuffer = Z.Buffer();
-	    const Int dindex =
-	    NextIndexMatrix (destination,
-			numEntries, 
-			XBuffer,
-			&matrix_index);
-
-	    DEBUG_ONLY (if
-			(Int (matrices_[matrix_index].data_[destination][dindex].size ()) !=
-			 numEntries) LogicError ("Error in NextIndexMatrix");)
-
-	    T *sendBuffer = matrices_[matrix_index].data_[destination][dindex].data ();
-            for( Int t=0; t<localWidth; ++t )
-            {
-                T* thisSendCol = &sendBuffer[t*localHeight];
-                T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
-                for( Int s=0; s<localHeight; ++s )
-                    thisSendCol[s] = thisXCol[colShift+s*r];
-            }
-	    // put request 
-	    mpi::TaggedISend (sendBuffer, numEntries, destination, 
-			DATA_PUT_TAG, g.VCComm (), 
-			matrices_[matrix_index].requests_[destination][dindex]);
-	}
-        
-	receivingRow = (receivingRow + 1) % r;
-        if( receivingRow == 0 )
-            receivingCol = (receivingCol + 1) % c;
-    }
-  
-    // my receives
-    // number of entries in my PE
-    const Int iLocalOffset = Length (i, Y.ColShift(), r);
-    const Int jLocalOffset = Length (j, Y.RowShift(), c);
-    const Int localHeight = Length( height, Y.ColShift(), r );    
-    const Int localWidth = Length( width,  Y.RowShift(), c );
-
-    std::vector<T> getVector_;
-    mpi::Status status;
-    
-    bool DONE = false;
-    mpi::Request nb_bar_request;
-    bool nb_bar_active = false;
-
-    while (!DONE)
-    {
-	if ( ( mpi::IProbe(mpi::ANY_SOURCE, DATA_PUT_TAG, g.VCComm (), status ) ) )
-	{
-	    const Int source = status.MPI_SOURCE;
-	    const Int count = mpi::GetCount <T> (status);
-	    getVector_.resize ( count );
-	    // post receive for data
-	    T *getBuffer = getVector_.data();
-
-	    mpi::TaggedRecv (getBuffer, count, source, 
-		    DATA_PUT_TAG, g.VCComm());
-
-	    const T *XBuffer = reinterpret_cast < const T * >(getBuffer);
-
-	    for (Int t = 0; t < localWidth; ++t)
-	    {
-		T *YCol = Y.Buffer (iLocalOffset, jLocalOffset + t);
-		const T *XCol = &XBuffer[t * localHeight];
-		for (Int s = 0; s < localHeight; ++s)
-		    YCol[s] = XCol[s];
-	    }
-	}
-	// progress my sends
-	if ( nb_bar_active )
-	{
-	    DONE = mpi::Test ( nb_bar_request );
-	}
-	else
-	{
-	    // check if all nb sends are complete
-	    if ( TestMatrix( Z ) )
-	    {
-		mpi::IBarrier ( g.VCComm(), nb_bar_request );
-		nb_bar_active = true;
-	    }
-	}
-    }
-	    
-    getVector_.clear();
-}
-
-template<typename T>
-void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
-{
-    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Get"))
-    // a call to Attach with a non-const DistMatrix must set
-    // toBeAttachedForGet_ also, if not then it is assumed that
-    // the DistMatrix isn't attached
-    if ( !toBeAttachedForGet_ )
-	LogicError ("Cannot perform this operation as matrix is not attached.");
-    DistMatrix<T>& X = *GlobalArrayGet_;
-
-    const Int height = Z.Height ();
-    const Int width = Z.Width ();
-    
-    if (i + height > X.Height () || j + width > X.Width ())
-	LogicError ("Invalid AxpyGlobalToLocal submatrix");
-
-    const Grid & g = X.Grid ();
-    const Int r = g.Height ();
-    const Int c = g.Width ();
-    const Int p = g.Size ();
-
-    std::vector<T> recvVector_;
-    Int matrix_index;
-     	
-    const Int XLDim = Z.LDim();	
-    const Int colAlign = (X.ColAlign() + i) % r;
-    const Int rowAlign = (X.RowAlign() + j) % c;
-    const Int iLocalOffset = Length (i, X.ColShift (), r);
-    const Int jLocalOffset = Length (j, X.RowShift (), c);
-
-    Int receivingRow = g.Row();
-    Int receivingCol = g.Col();
-   
-    for( Int step=0; step<p; ++step )
-    {
-        const Int colShift = Shift( receivingRow, colAlign, r );
-        const Int rowShift = Shift( receivingCol, rowAlign, c );
-	
-	const Int localHeight = Length (height, colShift, r);
-	const Int localWidth = Length (width, rowShift, c);
-
-	const Int numEntries = localHeight * localWidth;
-
-	DEBUG_ONLY (if (numEntries < Int (sizeof (T)))
-		LogicError ("Count was too small");)
-
-	if( numEntries != 0 )
-	{
-	    const Int source = receivingRow + r*receivingCol;
-	    T* XBuffer = Z.Buffer();
-	
-	    const Int index =
-	    NextIndexMatrix (source,
-		    numEntries, 
-		    XBuffer,
-		    &matrix_index);
-
-	    DEBUG_ONLY (if
-		(Int (matrices_[matrix_index].data_[source][index].size ()) !=
-		 numEntries) LogicError ("Error in NextIndexMatrix");)
-
-            T *replyBuffer = matrices_[matrix_index].data_[source][index].data ();
-		
-	    for (Int t = 0; t < localWidth; ++t)
-	    {
-		T *sendCol = &replyBuffer[t * localHeight];
-		const T *XCol = X.LockedBuffer (iLocalOffset, jLocalOffset + t);
-		MemCopy (sendCol, XCol, localHeight);
-	    }
-		
-	    // Fire off non-blocking send
-	    mpi::TaggedISend (replyBuffer, numEntries, source, 
-		    DATA_GET_TAG, g.VCComm (), 
-		    matrices_[matrix_index].requests_[source][index]);
-	}
-	
-	receivingRow = (receivingRow + 1) % r;
-	if( receivingRow == 0 )
-	    receivingCol = (receivingCol + 1) % c;
-    }
-
-    // Receive all of the replies
-    mpi::Status status;
-    
-    bool DONE = false;
-    mpi::Request nb_bar_request;
-    bool nb_bar_active = false;
-
-    while ( !DONE )
-    {
-	if (mpi::IProbe
-		(mpi::ANY_SOURCE, DATA_GET_TAG, g.VCComm (), status))
-	{
-	    const Int source = status.MPI_SOURCE;
-	    // Ensure that we have a recv buffer
-	    const Int count = mpi::GetCount <T> (status);
-	    recvVector_.resize (count);
-	    T *recvBuffer = recvVector_.data ();
-
-	    // Receive the data
-	    mpi::TaggedRecv
-		(recvBuffer, count, source, DATA_GET_TAG, g.VCComm ());
-
-	    // Compute the local heights and offsets
-	    const Int myRow = g.Row ();
-	    const Int myCol = g.Col ();
-	    const Int colAlign = (X.ColAlign () + i) % r;
-	    const Int rowAlign = (X.RowAlign () + j) % c;
-	    const Int colShift = Shift (myRow, colAlign, r);
-	    const Int rowShift = Shift (myCol, rowAlign, c);
-	    const Int localHeight = Length (height, colShift, r);
-	    const Int localWidth = Length (width, rowShift, c);
-
-	    // Unpack the local matrix
-	    for (Int t = 0; t < localWidth; ++t)
-	    {
-		T *YCol = X.Buffer (0, rowShift + t * c);
-		const T *XCol = &recvBuffer[t * localHeight];
-		for (Int s = 0; s < localHeight; ++s)
-		    YCol[colShift + s * r] = XCol[s];
-	    }
-	}    
-	// progress my sends
-	if ( nb_bar_active )
-	{
-	    DONE = mpi::Test ( nb_bar_request );
-	}
-	else
-	{
-	    // check if all nb sends are complete
-	    if ( TestMatrix( Z ) )
-	    {
-		mpi::IBarrier ( g.VCComm(), nb_bar_request );
-		nb_bar_active = true;
-	    }
-	}
-    }
-    
-    recvVector_.clear();
-}
-
-// accumulate = Update Y(i:i+height-1,j:j+width-1) += X,
-// where X is height x width
-template<typename T>
-void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
-{
-    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Acc"))
-
-    if( i < 0 || j < 0 )
-        LogicError("Submatrix offsets must be non-negative");
-    if ( !toBeAttachedForPut_ )
-        LogicError("Global matrix cannot be updated");
-
-    DistMatrix<T>& Y = *GlobalArrayPut_;
-   
-    //do boundary checks
-    if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
-        LogicError("Submatrix out of bounds of global matrix");
-
-    const Grid& g = Y.Grid();
-    const Int r = g.Height();
-    const Int c = g.Width();
-    const Int p = g.Size();
-    const Int myProcessRow = g.Row();
-    const Int myProcessCol = g.Col();
-    const Int colAlign = (Y.ColAlign() + i) % r;
-    const Int rowAlign = (Y.RowAlign() + j) % c;
- 
-    Int matrix_index, coord_index;
-    
-    const Int XLDim = Z.LDim();
-    // local matrix width and height
-    const Int height = Z.Height();
-    const Int width = Z.Width();
-
-    Int receivingRow = myProcessRow;
-    Int receivingCol = myProcessCol;
-
-    const Int YLDim = Y.LDim();
-
-    for( Int step=0; step<p; ++step )
-    {
-        const Int colShift = Shift( receivingRow, colAlign, r );
-        const Int rowShift = Shift( receivingCol, rowAlign, c );
-        // number of entries in my PE
-        const Int localHeight = Length( height, colShift, r );
-        const Int localWidth = Length( width, rowShift, c );
-        const Int numEntries = localHeight * localWidth;
-	
-        if( numEntries != 0  )
-        {
-            const Int destination = receivingRow + r*receivingCol;
-            T* XBuffer = Z.Buffer();
-	    
-	    // send data 
-     	    const Int dindex =
-		NextIndexMatrix (destination,
-			numEntries, 
-			XBuffer,
-			&matrix_index);
-
-	    DEBUG_ONLY (if
-			(Int (matrices_[matrix_index].data_[destination][dindex].size ()) !=
-			 numEntries) LogicError ("Error in NextIndexMatrix");)
-	    
-	    T *sendBuffer = matrices_[matrix_index].data_[destination][dindex].data ();
-	    for( Int t=0; t<localWidth; ++t )
-            {
-                T* thisSendCol = &sendBuffer[t*localHeight];
-                T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
-                for( Int s=0; s<localHeight; ++s )
-                    thisSendCol[s] = thisXCol[colShift+s*r];
-            }
-
-	    mpi::TaggedISend (sendBuffer, numEntries, destination, 
-	    	DATA_ACC_TAG, g.VCComm(), 
-	   	matrices_[matrix_index].requests_[destination][dindex]);
-	}
-        
-	receivingRow = (receivingRow + 1) % r;
-        if( receivingRow == 0 )
-            receivingCol = (receivingCol + 1) % c;
-    }
-    // my receives
-    // number of entries in my PE
-    const Int iLocalOffset = Length (i, Y.ColShift(), r);
-    const Int jLocalOffset = Length (j, Y.RowShift(), c);
-    const Int localHeight = Length( height, Y.ColShift(), r );    
-    const Int localWidth = Length( width,  Y.RowShift(), c );
-
-    std::vector<T> getVector_;
-    mpi::Status status;
-    
-    bool DONE = false;
-    mpi::Request nb_bar_request;
-    bool nb_bar_active = false;
-
-    while (!DONE)
-    {
-	if ( ( mpi::IProbe(mpi::ANY_SOURCE, DATA_ACC_TAG, g.VCComm (), status ) ) )
-	{
-	    const Int source = status.MPI_SOURCE;
-	    const Int count = mpi::GetCount <T> (status);
-	    getVector_.resize ( count );
-	    // post receive for data
-	    T *getBuffer = getVector_.data();
-
-	    mpi::TaggedRecv (getBuffer, count, source, 
-		    DATA_ACC_TAG, g.VCComm());
-
-	    const T *XBuffer = reinterpret_cast < const T * >(getBuffer);
-
-	    for (Int t = 0; t < localWidth; ++t)
-	    {
-		T *YCol = Y.Buffer (iLocalOffset, jLocalOffset + t);
-		const T *XCol = &XBuffer[t * localHeight];
-		for (Int s = 0; s < localHeight; ++s)
-		    YCol[s] += XCol[s];
-	    }
-	}
-	// progress my sends
-	if ( nb_bar_active )
-	{
-	    DONE = mpi::Test ( nb_bar_request );
-	}
-	else
-	{
-	    // check if all nb sends are complete
-	    if ( TestMatrix( Z ) )
-	    {
-		mpi::IBarrier ( g.VCComm(), nb_bar_request );
-		nb_bar_active = true;
-	    }
-	}
-    }
-	    
-    getVector_.clear();
-}
-
-// nonblocking update routines
 template<typename T>
 void AxpyInterface2<T>::Iput( Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Iput"))
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Put"))
 
     if( i < 0 || j < 0 )
         LogicError("Submatrix offsets must be non-negative");
@@ -807,7 +391,7 @@ void AxpyInterface2<T>::Iput( Matrix<T>& Z, Int i, Int j )
 template<typename T>
 void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Iget"))
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Get"))
     // a call to Attach with a non-const DistMatrix must set
     // toBeAttachedForGet_ also, if not then it is assumed that
     // the DistMatrix isn't attached
@@ -895,7 +479,7 @@ void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
 template<typename T>
 void AxpyInterface2<T>::Iacc( Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Iacc"))
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Acc"))
 
     if( i < 0 || j < 0 )
         LogicError("Submatrix offsets must be non-negative");
@@ -986,7 +570,12 @@ void AxpyInterface2<T>::Iacc( Matrix<T>& Z, Int i, Int j )
     }
 }
 
-// progress communications for a particular matrix
+// free requests - this is necessary for freeing
+// requests of ISends after successful Recvs,
+// because 
+
+// progress communication for a particular matrix
+// progress requests
 template<typename T>
 bool AxpyInterface2<T>::TestMatrix ( Matrix<T>& Z )
 {
@@ -1068,6 +657,8 @@ bool AxpyInterface2<T>::TestCoord ( Matrix<T>& Z )
 }
 
 // flush ensures local and remote completion
+// this interface assumes a send has been issued
+// and will post a matching receive and progress
 template<typename T>
 void AxpyInterface2<T>::Flush( Matrix<T>& Z )
 {
@@ -1315,6 +906,382 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z )
 		DATA_GET_TAG, g.VCComm (), 
 		matrices_[matrix_index].requests_[source][index]);
     }
+}
+
+// blocking update routines
+template<typename T>
+void AxpyInterface2<T>::Put( Matrix<T>& Z, Int i, Int j )
+{
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Put"))
+
+    if( i < 0 || j < 0 )
+        LogicError("Submatrix offsets must be non-negative");
+    if ( !toBeAttachedForPut_ )
+        LogicError("Global matrix cannot be updated");
+
+    DistMatrix<T>& Y = *GlobalArrayPut_;
+    //do boundary checks
+    if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
+        LogicError("Submatrix out of bounds of global matrix");
+
+    const Grid& g = Y.Grid();
+    const Int r = g.Height();
+    const Int c = g.Width();
+    const Int p = g.Size();
+    const Int myProcessRow = g.Row();
+    const Int myProcessCol = g.Col();
+    const Int colAlign = (Y.ColAlign() + i) % r;
+    const Int rowAlign = (Y.RowAlign() + j) % c;
+
+    Int matrix_index;
+
+    const Int XLDim = Z.LDim();
+
+    // local matrix width and height
+    const Int height = Z.Height();
+    const Int width = Z.Width();
+
+    Int receivingRow = myProcessRow;
+    Int receivingCol = myProcessCol;
+
+    const Int YLDim = Y.LDim();
+
+    for( Int step=0; step<p; ++step )
+    {
+	const Int colShift = Shift( receivingRow, colAlign, r );
+	const Int rowShift = Shift( receivingCol, rowAlign, c );
+	const Int localHeight = Length( height, colShift, r );
+	const Int localWidth = Length( width, rowShift, c );
+	const Int numEntries = localHeight * localWidth;
+
+	if( numEntries != 0  )
+	{
+	    const Int destination = receivingRow + r*receivingCol;
+	    T* XBuffer = Z.Buffer();
+	    // send data 
+	    const Int dindex =
+		NextIndexMatrix (destination,
+			numEntries, 
+			XBuffer,
+			&matrix_index);
+
+	    DEBUG_ONLY (if
+		    (Int (matrices_[matrix_index].data_[destination][dindex].size ()) !=
+		     numEntries) LogicError ("Error in NextIndexMatrix");)
+
+		T *sendBuffer = matrices_[matrix_index].data_[destination][dindex].data ();
+	    for( Int t=0; t<localWidth; ++t )
+	    {
+		T* thisSendCol = &sendBuffer[t*localHeight];
+		T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
+		for( Int s=0; s<localHeight; ++s )
+		    thisSendCol[s] = thisXCol[colShift+s*r];
+	    }
+
+	    mpi::TaggedISend (sendBuffer, numEntries, destination, 
+		    DATA_PUT_TAG, g.VCComm(), 
+		    matrices_[matrix_index].requests_[destination][dindex]);
+	}
+
+	receivingRow = (receivingRow + 1) % r;
+	if( receivingRow == 0 )
+	    receivingCol = (receivingCol + 1) % c;
+    }
+
+    // my receives
+    while ( !TestMatrix (Z) )
+    {
+	mpi::Status status;
+	std::vector<T> getVector;
+
+	if ( mpi::IProbe( mpi::ANY_SOURCE, DATA_PUT_TAG, g.VCComm (), status ) )
+	{	
+	    const Int source = status.MPI_SOURCE;
+	    const Int count = mpi::GetCount <T> (status);
+
+	    getVector.resize (count);
+	    T *getBuffer = getVector.data ();
+
+	    mpi::TaggedRecv (getBuffer, count, source, 
+		    DATA_PUT_TAG, g.VCComm());
+
+	    const T *XBuffer = reinterpret_cast < const T * >(getBuffer);
+
+	    const Int colShift = Shift (g.Row(), colAlign, r);
+	    const Int rowShift = Shift (g.Col(), rowAlign, c);
+
+	    const Int localHeight = Length (height, colShift, r);
+	    const Int localWidth = Length (width, rowShift, c);
+
+	    const Int iLocalOffset = Length (i, Y.ColShift (), r);
+	    const Int jLocalOffset = Length (j, Y.RowShift (), c);
+
+	    for (Int t = 0; t < localWidth; ++t)
+	    {
+		T *YCol = Y.Buffer (iLocalOffset, jLocalOffset + t);
+		const T *XCol = &XBuffer[t * localHeight];
+		for (Int s = 0; s < localHeight; ++s)
+		    YCol[s] = XCol[s];
+	    }
+
+	    getVector.clear();
+	}
+    }
+}
+
+template<typename T>
+void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
+{
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Get"))
+    // a call to Attach with a non-const DistMatrix must set
+    // toBeAttachedForGet_ also, if not then it is assumed that
+    // the DistMatrix isn't attached
+    if ( !toBeAttachedForGet_ )
+	LogicError ("Cannot perform this operation as matrix is not attached.");
+    DistMatrix<T>& X = *GlobalArrayGet_;
+
+    const Int height = Z.Height ();
+    const Int width = Z.Width ();
+    
+    if (i + height > X.Height () || j + width > X.Width ())
+	LogicError ("Invalid AxpyGlobalToLocal submatrix");
+
+    const Grid & g = X.Grid ();
+    const Int r = g.Height ();
+    const Int c = g.Width ();
+    const Int p = g.Size ();
+
+    Int matrix_index;
+     	
+    const Int XLDim = Z.LDim();	
+    const Int colAlign = (X.ColAlign() + i) % r;
+    const Int rowAlign = (X.RowAlign() + j) % c;
+    const Int iLocalOffset = Length (i, X.ColShift (), r);
+    const Int jLocalOffset = Length (j, X.RowShift (), c);
+
+    Int receivingRow = g.Row();
+    Int receivingCol = g.Col();
+   
+    for( Int step=0; step<p; ++step )
+    {
+        const Int colShift = Shift( receivingRow, colAlign, r );
+        const Int rowShift = Shift( receivingCol, rowAlign, c );
+	
+	const Int localHeight = Length (height, colShift, r);
+	const Int localWidth = Length (width, rowShift, c);
+
+	const Int numEntries = localHeight * localWidth;
+
+	DEBUG_ONLY (if (numEntries < Int (sizeof (T)))
+		LogicError ("Count was too small");)
+
+	if( numEntries != 0 )
+	{
+	    const Int source = receivingRow + r*receivingCol;
+	    T* XBuffer = Z.Buffer();
+	
+	    const Int index =
+	    NextIndexMatrix (source,
+		    numEntries, 
+		    XBuffer,
+		    &matrix_index);
+
+	    DEBUG_ONLY (if
+		(Int (matrices_[matrix_index].data_[source][index].size ()) !=
+		 numEntries) LogicError ("Error in NextIndexMatrix");)
+
+            T *replyBuffer = matrices_[matrix_index].data_[source][index].data ();
+		
+	    for (Int t = 0; t < localWidth; ++t)
+	    {
+		T *sendCol = &replyBuffer[t * localHeight];
+		const T *XCol = X.LockedBuffer (iLocalOffset, jLocalOffset + t);
+		MemCopy (sendCol, XCol, localHeight);
+	    }
+		
+	    // Fire off non-blocking send
+	    mpi::TaggedISend (replyBuffer, numEntries, source, 
+		    DATA_GET_TAG, g.VCComm (), 
+		    matrices_[matrix_index].requests_[source][index]);
+	}
+	
+	receivingRow = (receivingRow + 1) % r;
+	if( receivingRow == 0 )
+	    receivingCol = (receivingCol + 1) % c;
+    }
+
+    // Receive all of the replies
+    while ( !TestMatrix (Z) )
+    {
+	mpi::Status status;
+	std::vector<T> recvVector_;
+
+	if (mpi::IProbe
+		(mpi::ANY_SOURCE, DATA_GET_TAG, g.VCComm (), status))
+	{
+	    const Int source = status.MPI_SOURCE;
+	    // Ensure that we have a recv buffer
+	    const Int count = mpi::GetCount <T> (status);
+	    recvVector_.resize (count);
+	    T *recvBuffer = recvVector_.data ();
+
+	    // Receive the data
+	    mpi::TaggedRecv
+		(recvBuffer, count, source, DATA_GET_TAG, g.VCComm ());
+
+	    // Compute the local heights and offsets
+	    const Int myRow = g.Row ();
+	    const Int myCol = g.Col ();
+	    
+	    const Int colAlign = (X.ColAlign () + i) % r;
+	    const Int rowAlign = (X.RowAlign () + j) % c;
+	    
+	    const Int colShift = Shift (myRow, colAlign, r);
+	    const Int rowShift = Shift (myCol, rowAlign, c);
+
+	    const Int localHeight = Length (height, colShift, r);
+	    const Int localWidth = Length (width, rowShift, c);
+
+	    // Unpack the local matrix
+	    for (Int t = 0; t < localWidth; ++t)
+	    {
+		T *YCol = X.Buffer (0, rowShift + t * c);
+		const T *XCol = &recvBuffer[t * localHeight];
+		for (Int s = 0; s < localHeight; ++s)
+		    YCol[colShift + s * r] = XCol[s];
+	    }
+	}
+	recvVector_.clear();
+    }
+}
+
+// accumulate = Update Y(i:i+height-1,j:j+width-1) += X,
+// where X is height x width
+    template<typename T>
+void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
+{
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Acc"))
+
+	if( i < 0 || j < 0 )
+	    LogicError("Submatrix offsets must be non-negative");
+    if ( !toBeAttachedForPut_ )
+	LogicError("Global matrix cannot be updated");
+
+    DistMatrix<T>& Y = *GlobalArrayPut_;
+
+    //do boundary checks
+    if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
+	LogicError("Submatrix out of bounds of global matrix");
+
+    const Grid& g = Y.Grid();
+
+    const Int XLDim = Z.LDim();
+
+    const Int height = Z.Height();
+    const Int width = Z.Width();
+
+    const Int r = g.Height();
+    const Int c = g.Width();
+    const Int p = g.Size();
+
+    const Int myProcessRow = g.Row();
+    const Int myProcessCol = g.Col();
+
+    const Int colAlign = (Y.ColAlign() + i) % r;
+    const Int rowAlign = (Y.RowAlign() + j) % c;
+
+    const Int colShift = Shift (myProcessRow, colAlign, r);
+    const Int rowShift = Shift (myProcessCol, rowAlign, c);
+
+    const Int localHeight = Length (height, colShift, r);
+    const Int localWidth = Length (width, rowShift, c);
+
+    const Int iLocalOffset = Length (i, Y.ColShift (), r);
+    const Int jLocalOffset = Length (j, Y.RowShift (), c);
+
+    Int matrix_index;
+
+    Int receivingRow = myProcessRow;
+    Int receivingCol = myProcessCol;
+
+    const Int YLDim = Y.LDim();
+	
+    for( Int step=0; step<p; ++step )
+    {
+	const Int colShift = Shift( receivingRow, colAlign, r );
+	const Int rowShift = Shift( receivingCol, rowAlign, c );
+	const Int localHeight = Length( height, colShift, r );
+	const Int localWidth = Length( width, rowShift, c );
+	const Int numEntries = localHeight * localWidth;
+
+	if( numEntries != 0  )
+	{
+	    const Int destination = receivingRow + r*receivingCol;
+	    T* XBuffer = Z.Buffer();
+	    // send data 
+	    const Int dindex =
+		NextIndexMatrix (destination,
+			numEntries, 
+			XBuffer,
+			&matrix_index);
+
+	    DEBUG_ONLY (if
+		    (Int (matrices_[matrix_index].data_[destination][dindex].size ()) !=
+		     numEntries) LogicError ("Error in NextIndexMatrix");)
+
+	    T *sendBuffer = matrices_[matrix_index].data_[destination][dindex].data ();
+	    for( Int t=0; t<localWidth; ++t )
+	    {
+		T* thisSendCol = &sendBuffer[t*localHeight];
+		T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
+		for( Int s=0; s<localHeight; ++s )
+		    thisSendCol[s] = thisXCol[colShift+s*r];
+	    }
+
+	    mpi::TaggedISend (sendBuffer, numEntries, destination, 
+		    DATA_ACC_TAG, g.VCComm(), 
+		    matrices_[matrix_index].requests_[destination][dindex]);
+	}
+
+	receivingRow = (receivingRow + 1) % r;
+	if( receivingRow == 0 )
+	    receivingCol = (receivingCol + 1) % c;
+    }
+
+    mpi::Status status;
+    std::vector<T> getVector;
+
+    // my receives
+    while ( 1 )
+    {
+	if ( mpi::IProbe( mpi::ANY_SOURCE, DATA_ACC_TAG, g.VCComm (), status ) )
+	{	
+	    const Int source = status.MPI_SOURCE;
+	    const Int count = mpi::GetCount <T> (status);
+
+	    getVector.resize (count);
+	    T *getBuffer = getVector.data ();
+	    
+	    mpi::TaggedRecv (getBuffer, count, source, 
+		    DATA_ACC_TAG, g.VCComm());
+
+	    const T *XBuffer = reinterpret_cast < const T * >(getBuffer);
+
+	    for (Int t = 0; t < localWidth; ++t)
+	    {
+		T *YCol = Y.Buffer (iLocalOffset, jLocalOffset + t);
+		const T *XCol = &XBuffer[t * localHeight];
+		for (Int s = 0; s < localHeight; ++s)
+		    YCol[s] += XCol[s];
+	    }
+	}
+
+	// test if my sends are completed
+	if ( TestMatrix ( Z ) )
+	    break;
+    }
+    
+    getVector.clear();
 }
 
 // detach collectively 

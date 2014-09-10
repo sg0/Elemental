@@ -1425,9 +1425,8 @@ bool Testany (int count, Request * requests)
 // Ensure that the request finishes before continuing
 void Wait (Request & request)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Wait")) Status
-    status;
-    SafeMpi (MPI_Wait (&request, &status));
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Wait")) 
+    SafeMpi (MPI_Wait (&request, MPI_STATUS_IGNORE));
 }
 
 // Ensure that the request finishes before continuing
@@ -1453,6 +1452,14 @@ void WaitAll (int numRequests, Request * requests,
     DEBUG_ONLY (CallStackEntry cse ("mpi::WaitAll"))
     SafeMpi (MPI_Waitall
              (numRequests, requests, statuses));
+}
+
+// Ensure that any requests finish before continuing
+void WaitAny (int numRequests, Request * requests, Int * index)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::WaitAny"))
+    SafeMpi (MPI_Waitany
+             (numRequests, requests, index, MPI_STATUS_IGNORE));
 }
 
 // Nonblocking test for message completion

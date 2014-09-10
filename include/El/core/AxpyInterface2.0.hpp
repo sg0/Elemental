@@ -22,6 +22,7 @@ public:
     void Attach( const DistMatrix<T,MC,MR>& Z );
 
     // nonblocking update routines
+    // requires flush for completion
     void Iput( Matrix<T>& Z, Int i, Int j );
     void Iput( const Matrix<T>& Z, Int i, Int j );
 
@@ -81,7 +82,7 @@ private:
         	
     std::vector<struct coord_params_> coords_;
 
-    // need to add const here...
+    // TODO need to add const here...
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     DistMatrix<T,MC,MR>* GlobalArrayGet_;
    
@@ -118,6 +119,10 @@ private:
     
     bool TestCoord      ( Matrix<T>& Z );
     bool TestCoord      ( const Matrix<T>& Z );
+
+    /* Wait */
+    void WaitMatrix      ( Matrix<T>& Z );
+    void WaitMatrix      ( const Matrix<T>& Z );
 
     // these are only used for nonblocking
     // update rountines
