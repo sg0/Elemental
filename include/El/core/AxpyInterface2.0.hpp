@@ -52,7 +52,8 @@ private:
         DATA_GET_TAG      =2,
         DATA_ACC_TAG   	  =3,
         REQUEST_GET_TAG   =4,
-	COORD_IJ_TAG      =5;
+	COORD_ACC_TAG     =5,
+	COORD_PUT_TAG     =6;
 
     // struct for passing data
     struct matrix_params_

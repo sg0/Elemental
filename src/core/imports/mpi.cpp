@@ -1472,9 +1472,41 @@ bool IProbe (int source, int tag, Comm comm,
              (source, tag, comm.comm, &flag, &status));
     return flag;
 }
+
 bool IProbe (int source, Comm comm, Status & status)
 {
-    return IProbe (source, 0, comm, status);
+    return IProbe (source, mpi::ANY_TAG, comm, status);
+}
+
+bool IProbe (Comm comm, Status & status)
+{
+    return IProbe (mpi::ANY_SOURCE, mpi::ANY_TAG, comm, status);
+}
+
+void Probe (int source, int tag, Comm comm, Status & status)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Probe"))
+    SafeMpi (MPI_Probe(source, tag, comm.comm, &status));
+}
+
+void Probe (int source, Comm comm, Status & status)
+{
+    Probe (source, mpi::ANY_TAG, comm, status);
+}
+
+void Probe (Comm comm, Status & status)
+{
+    Probe (mpi::ANY_SOURCE, mpi::ANY_TAG, comm, status);
+}
+
+bool IMprobe (int source, int tag, Comm comm,
+             Status & status, Message & message)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::IMprobe")) 
+    int flag;
+    SafeMpi (MPI_Improbe
+             (source, tag, comm.comm, &flag, &message, &status));
+    return flag;
 }
 
 template < typename T > int GetCount (Status & status)
@@ -2031,6 +2063,51 @@ template void TaggedRecv (Complex < float >*buf,
 template void TaggedRecv (Complex < double >*buf,
                           int count, int from, int tag,
                           Comm comm);
+
+// matching recv
+template < typename R >
+void TaggedMrecv (R * buf, int count, Message & msg)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Mrecv")) 
+    Status status;
+    SafeMpi (MPI_Mrecv
+             (buf, count, TypeMap < R > (), 
+	      &msg, &status));
+}
+
+template < typename R >
+void TaggedMrecv (Complex < R > *buf, int count, Message & msg)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Mrecv")) 
+    Status status;
+#ifdef EL_AVOID_COMPLEX_MPI
+    SafeMpi
+    (MPI_Mrecv
+     (buf, 2 * count, TypeMap < R > (), &msg, &status));
+#else
+    SafeMpi
+    (MPI_Mrecv
+     (buf, count, TypeMap < Complex < R >> (), 
+      &msg, &status));
+#endif
+}
+
+template void TaggedMrecv (byte * buf, int count, Message & msg);
+template void TaggedMrecv (int *buf, int count, Message & msg);
+template void TaggedMrecv (unsigned *buf, int count, Message & msg);
+template void TaggedMrecv (long int *buf, int count, Message & msg);
+template void TaggedMrecv (unsigned long *buf, int count, Message & msg);
+#ifdef EL_HAVE_MPI_LONG_LONG
+template void TaggedMrecv (long long int *buf, int count, Message & msg);
+template void TaggedMrecv (unsigned long long *buf,
+                          int count, Message & msg);
+#endif
+template void TaggedMrecv (float *buf, int count, Message & msg);
+template void TaggedMrecv (double *buf, int count, Message & msg);
+template void TaggedMrecv (Complex < float >*buf,
+                          int count, Message & msg);
+template void TaggedMrecv (Complex < double >*buf,
+                          int count, Message & msg);
 
 template < typename T >
 void Recv (T * buf, int count, int from, Comm comm)

@@ -102,6 +102,7 @@ typedef MPI_Datatype Datatype;
 typedef MPI_Errhandler ErrorHandler;
 typedef MPI_Request Request;
 typedef MPI_Status Status;
+typedef MPI_Message Message;
 typedef MPI_User_function UserFunction;
 #if MPI_VERSION >= 3
 typedef MPI_Win Window;
@@ -357,6 +358,14 @@ bool Testany( int count, Request* requests );
 bool Testany( int count, Request* requests, int& indx );
 bool Testany( int count, Request* requests, int& indx, Status& status );
 bool IProbe( int source, int tag, Comm comm, Status& status );
+bool IProbe( int source, Comm comm, Status& status );
+bool IProbe( Comm comm, Status& status );
+void Probe ( int source, int tag, Comm comm, Status & status );
+void Probe ( int source, Comm comm, Status & status );
+void Probe ( Comm comm, Status & status );
+// matching probe
+bool IMprobe( int source, int tag, Comm comm, Status& status, Message& message );
+
 template<typename T>
 int GetCount( Status& status );
 
@@ -432,6 +441,11 @@ T TaggedRecv( int from, int tag, Comm comm );
 // If the recv count is one and the tag is irrelevant
 template<typename T>
 T Recv( int from, Comm comm );
+// matched recv
+template<typename R>
+void TaggedMrecv( R* buf, int count, Message & message );
+template<typename R>
+void TaggedMrecv( Complex<R>* buf, int count, Message & message );
 
 // Non-blocking recv
 // -----------------
