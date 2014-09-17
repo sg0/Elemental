@@ -1,0 +1,28 @@
+VG_PATH		= /home/sg/builds/valgrind
+EL_PATH 	= /home/sg/builds/Elemental-updated
+MPILOC   	= /home/sg/builds/mpich
+CPPFLAGS 	= -g -O3 -pthread -DDEBUG=2 -std=c++11 -Wall -Wno-unused-variable
+SRCS 		= $(wildcard *.cpp)
+INCLUDES 	= -I$(MPILOC)/include -I$(EL_PATH)/include   
+LINK 		= -Wl,-rpath=$(EL_PATH)/lib -L$(EL_PATH)/lib -Wl,-rpath=$(MPILOC)/lib -L$(MPILOC)/lib
+LIBS 		= -llapack -lblas -lrt -lm -lmpich -lopa -lmpl -lEl -lpmrrr 
+NAME 		= rmaaxpy
+NPROCS 		= 4
+
+all: $(NAME)
+
+$(NAME) : $(SRCS)
+	$(CXX) $(CPPFLAGS) $(INCLUDES) -o $(NAME) $? $(LINK) $(LIBS)
+clean:
+	rm -f $(NAME)
+
+run:
+	$(MPILOC)/bin/mpiexec -n $(NPROCS) ./$(NAME)
+
+distclean: clean
+profclean:
+	rm -f $(NAME).hpcstruct
+	rm -rf hpctoolkit-$(NAME)-measurements/
+	rm -rf hpctoolkit-$(NAME)-database/
+	rm -rf hpctoolkit-$(NAME)-database-*/
+	rm -rf workspace/
