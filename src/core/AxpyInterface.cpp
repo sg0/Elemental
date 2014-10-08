@@ -541,6 +541,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 	    ReadyForSend (bufferSize, dataVectors_[destination],
 		    dataSendRequests_[destination],
 		    sendingData_[destination]);
+
 	    DEBUG_ONLY (if
 			(Int (dataVectors_[destination][index].size ()) !=
 			 bufferSize) LogicError ("Error in ReadyForSend");)

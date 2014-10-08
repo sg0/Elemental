@@ -55,75 +55,42 @@ private:
 	COORD_ACC_TAG     =5,
 	COORD_PUT_TAG     =6;
 
-    // struct for passing data
-    struct matrix_params_
-    {
-	T *base_;
-	std::vector<std::deque<std::vector<T>>>
-	    data_;
-	std::vector<std::deque<mpi::Request>> 
-	    requests_;
-	std::vector<std::deque<bool>> 
-	    statuses_;
-    };
-        	
-    std::vector<struct matrix_params_> matrices_;
-
-    // struct for passing coordinates
-    struct coord_params_
-    {
-	T *base_;
-	std::vector<std::deque<std::array<Int, 2>>>
-	    coord_;
-	std::vector<std::deque<mpi::Request>> 
-	    requests_;
-	std::vector<std::deque<bool>> 
-	    statuses_;
-    };
-        	
-    std::vector<struct coord_params_> coords_;
-
+    // request statuses
+    std::vector<std::deque<bool>> 
+        sendDataStatuses_, sendCoordStatuses_, 
+	recvDataStatuses_, recvCoordStatuses_;
+    
+    // request handles
+    std::vector<std::deque<mpi::Request>> 
+        sendDataRequests_, sendCoordRequests_, 
+	recvDataRequests_, recvCoordRequests_;
+    
+    // data
+    std::vector<std::deque<std::vector<T>>>
+        sendData_, recvData_;
+    
+    // coords
+    std::vector<std::deque<std::array<Int,3>>>
+        sendCoord_, recvCoord_;
+   
     // TODO need to add const here...
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     DistMatrix<T,MC,MR>* GlobalArrayGet_;
    
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
 	 attached_, detached_;
-     
-    Int NextIndexMatrix ( 
-	Int target,
-	Int dataSize, 
-	T * base_address,
-	Int *matrix_index);
- 
-    Int NextIndexMatrix ( 
-	Int target,
-	Int dataSize, 
-	const T * base_address,
-	Int *matrix_index);
- 
-    Int NextIndexCoord (
-	Int i, Int j,
-	Int target,
-	T * base_address,
-	Int *matrix_index);
- 
-    Int NextIndexCoord ( 
-	Int i, Int j,
-	Int target,
-	const T * base_address,
-	Int *matrix_index);
-   
-    /* Test */
-    bool TestMatrix      ( Matrix<T>& Z );
-    bool TestMatrix      ( const Matrix<T>& Z );
-    
-    bool TestCoord      ( Matrix<T>& Z );
-    bool TestCoord      ( const Matrix<T>& Z );
 
-    /* Wait */
-    void WaitMatrix      ( Matrix<T>& Z );
-    void WaitMatrix      ( const Matrix<T>& Z );
+    // next index for data and coord
+    Int NextIndexData
+    ( Int dataSize,
+      std::deque<std::vector<T>>& data,
+      std::deque<mpi::Request>& requests, 
+      std::deque<bool>& requestStatuses );
+    
+    Int NextIndexCoord
+    ( std::deque<std::array<Int,3>>& coord,
+      std::deque<mpi::Request>& requests, 
+      std::deque<bool>& requestStatuses );
 
     // these are only used for nonblocking
     // update rountines

@@ -400,6 +400,17 @@ void Translate
 // ==================
 
 #if MPI_VERSION>=3
+long ReadInc (Window & win, Aint offset, long inc, int fop_root)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::ReadInc"))
+    long otemp;			
+    SafeMpi ( MPI_Fetch_and_op (&inc, &otemp, MPI_LONG, fop_root, offset, MPI_SUM,
+	    win) );
+    SafeMpi ( MPI_Win_flush (fop_root, win) );
+
+    return otemp;
+}
+
 void SetWindowProp (Window & window, int prop)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::SetWindowProp"))
@@ -2063,6 +2074,62 @@ template void TaggedRecv (Complex < float >*buf,
 template void TaggedRecv (Complex < double >*buf,
                           int count, int from, int tag,
                           Comm comm);
+
+template < typename R >
+void TaggedRecvS (R * buf, int count, int from,
+                 int tag, Comm comm, Status & status)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Recv")) 
+    SafeMpi (MPI_Recv
+             (buf, count, TypeMap < R > (), from, tag,
+              comm.comm, &status));
+}
+
+template < typename R >
+void TaggedRecvS (Complex < R > *buf, int count,
+                 int from, int tag, Comm comm, Status & status)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Recv"))
+#ifdef EL_AVOID_COMPLEX_MPI
+    SafeMpi
+    (MPI_Recv
+     (buf, 2 * count, TypeMap < R > (), from, tag,
+      comm.comm, &status));
+#else
+    SafeMpi
+    (MPI_Recv
+     (buf, count, TypeMap < Complex < R >> (), from,
+      tag, comm.comm, &status));
+#endif
+}
+
+template void TaggedRecvS (byte * buf, int count, int from,
+                          int tag, Comm comm, Status & status);
+template void TaggedRecvS (int *buf, int count, int from,
+                          int tag, Comm comm, Status & status);
+template void TaggedRecvS (unsigned *buf, int count,
+                          int from, int tag, Comm comm, Status & status);
+template void TaggedRecvS (long int *buf, int count,
+                          int from, int tag, Comm comm, Status & status);
+template void TaggedRecvS (unsigned long *buf, int count,
+                          int from, int tag, Comm comm, Status & status);
+#ifdef EL_HAVE_MPI_LONG_LONG
+template void TaggedRecvS (long long int *buf, int count,
+                          int from, int tag, Comm comm, Status & status);
+template void TaggedRecvS (unsigned long long *buf,
+                          int count, int from, int tag,
+                          Comm comm, Status & status);
+#endif
+template void TaggedRecvS (float *buf, int count, int from,
+                          int tag, Comm comm, Status & status);
+template void TaggedRecvS (double *buf, int count,
+                          int from, int tag, Comm comm, Status & status);
+template void TaggedRecvS (Complex < float >*buf,
+                          int count, int from, int tag,
+                          Comm comm, Status & status);
+template void TaggedRecvS (Complex < double >*buf,
+                          int count, int from, int tag,
+                          Comm comm, Status & status);
 
 // matching recv
 template < typename R >

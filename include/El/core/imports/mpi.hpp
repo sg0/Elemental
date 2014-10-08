@@ -243,6 +243,8 @@ void SetWindowProp ( Window& window, int prop );
 void CheckBounds ( Window & window, mpi::Datatype win_type, mpi::Datatype type, 
 size_t count, ptrdiff_t target_offset );
 void RmaProgress ( Comm comm );
+long ReadInc (Window & win, Aint offset, 
+	long inc, int fop_root);
 
 // strided/vector to datatype
 void StridedDatatype (El_strided_t* stride_descr,
@@ -446,6 +448,10 @@ template<typename R>
 void TaggedMrecv( R* buf, int count, Message & message );
 template<typename R>
 void TaggedMrecv( Complex<R>* buf, int count, Message & message );
+template<typename R>
+void TaggedRecvS( R* buf, int count, int from, int tag, Comm comm, Status & status );
+template<typename R>
+void TaggedRecvS( Complex<R>* buf, int count, int from, int tag, Comm comm, Status & status );
 
 // Non-blocking recv
 // -----------------
