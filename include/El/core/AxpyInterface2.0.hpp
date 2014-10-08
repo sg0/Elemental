@@ -95,12 +95,12 @@ private:
     // these are only used for nonblocking
     // update rountines
     void HandleGlobalToLocalData( Matrix<T>& Z );
-    void HandleLocalToGlobalData( Matrix<T>& Z, Int count, Int source );
-    void HandleLocalToGlobalAcc(  Matrix<T>& Z, Int count, Int source );
+    void HandleLocalToGlobalData( Matrix<T>& Z, Int source );
+    void HandleLocalToGlobalAcc(  Matrix<T>& Z, Int source );
 
     void HandleGlobalToLocalData( const Matrix<T>& Z );
-    void HandleLocalToGlobalData( const Matrix<T>& Z, Int count, Int source );
-    void HandleLocalToGlobalAcc(  const Matrix<T>& Z, Int count, Int source );
+    void HandleLocalToGlobalData( const Matrix<T>& Z, Int source );
+    void HandleLocalToGlobalAcc(  const Matrix<T>& Z, Int source );
 };
 } // namespace El
 #endif // ifndef EL_AXPYINTERFACE2_HPP
