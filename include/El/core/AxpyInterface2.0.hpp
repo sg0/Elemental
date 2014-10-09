@@ -7,6 +7,7 @@
 #ifndef EL_AXPYINTERFACE2_HPP
 #define EL_AXPYINTERFACE2_HPP
 
+#if MPI_VERSION>=3
 namespace El {
 template<typename T>
 class AxpyInterface2
@@ -80,6 +81,13 @@ private:
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
 	 attached_, detached_;
 
+    // op count window for read increment
+    mpi::Window put_win_, acc_win_,
+	getrq_win_;
+
+    long *put_win_base_, *acc_win_base_,
+	 *getrq_win_base_;
+
     // next index for data and coord
     Int NextIndexData
     ( Int dataSize,
@@ -92,6 +100,11 @@ private:
       std::deque<mpi::Request>& requests, 
       std::deque<bool>& requestStatuses );
 
+    Int GetIndexData( Matrix<T>& Z );
+    Int GetIndexCoord( Matrix<T>& Z );
+
+    bool TestRequests( Matrix<T>& Z );
+
     // these are only used for nonblocking
     // update rountines
     void HandleGlobalToLocalData( Matrix<T>& Z );
@@ -103,4 +116,5 @@ private:
     void HandleLocalToGlobalAcc(  const Matrix<T>& Z, Int source );
 };
 } // namespace El
+#endif // MPI-3
 #endif // ifndef EL_AXPYINTERFACE2_HPP

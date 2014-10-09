@@ -20,6 +20,8 @@ namespace El
 	recvDataRequests_(0), recvCoordRequests_(0),
 	sendData_(0), recvData_(0),
 	sendCoord_(0), recvCoord_(0),
+	put_win_(0), acc_win_(0), getrq_win_(0),
+	put_win_base_(0), acc_win_base_(0), getrq_win_base_(0),
 	toBeAttachedForGet_(false), toBeAttachedForPut_(false),
 	attached_(false), detached_(false)
     { }
@@ -56,6 +58,25 @@ AxpyInterface2<T>::AxpyInterface2( DistMatrix<T>& Z )
 	recvData_.resize (p);
 	recvCoord_.resize (p);
     }
+
+    // count window related
+    put_win_base_ = new long;
+    mpi::WindowCreate ( put_win_base_, sizeof(long), 
+	    g.VCComm(), put_win_ );
+    memset (put_win_base_, 0, sizeof (long));
+    mpi::WindowLock (put_win_);
+
+    acc_win_base_ = new long;
+    mpi::WindowCreate ( acc_win_base_, sizeof(long), 
+	    g.VCComm(), acc_win_ );
+    memset (acc_win_base_, 0, sizeof (long));
+    mpi::WindowLock (acc_win_);
+
+    getrq_win_base_ = new long;
+    mpi::WindowCreate ( getrq_win_base_, sizeof(long), 
+	    g.VCComm(), getrq_win_ );
+    memset (getrq_win_base_, 0, sizeof (long));
+    mpi::WindowLock (getrq_win_);
 }
 
 template<typename T>
@@ -123,6 +144,24 @@ void AxpyInterface2<T>::Attach( DistMatrix<T>& Z )
 	    recvData_.resize (p);
 	    recvCoord_.resize (p);
 	}
+	// count window related
+	put_win_base_ = new long;
+	mpi::WindowCreate ( put_win_base_, sizeof(long), 
+		g.VCComm(), put_win_ );
+	memset (put_win_base_, 0, sizeof (long));
+	mpi::WindowLock (put_win_);
+
+	acc_win_base_ = new long;
+	mpi::WindowCreate ( acc_win_base_, sizeof(long), 
+		g.VCComm(), acc_win_ );
+	memset (acc_win_base_, 0, sizeof (long));
+	mpi::WindowLock (acc_win_);
+
+	getrq_win_base_ = new long;
+	mpi::WindowCreate ( getrq_win_base_, sizeof(long), 
+		g.VCComm(), getrq_win_ );
+	memset (getrq_win_base_, 0, sizeof (long));
+	mpi::WindowLock (getrq_win_);
     }
 }
 
@@ -285,6 +324,9 @@ void AxpyInterface2<T>::Iput( Matrix<T>& Z, Int i, Int j )
 
 	    mpi::TaggedISend (coord, 3, destination, COORD_PUT_TAG, g.VCComm (), 
 		    sendCoordRequests_[destination][cindex]);
+	
+	    // put count
+	    mpi::ReadInc (put_win_, 0, 1, destination);
 	}
 
         receivingRow = (receivingRow + 1) % r;
@@ -335,6 +377,8 @@ void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
 	mpi::TaggedISend (coord, 3, rank, 
 		REQUEST_GET_TAG, g.VCComm (), 
 		sendCoordRequests_[rank][cindex]);
+	// get request count
+	mpi::ReadInc (getrq_win_, 0, 1, rank);
     }
 
     // Receive all of the replies
@@ -343,6 +387,7 @@ void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
     {
 	mpi::Status status;
 	HandleGlobalToLocalData ( Z );
+
 	if (mpi::IProbe
 		(mpi::ANY_SOURCE, DATA_GET_TAG, g.VCComm (), status))
 	{
@@ -468,7 +513,10 @@ void AxpyInterface2<T>::Iacc( Matrix<T>& Z, Int i, Int j )
 
 	    mpi::TaggedISend (coord, 3, destination, 
 		    COORD_ACC_TAG, g.VCComm(), 
-		    sendCoordRequests_[destination][cindex]);    
+		    sendCoordRequests_[destination][cindex]);   
+
+	    // acc count
+	    mpi::ReadInc (acc_win_, 0, 1, destination);
 	}
 
         receivingRow = (receivingRow + 1) % r;
@@ -477,10 +525,65 @@ void AxpyInterface2<T>::Iacc( Matrix<T>& Z, Int i, Int j )
     }
 }
 
+template<typename T>
+bool AxpyInterface2<T>::TestRequests( Matrix<T>& Z )
+{
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::TestRequests"))
+    
+    DistMatrix<T>& Y = *GlobalArrayPut_;
+    const Grid& g = Y.Grid();
+    const Int p = g.Size ();
+
+    for (Int i = 0; i < p; ++i)
+    {
+	// coord recvs
+	const Int numrecvCoordRequests = recvCoordRequests_[i].size ();
+	for (Int j = 0; j < numrecvCoordRequests; ++j)
+	{
+	    recvCoordStatuses_[i][j] = 
+		!mpi::Test (recvCoordRequests_[i][j]);
+	    if (recvCoordStatuses_[i][j])
+		return false;
+	} 
+	
+	// coord sends
+	const Int numsendCoordRequests = sendCoordRequests_[i].size ();
+	for (Int j = 0; j < numsendCoordRequests; ++j)
+	{
+	    sendCoordStatuses_[i][j] = 
+		!mpi::Test (sendCoordRequests_[i][j]);
+	    if (sendCoordStatuses_[i][j])
+		return false;
+	}
+
+	// data recvs
+	const Int numrecvDataRequests = recvDataRequests_[i].size ();
+	for (Int j = 0; j < numrecvDataRequests; ++j)
+	{
+	    recvDataStatuses_[i][j] = 
+		!mpi::Test (recvDataRequests_[i][j]);
+	    if (recvDataStatuses_[i][j])
+		return false;
+	}
+
+	// data sends
+	const Int numsendDataRequests = sendDataRequests_[i].size ();
+	for (Int j = 0; j < numsendDataRequests; ++j)
+	{
+	    sendDataStatuses_[i][j] = 
+		!mpi::Test (sendDataRequests_[i][j]);
+	    if (sendDataStatuses_[i][j])
+		return false;
+	}
+    }
+
+    return true;
+}
+
 // flush ensures local and remote completion
 // this interface assumes a send has been issued
 // and will post a matching receive and progress
-template<typename T>
+    template<typename T>
 void AxpyInterface2<T>::Flush( Matrix<T>& Z )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Flush"))
@@ -490,99 +593,36 @@ void AxpyInterface2<T>::Flush( Matrix<T>& Z )
     DistMatrix<T>& Y = *GlobalArrayPut_;
     const Grid& g = Y.Grid();
     const Int p = g.Size ();
-    bool _sendDataStatus, _sendCoordStatus,
-	 _recvDataStatus, _recvCoordStatus;
+    const Int me = g.VCRank();
+    
+    // get my put/get/acc recv counts
+    const Int put_count = mpi::ReadInc (put_win_, 0, 0, me);
+    const Int acc_count = mpi::ReadInc (acc_win_, 0, 0, me);
+    const Int getrq_count = mpi::ReadInc (getrq_win_, 0, 0, me);
+	    
+    TestRequests (Z);
 
-    while ( 1 )
+    for (Int count = 0; count < put_count; ++count)
     {
 	mpi::Status status;
 	if ( mpi::IProbe (mpi::ANY_SOURCE, DATA_PUT_TAG, g.VCComm(), status) )
-	{			
 	    HandleLocalToGlobalData ( Z, status.MPI_SOURCE );
-	}
-
-	if ( mpi::IProbe (mpi::ANY_SOURCE, DATA_ACC_TAG, g.VCComm(), status) )
-	{
-	    HandleLocalToGlobalAcc ( Z, status.MPI_SOURCE );
-	}
-
-	if ( mpi::IProbe (mpi::ANY_SOURCE, REQUEST_GET_TAG, g.VCComm(), status) )
-	{
-	    HandleGlobalToLocalData ( Z );
-	}
-
-	//test for completion
-	for (Int i = 0; i < p; ++i)
-	{
-	    // coord recvs
-	    const Int numrecvCoordRequests = recvCoordRequests_[i].size ();
-	    for (Int j = 0; j < numrecvCoordRequests; ++j)
-	    {
-		if (recvCoordStatuses_[i][j])
-		    recvCoordStatuses_[i][j] = 
-			!mpi::Test (recvCoordRequests_[i][j]);
-		if (!recvCoordStatuses_[i][j])
-		    _recvCoordStatus = true;
-		else
-		{
-		    _recvCoordStatus = false;
-		    break;
-		}
-	    } 
-	    
-	    // coord sends
-	    const Int numsendCoordRequests = sendCoordRequests_[i].size ();
-	    for (Int j = 0; j < numsendCoordRequests; ++j)
-	    {
-		if (sendCoordStatuses_[i][j])
-		    sendCoordStatuses_[i][j] = 
-			!mpi::Test (sendCoordRequests_[i][j]);
-		if (!sendCoordStatuses_[i][j])
-		    _sendCoordStatus = true;
-		else
-		{
-		    _sendCoordStatus = false;
-		    break;
-		}
-	    }
-
-	    // data recvs
-	    const Int numrecvDataRequests = recvDataRequests_[i].size ();
-	    for (Int j = 0; j < numrecvDataRequests; ++j)
-	    {
-		if (recvDataStatuses_[i][j])
-		    recvDataStatuses_[i][j] = 
-			!mpi::Test (recvDataRequests_[i][j]);
-		if (!recvDataStatuses_[i][j])
-		    _recvDataStatus = true;
-		else
-		{
-		    _recvDataStatus = false;
-		    break;
-		}
-	    }
-	    
-	    // data sends
-	    const Int numsendDataRequests = sendDataRequests_[i].size ();
-	    for (Int j = 0; j < numsendDataRequests; ++j)
-	    {
-		if (sendDataStatuses_[i][j])
-		    sendDataStatuses_[i][j] = 
-			!mpi::Test (sendDataRequests_[i][j]);
-		if (!sendDataStatuses_[i][j])
-		    _sendDataStatus = true;
-		else
-		{
-		    _sendDataStatus = false;
-		    break;
-		}
-	    }
-	}
-
-	if (_sendDataStatus && _sendCoordStatus && 
-		_recvDataStatus && _recvCoordStatus)
-	    break;
     }
+
+    for (Int count = 0; count < acc_count; ++count)
+    {
+	mpi::Status status;
+	if ( mpi::IProbe (mpi::ANY_SOURCE, DATA_ACC_TAG, g.VCComm(), status) )
+	    HandleLocalToGlobalAcc ( Z, status.MPI_SOURCE );
+    }
+
+    for (Int count = 0; count < getrq_count; ++count)
+    {
+	mpi::Status status;
+	if ( mpi::IProbe (mpi::ANY_SOURCE, REQUEST_GET_TAG, g.VCComm(), status) )
+	    HandleGlobalToLocalData ( Z ); 
+    }
+
 }
 
 template < typename T > 
@@ -1469,6 +1509,19 @@ void AxpyInterface2<T>::Detach()
     sendCoord_.clear ();
     recvData_.clear ();
     recvCoord_.clear ();
+
+    mpi::WindowUnlock (put_win_);
+    mpi::WindowFree (put_win_);
+
+    mpi::WindowUnlock (acc_win_);
+    mpi::WindowFree (acc_win_);
+    
+    mpi::WindowUnlock (getrq_win_);
+    mpi::WindowFree (getrq_win_);
+
+    delete put_win_base_;
+    delete acc_win_base_;
+    delete getrq_win_base_;
 }
 
 template class AxpyInterface2<Int>;
