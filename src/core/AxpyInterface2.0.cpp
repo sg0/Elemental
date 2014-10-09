@@ -770,8 +770,8 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z )
 		REQUEST_GET_TAG, g.VCComm());
     	Int i = coord[0]; 
 	Int j = coord[1];
-	// we calculate numEntries anyway, so
-	// coord[2] is not required
+	// we need the localwidth/height here,
+	// used also to calculate numEntries
  
 	const Int colAlign = (Y.ColAlign() + i) % r;
 	const Int rowAlign = (Y.RowAlign() + j) % c;
@@ -1106,66 +1106,137 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
     const Int p = g.Size ();
 
     const Int XLDim = Z.LDim();	
-    const Int colAlign = (X.ColAlign() + i) % r;
-    const Int rowAlign = (X.RowAlign() + j) % c;
-    const Int iLocalOffset = Length (i, X.ColShift (), r);
-    const Int jLocalOffset = Length (j, X.RowShift (), c);
+     
+    std::vector<Int> dataindices_;
+    dataindices_.resize (p);
 
-    Int receivingRow = g.Row();
-    Int receivingCol = g.Col();
-   
-    for( Int step=0; step<p; ++step )
+    const Int myProcessRow = g.Row();
+    const Int myProcessCol = g.Col();
+
+    const T* XBuffer = Z.LockedBuffer();
+ 
+    // prepost receives for coordinates
+    for ( Int rank = 0; rank < p; ++rank )
     {
-        const Int colShift = Shift( receivingRow, colAlign, r );
-        const Int rowShift = Shift( receivingCol, rowAlign, c );
-	
+	const Int index =
+	    NextIndexCoord (recvCoord_[rank],
+		    recvCoordRequests_[rank],
+		    recvCoordStatuses_[rank]);
+	    
+	dataindices_[rank] = index;
+	Int *coord_ = recvCoord_[rank][index].data();
+	mpi::TaggedIRecv (coord_, 3, rank, COORD_PUT_TAG, g.VCComm(), 
+		 recvCoordRequests_[rank][index]);
+    } 
+    
+    // send coordinates
+    for( Int rank=0; rank<p; ++rank )
+    {
+	const Int index =
+	NextIndexCoord (sendCoord_[rank],
+		    sendCoordRequests_[rank],
+		    sendCoordStatuses_[rank]);
+
+	int * coord_ = sendCoord_[rank][index].data ();
+	coord_[0] = i; 
+	coord_[1] = j;
+	coord_[2] = -1;
+
+	// post receive for coordinates
+	mpi::TaggedISend (coord_, 3, rank, 
+		COORD_PUT_TAG, g.VCComm(), 
+		sendCoordRequests_[rank][index]);
+    }
+
+    // wait for my coordinates xfer to be over
+    for (Int i = 0; i < p; ++i)
+    {
+	// coord receives
+	const Int numRecvCoordRequests = recvCoordRequests_[i].size ();
+	for (Int j = 0; j < numRecvCoordRequests; ++j)
+	{
+	    if (recvCoordStatuses_[i][j])
+	    {
+		mpi::Wait (recvCoordRequests_[i][j]);
+		recvCoordStatuses_[i][j] = false;
+	    }
+	}
+	// coord sends
+	const Int numSendCoordRequests = sendCoordRequests_[i].size ();
+	for (Int j = 0; j < numSendCoordRequests; ++j)
+	{
+	    if (sendCoordStatuses_[i][j])
+	    {
+		mpi::Wait (recvCoordRequests_[i][j]);
+		sendCoordStatuses_[i][j] = false;
+	    }
+	}
+    }
+ 
+    // exchange data
+    // data sends
+    for( Int source=0; source<p; ++source )
+    {
+	const Int rindex = dataindices_[source];
+	const Int i = recvCoord_[source][rindex][0]; 
+	const Int j = recvCoord_[source][rindex][1]; 
+
+	const Int myRow = g.Row ();
+	const Int myCol = g.Col ();
+
+	const Int colAlign = (X.ColAlign() + i) % r;
+	const Int rowAlign = (X.RowAlign() + j) % c;
+
+	const Int XLDim = Z.LDim();
+	// local matrix width and height
+	const Int height = Z.Height();
+	const Int width = Z.Width();
+
+	const Int colShift = Shift (myRow, colAlign, r);
+	const Int rowShift = Shift (myCol, rowAlign, c);
 	const Int localHeight = Length (height, colShift, r);
 	const Int localWidth = Length (width, rowShift, c);
+
+	const Int iLocalOffset = Length (i, X.ColShift (), r);
+	const Int jLocalOffset = Length (j, X.RowShift (), c);
 
 	const Int numEntries = localHeight * localWidth;
 
 	DEBUG_ONLY (if (numEntries < Int (sizeof (T)))
 		LogicError ("Count was too small");)
 
-	if( numEntries != 0 )
-	{
-	    const Int source = receivingRow + r*receivingCol;
-	    T* XBuffer = Z.Buffer();
-	
-	    const Int index =
-		NextIndexData (numEntries,
-			sendData_[source],
-			sendDataRequests_[source],
-			sendDataStatuses_[source]);
+	T* XBuffer = Z.Buffer();
+	const Int index =
+	NextIndexData (numEntries,
+		    sendData_[source],
+		    sendDataRequests_[source],
+		    sendDataStatuses_[source]);
 
-	    DEBUG_ONLY (if
+	DEBUG_ONLY (if
 		(Int (sendData_[source][index].size ()) !=
 		 numEntries) LogicError ("Error in NextIndex");)
-
-            T *replyBuffer = sendData_[source][index].data ();
-		
-	    for (Int t = 0; t < localWidth; ++t)
-	    {
-		T *sendCol = &replyBuffer[t * localHeight];
-		const T *XCol = X.LockedBuffer (iLocalOffset, jLocalOffset + t);
-		MemCopy (sendCol, XCol, localHeight);
-	    }
-		
-	    // Fire off non-blocking send
-	    mpi::TaggedISend (replyBuffer, numEntries, source, 
-		    DATA_GET_TAG, g.VCComm (), 
-		    sendDataRequests_[source][index]);
-	}
 	
-	receivingRow = (receivingRow + 1) % r;
-	if( receivingRow == 0 )
-	    receivingCol = (receivingCol + 1) % c;
+	T *replyBuffer = sendData_[source][index].data ();
+	
+	for (Int t = 0; t < localWidth; ++t)
+	{
+	    T *sendCol = &replyBuffer[t * localHeight];
+	    const T *XCol = X.LockedBuffer (iLocalOffset, jLocalOffset + t);
+	    MemCopy (sendCol, XCol, localHeight);
+	}
+
+	// Fire off non-blocking send
+	mpi::TaggedISend (replyBuffer, numEntries, source, 
+		DATA_GET_TAG, g.VCComm (), 
+		sendDataRequests_[source][index]);
     }
  
+    // data receives
     std::vector<T> recvVector_;
 
     // Receive all of the replies
-    while ( 1 )
+    Int numReplies = 0;
+    while ( numReplies < p )
     {
 	mpi::Status status;
 	if (mpi::IProbe
@@ -1202,9 +1273,27 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 		for (Int s = 0; s < localHeight; ++s)
 		    YCol[colShift + s * r] = XCol[s];
 	    }
+	    ++numReplies;
 	}
 	recvVector_.clear();
     }
+    // wait for my data xfer to be over
+    for (Int i = 0; i < p; ++i)
+    {
+	// data sends
+	const Int numsendDataRequests = sendDataRequests_[i].size ();
+	for (Int j = 0; j < numsendDataRequests; ++j)
+	{
+	    if (sendDataStatuses_[i][j])
+	    {
+		mpi::Wait (sendDataRequests_[i][j]);
+		sendDataStatuses_[i][j] = false;
+	    }		    
+	}
+    } 
+
+    dataindices_.clear();
+
 }
 
 // accumulate = Update Y(i:i+height-1,j:j+width-1) += X,
