@@ -7,7 +7,6 @@ http://opensource.org/licenses/BSD-2-Clause
 #include <cassert>
 
 #if MPI_VERSION>=3
-// TODO Use DDT for put/get/acc when EL_USE_DERIVED_TYPE is defined
 // TODO bring back const interfaces
 namespace El
 {
@@ -20,8 +19,8 @@ namespace El
 	recvDataRequests_(0), recvCoordRequests_(0),
 	sendData_(0), recvData_(0),
 	sendCoord_(0), recvCoord_(0),
-	put_win_(0), acc_win_(0), getrq_win_(0),
-	put_win_base_(0), acc_win_base_(0), getrq_win_base_(0),
+	put_win_(0), acc_win_(0),
+	put_win_base_(0), acc_win_base_(0),
 	toBeAttachedForGet_(false), toBeAttachedForPut_(false),
 	attached_(false), detached_(false)
     { }
@@ -71,12 +70,6 @@ AxpyInterface2<T>::AxpyInterface2( DistMatrix<T>& Z )
 	    g.VCComm(), acc_win_ );
     memset (acc_win_base_, 0, sizeof (long));
     mpi::WindowLock (acc_win_);
-
-    getrq_win_base_ = new long;
-    mpi::WindowCreate ( getrq_win_base_, sizeof(long), 
-	    g.VCComm(), getrq_win_ );
-    memset (getrq_win_base_, 0, sizeof (long));
-    mpi::WindowLock (getrq_win_);
 }
 
 template<typename T>
@@ -156,12 +149,6 @@ void AxpyInterface2<T>::Attach( DistMatrix<T>& Z )
 		g.VCComm(), acc_win_ );
 	memset (acc_win_base_, 0, sizeof (long));
 	mpi::WindowLock (acc_win_);
-
-	getrq_win_base_ = new long;
-	mpi::WindowCreate ( getrq_win_base_, sizeof(long), 
-		g.VCComm(), getrq_win_ );
-	memset (getrq_win_base_, 0, sizeof (long));
-	mpi::WindowLock (getrq_win_);
     }
 }
 
@@ -350,7 +337,7 @@ void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
     const Int width = Z.Width ();
     
     if (i + height > X.Height () || j + width > X.Width ())
-	LogicError ("Invalid AxpyGlobalToLocal submatrix");
+	LogicError ("Invalid submatrix for Get");
 
     const Grid & g = X.Grid ();
     const Int r = g.Height ();
@@ -359,7 +346,6 @@ void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
 
     std::vector<T> recvVector_;
 
-    const T* XBuffer = Z.LockedBuffer();
     // Send out the requests to all processes in the grid
     for (Int rank = 0; rank < p; ++rank)
     {
@@ -369,7 +355,7 @@ void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
 		    sendCoordRequests_[rank],
 		    sendCoordStatuses_[rank]);
 
-	Int *coord = reinterpret_cast<Int *>(sendCoord_[rank][cindex].data ());
+	Int *coord = sendCoord_[rank][cindex].data ();
         coord[0] = i; 
 	coord[1] = j;
         coord[2] = -1;
@@ -377,8 +363,6 @@ void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
 	mpi::TaggedISend (coord, 3, rank, 
 		REQUEST_GET_TAG, g.VCComm (), 
 		sendCoordRequests_[rank][cindex]);
-	// get request count
-	mpi::ReadInc (getrq_win_, 0, 1, rank);
     }
 
     // Receive all of the replies
@@ -414,15 +398,16 @@ void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
 	    // Unpack the local matrix
 	    for (Int t = 0; t < localWidth; ++t)
 	    {
-		T *YCol = X.Buffer (0, rowShift + t * c);
+		T *YCol = Z.Buffer (0, rowShift + t * c);
 		const T *XCol = &recvBuffer[t * localHeight];
 		for (Int s = 0; s < localHeight; ++s)
-		    YCol[colShift + s * r] = XCol[s];
-	    }
+		  YCol[colShift + s * r] = XCol[s];
+	      }
+
 	    ++numReplies;
-	    recvVector_.clear();
 	}
     }
+    recvVector_.clear();
 }
 
 // accumulate = Update Y(i:i+height-1,j:j+width-1) += X,
@@ -526,6 +511,55 @@ void AxpyInterface2<T>::Iacc( Matrix<T>& Z, Int i, Int j )
 }
 
 template<typename T>
+void AxpyInterface2<T>::WaitRequests( Matrix<T>& Z )
+{
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::WaitRequests"))
+    
+    DistMatrix<T>& Y = *GlobalArrayPut_;
+    const Grid& g = Y.Grid();
+    const Int p = g.Size ();
+
+    for (Int i = 0; i < p; ++i)
+    {
+	// coord recvs
+	const Int numrecvCoordRequests = recvCoordRequests_[i].size ();
+	for (Int j = 0; j < numrecvCoordRequests; ++j)
+	{
+	    if (recvCoordStatuses_[i][j])
+		mpi::Wait (recvCoordRequests_[i][j]);
+	    recvCoordStatuses_[i][j] = false; 
+	} 
+	
+	// coord sends
+	const Int numsendCoordRequests = sendCoordRequests_[i].size ();
+	for (Int j = 0; j < numsendCoordRequests; ++j)
+	{
+	    if (sendCoordStatuses_[i][j])
+		mpi::Wait (sendCoordRequests_[i][j]);
+	    sendCoordStatuses_[i][j] = false;
+	}
+
+	// data recvs
+	const Int numrecvDataRequests = recvDataRequests_[i].size ();
+	for (Int j = 0; j < numrecvDataRequests; ++j)
+	{
+	    if (recvDataStatuses_[i][j])
+		mpi::Wait (recvDataRequests_[i][j]);
+	    recvDataStatuses_[i][j] = false;
+	}
+
+	// data sends
+	const Int numsendDataRequests = sendDataRequests_[i].size ();
+	for (Int j = 0; j < numsendDataRequests; ++j)
+	{
+	    if (sendDataStatuses_[i][j])
+		mpi::Wait (sendDataRequests_[i][j]);
+	    sendDataStatuses_[i][j] = false;
+	}
+    }
+}
+
+template<typename T>
 bool AxpyInterface2<T>::TestRequests( Matrix<T>& Z )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::TestRequests"))
@@ -598,10 +632,7 @@ void AxpyInterface2<T>::Flush( Matrix<T>& Z )
     // get my put/get/acc recv counts
     const Int put_count = mpi::ReadInc (put_win_, 0, 0, me);
     const Int acc_count = mpi::ReadInc (acc_win_, 0, 0, me);
-    const Int getrq_count = mpi::ReadInc (getrq_win_, 0, 0, me);
 	    
-    TestRequests (Z);
-
     for (Int count = 0; count < put_count; ++count)
     {
 	mpi::Status status;
@@ -616,13 +647,11 @@ void AxpyInterface2<T>::Flush( Matrix<T>& Z )
 	    HandleLocalToGlobalAcc ( Z, status.MPI_SOURCE );
     }
 
-    for (Int count = 0; count < getrq_count; ++count)
-    {
-	mpi::Status status;
-	if ( mpi::IProbe (mpi::ANY_SOURCE, REQUEST_GET_TAG, g.VCComm(), status) )
-	    HandleGlobalToLocalData ( Z ); 
-    }
+    for (Int count = 0; count < p; ++count)
+	HandleGlobalToLocalData ( Z ); 
 
+    // wait for all requests - coords and data
+    WaitRequests (Z);
 }
 
 template < typename T > 
@@ -794,7 +823,6 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z )
 	DEBUG_ONLY (if (numEntries < Int (sizeof (T)))
 		LogicError ("Count was too small");)
 
-	T* XBuffer = Z.Buffer();
 	const Int index =
 	NextIndexData (numEntries,
 		    sendData_[source],
@@ -1268,14 +1296,13 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 	    // Unpack the local matrix
 	    for (Int t = 0; t < localWidth; ++t)
 	    {
-		T *YCol = X.Buffer (0, rowShift + t * c);
+		T *YCol = Z.Buffer (0, rowShift + t * c);
 		const T *XCol = &recvBuffer[t * localHeight];
 		for (Int s = 0; s < localHeight; ++s)
 		    YCol[colShift + s * r] = XCol[s];
 	    }
 	    ++numReplies;
 	}
-	recvVector_.clear();
     }
     // wait for my data xfer to be over
     for (Int i = 0; i < p; ++i)
@@ -1292,8 +1319,8 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 	}
     } 
 
-    dataindices_.clear();
-
+    dataindices_.clear();	
+    recvVector_.clear();
 }
 
 // accumulate = Update Y(i:i+height-1,j:j+width-1) += X,
@@ -1605,12 +1632,8 @@ void AxpyInterface2<T>::Detach()
     mpi::WindowUnlock (acc_win_);
     mpi::WindowFree (acc_win_);
     
-    mpi::WindowUnlock (getrq_win_);
-    mpi::WindowFree (getrq_win_);
-
     delete put_win_base_;
     delete acc_win_base_;
-    delete getrq_win_base_;
 }
 
 template class AxpyInterface2<Int>;

@@ -82,11 +82,8 @@ private:
 	 attached_, detached_;
 
     // op count window for read increment
-    mpi::Window put_win_, acc_win_,
-	getrq_win_;
-
-    long *put_win_base_, *acc_win_base_,
-	 *getrq_win_base_;
+    mpi::Window put_win_, acc_win_;
+    long *put_win_base_, *acc_win_base_;
 
     // next index for data and coord
     Int NextIndexData
@@ -100,10 +97,12 @@ private:
       std::deque<mpi::Request>& requests, 
       std::deque<bool>& requestStatuses );
 
+    // TODO
     Int GetIndexData( Matrix<T>& Z );
     Int GetIndexCoord( Matrix<T>& Z );
 
     bool TestRequests( Matrix<T>& Z );
+    void WaitRequests( Matrix<T>& Z );
 
     // these are only used for nonblocking
     // update rountines
