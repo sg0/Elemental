@@ -406,7 +406,7 @@ long ReadInc (Window & win, Aint offset, long inc, int fop_root)
     long otemp;			
     SafeMpi ( MPI_Fetch_and_op (&inc, &otemp, MPI_LONG, fop_root, offset, MPI_SUM,
 	    win) );
-    SafeMpi ( MPI_Win_flush (fop_root, win) );
+    SafeMpi ( MPI_Win_flush_local (fop_root, win) );
 
     return otemp;
 }

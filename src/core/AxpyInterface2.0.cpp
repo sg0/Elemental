@@ -602,6 +602,10 @@ void AxpyInterface2<T>::Flush( Matrix<T>& Z )
     const Int r = g.Height ();
     const Int c = g.Width ();
 
+    mpi::Flush (put_win_);
+    mpi::Flush (acc_win_);
+    mpi::Flush (getrq_win_);
+
     // get my put/get/acc recv counts
     const Int put_count = mpi::ReadInc (put_win_, 0, 0, me);
     const Int acc_count = mpi::ReadInc (acc_win_, 0, 0, me);
