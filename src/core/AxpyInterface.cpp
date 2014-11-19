@@ -710,35 +710,10 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     return numCreated;
   }
  
-  template < typename T > void AxpyInterface < T >::UpdateRequestStatuses ()
-  {
-    DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::UpdateRequestStatuses"))
-      const Grid & g = (attachedForLocalToGlobal_ ?
-			localToGlobalMat_->Grid () :
-			globalToLocalMat_->Grid ());
-    const Int p = g.Size ();
-
-    for (Int i = 0; i < p; ++i)
-      {
-	const Int numDataSendRequests = dataSendRequests_[i].size ();
-	for (Int j = 0; j < numDataSendRequests; ++j)
-	  if (sendingData_[i][j])
-	    sendingData_[i][j] = !mpi::Test (dataSendRequests_[i][j]);
-	const Int numRequestSendRequests = requestSendRequests_[i].size ();
-	for (Int j = 0; j < numRequestSendRequests; ++j)
-	  if (sendingRequest_[i][j])
-	    sendingRequest_[i][j] = !mpi::Test (requestSendRequests_[i][j]);
-	const Int numReplySendRequests = replySendRequests_[i].size ();
-	for (Int j = 0; j < numReplySendRequests; ++j)
-	  if (sendingReply_[i][j])
-	    sendingReply_[i][j] = !mpi::Test (replySendRequests_[i][j]);
-      }
-  }
-
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
 template < typename T > bool AxpyInterface < T >::ReturnRequestStatuses ()
   {
-    DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::UpdateRequestStatuses"))
+    DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::ReturnRequestStatuses"))
       const Grid & g = (attachedForLocalToGlobal_ ?
 			localToGlobalMat_->Grid () :
 			globalToLocalMat_->Grid ());
@@ -772,7 +747,32 @@ template < typename T > bool AxpyInterface < T >::ReturnRequestStatuses ()
 	}
     }
     return true;
-  } 
+  }
+#else  
+  template < typename T > void AxpyInterface < T >::UpdateRequestStatuses ()
+  {
+    DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::UpdateRequestStatuses"))
+      const Grid & g = (attachedForLocalToGlobal_ ?
+			localToGlobalMat_->Grid () :
+			globalToLocalMat_->Grid ());
+    const Int p = g.Size ();
+
+    for (Int i = 0; i < p; ++i)
+      {
+	const Int numDataSendRequests = dataSendRequests_[i].size ();
+	for (Int j = 0; j < numDataSendRequests; ++j)
+	  if (sendingData_[i][j])
+	    sendingData_[i][j] = !mpi::Test (dataSendRequests_[i][j]);
+	const Int numRequestSendRequests = requestSendRequests_[i].size ();
+	for (Int j = 0; j < numRequestSendRequests; ++j)
+	  if (sendingRequest_[i][j])
+	    sendingRequest_[i][j] = !mpi::Test (requestSendRequests_[i][j]);
+	const Int numReplySendRequests = replySendRequests_[i].size ();
+	for (Int j = 0; j < numReplySendRequests; ++j)
+	  if (sendingReply_[i][j])
+	    sendingReply_[i][j] = !mpi::Test (replySendRequests_[i][j]);
+      }
+  }
 #endif
 
 template < typename T > void AxpyInterface < T >::Detach ()

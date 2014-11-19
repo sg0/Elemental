@@ -57,6 +57,10 @@ private:
 #else
     std::vector<bool> sentEomTo_, haveEomFrom_;
     std::vector<mpi::Request> eomSendRequests_;
+    // Check if we are done with this attachment's work
+    bool Finished();
+    // Progress functions
+    void UpdateRequestStatuses();
 #endif    
     
     std::vector<std::deque<bool>> 
@@ -70,10 +74,6 @@ private:
     
     byte sendDummy_, recvDummy_;
 
-    // Check if we are done with this attachment's work
-    bool Finished();
-    // Progress functions
-    void UpdateRequestStatuses();
 #if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
     bool ReturnRequestStatuses();
 #else

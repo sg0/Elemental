@@ -643,6 +643,7 @@ void VectorDatatype (El_iov_t * vect_descr,
 
 void WindowFree (Window & window)
 {
+    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowFree"))
     SafeMpi (MPI_Win_free (&window));
 }
 
