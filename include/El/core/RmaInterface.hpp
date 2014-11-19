@@ -38,6 +38,12 @@ public:
     void Acc(       Matrix<T>& Z, Int i, Int j );
     void Acc( const Matrix<T>& Z, Int i, Int j );
 
+    void Iput( Matrix<T>& Z, Int i, Int j );
+    void Iput( const Matrix<T>& Z, Int i, Int j );
+
+    void Iacc(       Matrix<T>& Z, Int i, Int j );
+    void Iacc( const Matrix<T>& Z, Int i, Int j );
+
     void Flush(       Matrix<T>& Z, Int i, Int j );
     void Flush( const Matrix<T>& Z, Int i, Int j );
     void Flush(       Matrix<T>& Z );
