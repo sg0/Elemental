@@ -35,6 +35,9 @@ public:
     void Flush(       Matrix<T>& Z );
     void Flush( const Matrix<T>& Z );
     
+    void Cflush(       Matrix<T>& Z );
+    void Cflush( const Matrix<T>& Z );
+
     // blocking update routines
     void Put( Matrix<T>& Z, Int i, Int j );
     void Put( const Matrix<T>& Z, Int i, Int j );
