@@ -47,6 +47,12 @@ public:
     void Acc(       Matrix<T>& Z, Int i, Int j );
     void Acc( const Matrix<T>& Z, Int i, Int j );
 
+    void Eput( Matrix<T>& Z, Int i, Int j );
+    void Eput( const Matrix<T>& Z, Int i, Int j );
+
+    void Eacc(       Matrix<T>& Z, Int i, Int j );
+    void Eacc( const Matrix<T>& Z, Int i, Int j );
+
     void Detach();
 
 private:

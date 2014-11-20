@@ -185,7 +185,7 @@ Int RmaInterface<T>::NextIndex
     return numCreated;
 }
 
-// Blocking 
+// Locally Blocking 
 template<typename T>
 void RmaInterface<T>::Put( Matrix<T>& Z, Int i, Int j )
 {
@@ -252,13 +252,12 @@ void RmaInterface<T>::Put( Matrix<T>& Z, Int i, Int j )
                 mpi::Iput (&sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window);
             }
+            mpi::FlushLocal (destination, window);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
     }
-    // Flush all transfers        
-    mpi::Flush (window);
 }
 
 template<typename T>
@@ -326,13 +325,12 @@ void RmaInterface<T>::Put( const Matrix<T>& Z, Int i, Int j )
                 mpi::Iput (&sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window);
             }
+            mpi::FlushLocal (destination, window);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
     }
-    // Flush all transfers        
-    mpi::Flush (window);
 }
 
 // accumulate = Update Y(i:i+height-1,j:j+width-1) += X,
@@ -404,13 +402,12 @@ void RmaInterface<T>::Acc( Matrix<T>& Z, Int i, Int j )
                 mpi::Iacc (&sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window);
             }
+            mpi::FlushLocal (destination, window);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
     }
-    // Flush all transfers        
-    mpi::Flush (window);
 }
 
 template<typename T>
@@ -485,8 +482,6 @@ void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
     }
-    // Flush all transfers        
-    mpi::Flush (window);
 }
 
 template<typename T>
@@ -555,7 +550,6 @@ void RmaInterface<T>::Iput( Matrix<T>& Z, Int i, Int j )
                 mpi::Iput (&sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window);
             }
-            mpi::FlushLocal (destination, window);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -633,7 +627,6 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
                 mpi::Iput (&sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window);
             }
-            mpi::FlushLocal (destination, window);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -792,7 +785,6 @@ void RmaInterface<T>::Iacc( Matrix<T>& Z, Int i, Int j )
                 mpi::Iacc (&sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window);
             }
-            mpi::FlushLocal (destination, window);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
@@ -869,7 +861,6 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
                 mpi::Iacc (&sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window);
             }
-            mpi::FlushLocal (destination, window);
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )

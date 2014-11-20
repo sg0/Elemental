@@ -30,6 +30,7 @@ public:
     void Attach(       DistMatrix<T,MC,MR>& Z );
     void Attach( const DistMatrix<T,MC,MR>& Z );
 
+    // Local completion
     void Put( Matrix<T>& Z, Int i, Int j );
     void Put( const Matrix<T>& Z, Int i, Int j );
 
@@ -38,6 +39,7 @@ public:
     void Acc(       Matrix<T>& Z, Int i, Int j );
     void Acc( const Matrix<T>& Z, Int i, Int j );
 
+    // No local completion 
     void Iput( Matrix<T>& Z, Int i, Int j );
     void Iput( const Matrix<T>& Z, Int i, Int j );
 
