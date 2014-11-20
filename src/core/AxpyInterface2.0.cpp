@@ -1152,11 +1152,11 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 	coord[1] = j;
         coord[2] = -1;
 	
-	mpi::TaggedISend (coord, 3, rank, 
+	mpi::TaggedISSend (coord, 3, rank, 
 		REQUEST_GET_TAG, g.VCComm (), 
 		sendCoordRequests_[rank][cindex]);    
     }
-
+    
     // test for requests
     for (Int rank = 0; rank < p; ++rank)
     {
@@ -1165,8 +1165,8 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 	for (Int j = 0; j < numsendCoordRequests; ++j)
 	    sendCoordStatuses_[rank][j] = 
 		!mpi::Test (sendCoordRequests_[rank][j]);
-    }
-    
+    } 
+
     for ( Int step = 0; step < p; ++step )
     {
 	mpi::Status status;
@@ -1227,11 +1227,6 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
     // wait/test for send requests
     for (Int rank = 0; rank < p; ++rank)
     {
-	// data sends
-	const Int numsendDataRequests = sendDataRequests_[rank].size ();
-	for (Int j = 0; j < numsendDataRequests; ++j)
-	    sendDataStatuses_[rank][j] = 
-		!mpi::Test (sendDataRequests_[rank][j]);
 	// coord sends
 	const Int numSendCoordRequests = sendCoordRequests_[rank].size ();
 	for (Int j = 0; j < numSendCoordRequests; ++j)
@@ -1242,8 +1237,13 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 		sendCoordStatuses_[rank][j] = false;
 	    }
 	}
+	// data sends
+	const Int numsendDataRequests = sendDataRequests_[rank].size ();
+	for (Int j = 0; j < numsendDataRequests; ++j)
+	    sendDataStatuses_[rank][j] = 
+		!mpi::Test (sendDataRequests_[rank][j]);
     }
-	
+	    
     // receive data
     for (Int step = 0; step < p; ++step)
     {
@@ -1283,6 +1283,16 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
     // wait for send requests
     for (Int rank = 0; rank < p; ++rank)
     {
+	// coord sends
+	const Int numSendCoordRequests = sendCoordRequests_[rank].size ();
+	for (Int j = 0; j < numSendCoordRequests; ++j)
+	{
+	    if (sendCoordStatuses_[rank][j])
+	    {
+		mpi::Wait (sendCoordRequests_[rank][j]);	
+		sendCoordStatuses_[rank][j] = false;
+	    }
+	}
 	// data sends
 	const Int numsendDataRequests = sendDataRequests_[rank].size ();
 	for (Int j = 0; j < numsendDataRequests; ++j)
@@ -1404,10 +1414,10 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
     for (Int rank = 0; rank < p; ++rank)
     {
     	// coord sends
-	const Int numsendCoordRequests = sendCoordRequests_[rank].size ();
-	for (Int j = 0; j < numsendCoordRequests; ++j)
-	    sendCoordStatuses_[rank][j] = 
-		!mpi::Test (sendCoordRequests_[rank][j]);
+	const Int numsendDataRequests = sendDataRequests_[rank].size ();
+	for (Int j = 0; j < numsendDataRequests; ++j)
+	    sendDataStatuses_[rank][j] = 
+		!mpi::Test (sendDataRequests_[rank][j]);
     }
 
     for (Int step=0; step<p; ++step)
