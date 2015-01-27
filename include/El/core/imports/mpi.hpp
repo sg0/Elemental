@@ -351,7 +351,6 @@ void Wait( Request& request );
 void Wait( Request& request, Status& status );
 //TODO add another function for getting statuses
 void WaitAny (int numRequests, Request * requests, Int * index);
-
 void WaitAll( int numRequests, Request* requests );
 void WaitAll( int numRequests, Request* requests, Status* statuses );
 bool Test( Request& request );

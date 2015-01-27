@@ -1386,52 +1386,71 @@ void IBarrier (Comm comm, Request & request)
 // Test for completion
 bool Test (Request & request)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Test")) Status
-    status;
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Test")) 
+    
+    Status status;
     int flag;
 
     SafeMpi (MPI_Test (&request, &flag, &status));
-    return flag;
+    if (flag)
+	return true;
+    else
+	return false;
 }
 
 bool Test (Request & request, Status & status)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Test")) int
-    flag;
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Test")) 
+    int flag;
     SafeMpi (MPI_Test (&request, &flag, &status));
-    return flag;
+
+    if (flag)
+	return true;
+    else
+	return false;
 }
 
 bool Testany (int count, Request * requests, int &indx,
               Status & status)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Testany")) int
-    flag;
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Testany")) 
+    int flag;
     SafeMpi (MPI_Testany
              (count, requests, &indx, &flag, &status));
-    return flag;
+     if (flag)
+	return true;
+    else
+	return false;
 }
 
 bool Testany (int count, Request * requests, int &indx)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Testany")) int
-    flag;
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Testany")) 
+    
+    int flag;
     Status status;
 
     SafeMpi (MPI_Testany
-             (count, requests, &indx, &flag, &status));
-    return flag;
+             (count, requests, &indx, &flag, &status)); 
+    if (flag)
+	return true;
+    else
+	return false;
 }
 
 bool Testany (int count, Request * requests)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Testany")) int
-    flag, indx;
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Testany")) 
+
+    int flag, indx;
     Status status;
 
     SafeMpi (MPI_Testany
              (count, requests, &indx, &flag, &status));
-    return flag;
+    if (flag)
+	return true;
+    else
+	return false;
 }
 
 // Ensure that the request finishes before continuing

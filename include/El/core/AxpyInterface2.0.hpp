@@ -7,7 +7,6 @@
 #ifndef EL_AXPYINTERFACE2_HPP
 #define EL_AXPYINTERFACE2_HPP
 
-#if MPI_VERSION>=3
 namespace El {
 template<typename T>
 class AxpyInterface2
@@ -19,11 +18,15 @@ public:
     AxpyInterface2(       DistMatrix<T,MC,MR>& Z );
     AxpyInterface2( const DistMatrix<T,MC,MR>& Z );
 
+    // collective epoch initialization routines
     void Attach(       DistMatrix<T,MC,MR>& Z );
     void Attach( const DistMatrix<T,MC,MR>& Z );
+    void Detach();
 
-    // nonblocking update routines
-    // requires flush for completion
+    // remote update routines
+    
+    // requires Flush for local+remote 
+    // completion
     void Iput( Matrix<T>& Z, Int i, Int j );
     void Iput( const Matrix<T>& Z, Int i, Int j );
 
@@ -31,14 +34,9 @@ public:
 
     void Iacc(       Matrix<T>& Z, Int i, Int j );
     void Iacc( const Matrix<T>& Z, Int i, Int j );
-
-    void Flush(       Matrix<T>& Z );
-    void Flush( const Matrix<T>& Z );
     
-    void Cflush(       Matrix<T>& Z );
-    void Cflush( const Matrix<T>& Z );
-
-    // blocking update routines
+    // locally blocking update routines
+    // currently not implemented
     void Put( Matrix<T>& Z, Int i, Int j );
     void Put( const Matrix<T>& Z, Int i, Int j );
 
@@ -47,14 +45,10 @@ public:
     void Acc(       Matrix<T>& Z, Int i, Int j );
     void Acc( const Matrix<T>& Z, Int i, Int j );
 
-    void Eput( Matrix<T>& Z, Int i, Int j );
-    void Eput( const Matrix<T>& Z, Int i, Int j );
-
-    void Eacc(       Matrix<T>& Z, Int i, Int j );
-    void Eacc( const Matrix<T>& Z, Int i, Int j );
-
-    void Detach();
-
+    // synchronization routines
+    void Flush(          Matrix<T>& Z );
+    void Flush(    const Matrix<T>& Z ); 
+ 
 private:
    
     static const Int 
@@ -63,26 +57,36 @@ private:
         DATA_ACC_TAG   	  =3,
         REQUEST_GET_TAG   =4,
 	COORD_ACC_TAG     =5,
-	COORD_PUT_TAG     =6;
+	COORD_PUT_TAG     =6;	
 
-    // request statuses
-    std::vector<std::deque<bool>> 
-        sendDataStatuses_, sendCoordStatuses_, 
-	recvDataStatuses_, recvCoordStatuses_;
-    
-    // request handles
-    std::vector<std::deque<mpi::Request>> 
-        sendDataRequests_, sendCoordRequests_, 
-	recvDataRequests_, recvCoordRequests_;
-    
-    // data
-    std::vector<std::deque<std::vector<T>>>
-        sendData_, recvData_;
-    
-    // coords
-    std::vector<std::deque<std::array<Int,3>>>
-        sendCoord_, recvCoord_;
-   
+    // struct for passing data
+    struct matrix_params_
+    {
+	T *base_;
+	std::vector<std::deque<std::vector<T>>>
+	    data_;
+	std::vector<std::deque<mpi::Request>> 
+	    requests_;
+	std::vector<std::deque<bool>> 
+	    statuses_;
+    };
+        	
+    std::vector<struct matrix_params_> matrices_;
+
+    // struct for passing coordinates
+    struct coord_params_
+    {
+	T *base_;
+	std::vector<std::deque<std::array<Int, 3>>>
+	    coord_;
+	std::vector<std::deque<mpi::Request>> 
+	    requests_;
+	std::vector<std::deque<bool>> 
+	    statuses_;
+    };
+        	
+    std::vector<struct coord_params_> coords_;
+
     // TODO need to add const here...
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     DistMatrix<T,MC,MR>* GlobalArrayGet_;
@@ -90,29 +94,30 @@ private:
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
 	 attached_, detached_;
 
-    // op count window for read increment
-    mpi::Window put_win_, acc_win_, getrq_win_;
-    long *put_win_base_, *acc_win_base_, 
-	 *getrq_win_base_;
-
     // next index for data and coord
-    Int NextIndexData
-    ( Int dataSize,
-      std::deque<std::vector<T>>& data,
-      std::deque<mpi::Request>& requests, 
-      std::deque<bool>& requestStatuses );
-    
-    Int NextIndexCoord
-    ( std::deque<std::array<Int,3>>& coord,
-      std::deque<mpi::Request>& requests, 
-      std::deque<bool>& requestStatuses );
+    Int NextIndexData (
+	Int target,
+	Int dataSize, 
+	T * base_address,
+	Int *mindex);
+   
+    Int NextIndexCoord (
+	Int i, Int j,
+	Int target,
+	T * base_address,
+	Int *cindex);
 
-    // TODO
-    Int GetIndexData( Matrix<T>& Z );
-    Int GetIndexCoord( Matrix<T>& Z );
+    bool Testall();
+    bool Test(          Matrix<T>& Z );
+    bool Test(    const Matrix<T>& Z );  
+    bool TestAny(          Matrix<T>& Z );
+    bool TestAny(    const Matrix<T>& Z ); 
 
-    bool TestRequests( Matrix<T>& Z );
-    void WaitRequests( Matrix<T>& Z );
+    void Waitall();
+    void Wait(          Matrix<T>& Z );
+    void Wait(    const Matrix<T>& Z );    
+    void WaitAny(          Matrix<T>& Z );
+    void WaitAny(    const Matrix<T>& Z );   
 
     // these are only used for nonblocking
     // update rountines
@@ -125,5 +130,4 @@ private:
     void HandleLocalToGlobalAcc(  const Matrix<T>& Z, Int source );
 };
 } // namespace El
-#endif // MPI-3
 #endif // ifndef EL_AXPYINTERFACE2_HPP
