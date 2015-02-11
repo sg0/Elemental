@@ -36,14 +36,21 @@ public:
     void Iacc( const Matrix<T>& Z, Int i, Int j );
     
     // locally blocking update routines
-    // currently not implemented
-    void Put( Matrix<T>& Z, Int i, Int j );
-    void Put( const Matrix<T>& Z, Int i, Int j );
-
-    void Get(       Matrix<T>& Z, Int i, Int j );
-
+    // reuse input buffer when returns
     void Acc(       Matrix<T>& Z, Int i, Int j );
     void Acc( const Matrix<T>& Z, Int i, Int j );
+
+    void Put( Matrix<T>& Z, Int i, Int j );
+    void Put( const Matrix<T>& Z, Int i, Int j );   
+
+    // End to End blocking
+    void Eacc(       Matrix<T>& Z, Int i, Int j );
+    void Eacc( const Matrix<T>& Z, Int i, Int j );
+
+    void Eput( Matrix<T>& Z, Int i, Int j );
+    void Eput( const Matrix<T>& Z, Int i, Int j );
+
+    void Get(       Matrix<T>& Z, Int i, Int j );
 
     // synchronization routines
     void Flush(          Matrix<T>& Z );
@@ -86,6 +93,13 @@ private:
     };
         	
     std::vector<struct coord_params_> coords_;
+
+    // for blocking interface
+    // copying input buffer in this
+    // intermediate buffer so that input
+    // buffer could be reused
+    std::vector<std::vector<std::vector< T >>>
+        dataVectors_;
 
     // TODO need to add const here...
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
