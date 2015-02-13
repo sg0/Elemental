@@ -46,16 +46,42 @@ public:
     void Iacc(       Matrix<T>& Z, Int i, Int j );
     void Iacc( const Matrix<T>& Z, Int i, Int j );
 
-    void Flush(       Matrix<T>& Z, Int i, Int j );
-    void Flush( const Matrix<T>& Z, Int i, Int j );
-    void Flush(       Matrix<T>& Z );
-    void Flush( const Matrix<T>& Z );
+    // Request based RMA
+    void Rput( Matrix<T>& Z, Int i, Int j );
+    void Rput( const Matrix<T>& Z, Int i, Int j );
+
+    void Racc(       Matrix<T>& Z, Int i, Int j );
+    void Racc( const Matrix<T>& Z, Int i, Int j );
+
+    // Synchronization routines
+    void Flush(            Matrix<T>& Z );
+    void Flush(      const Matrix<T>& Z );
+    void LocalFlush( const Matrix<T>& Z );
+    void LocalFlush(       Matrix<T>& Z );
+    void LocalFlush();
 
     void Detach();
 
 private:
+    
     mpi::Window window;
 
+    // struct for passing data
+    // for request based rma
+    struct matrix_params_
+    {
+	const void *base_;
+	std::vector<std::deque<std::vector<T>>>
+	    data_;
+	std::vector<std::deque<mpi::Request>> 
+	    requests_;
+	std::vector<std::deque<bool>> 
+	    statuses_;
+    };
+        	
+    std::vector<struct matrix_params_> matrices_;
+
+    // buffers for rma 
     std::vector<std::deque<std::vector<T>>>
         getVector_, putVector_;
 
@@ -65,8 +91,33 @@ private:
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
 	 attached_, detached_;
 
-    Int NextIndex ( Int dataSize, 
+    // next index for data
+    Int NextIndex ( 
+	    Int dataSize, 
 	    std::deque <std::vector<T>> &dataVectors );
+
+    Int NextIndex (
+	Int target,
+	Int dataSize, 
+	const void* base_address,
+	Int* mindex);
+
+    // only relevant for request-based
+    // passive RMA
+    bool anyPendingXfers (       Matrix<T>& Z );
+    bool anyPendingXfers ( const Matrix<T>& Z );
+   
+    bool Testall();
+    bool Test(          Matrix<T>& Z );
+    bool Test(    const Matrix<T>& Z );  
+    bool TestAny(       Matrix<T>& Z );
+    bool TestAny( const Matrix<T>& Z ); 
+
+    void Waitall();
+    void Wait(          Matrix<T>& Z );
+    void Wait(    const Matrix<T>& Z );    
+    void WaitAny(       Matrix<T>& Z );
+    void WaitAny( const Matrix<T>& Z );   
 };
 #endif //MPI-3
 } // namespace El

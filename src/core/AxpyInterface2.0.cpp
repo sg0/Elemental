@@ -6,8 +6,6 @@ http://opensource.org/licenses/BSD-2-Clause
 #include "El-lite.hpp"
 #include <cassert>
 
-
-// TODO bring back const interfaces
 namespace El
 {
     template<typename T>
@@ -20,6 +18,21 @@ namespace El
 
 template<typename T>
 AxpyInterface2<T>::AxpyInterface2( DistMatrix<T>& Z )
+{
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::AxpyInterface2"))
+    
+    attached_ 		= false;
+    detached_ 		= true;
+    
+    toBeAttachedForGet_ = false;
+    toBeAttachedForPut_ = false;
+    
+    GlobalArrayPut_ 	= 0;
+    GlobalArrayGet_ 	= 0;
+}
+
+template<typename T>
+AxpyInterface2<T>::AxpyInterface2( const DistMatrix<T>& Z )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::AxpyInterface2"))
     
@@ -58,7 +71,7 @@ template<typename T>
 Int AxpyInterface2<T>::NextIndexData (
 	Int target,
 	Int dataSize, 
-	T * base_address,
+	const void* base_address,
 	Int *mindex)
 {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface2::NextIndexData"))
@@ -66,8 +79,9 @@ Int AxpyInterface2<T>::NextIndexData (
     assert ( base_address != NULL );
 
     Int matrixIndex = 0;
-    DistMatrix<T>& Y = *GlobalArrayGet_;
-    const Grid& g = Y.Grid();
+    const Grid& g = ( toBeAttachedForPut_ ?
+	    GlobalArrayPut_->Grid() :
+	    GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     const Int numMatrices = matrices_.size();
 
@@ -141,7 +155,7 @@ template<typename T>
 Int AxpyInterface2<T>::NextIndexCoord (
 	Int i, Int j,
 	Int target,
-	T * base_address,
+	const void* base_address,
 	Int *cindex)
 {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface2::NextIndexCoord"))
@@ -149,8 +163,9 @@ Int AxpyInterface2<T>::NextIndexCoord (
     assert ( base_address != NULL );
 
     Int coordIndex = 0;
-    DistMatrix<T>& Y = *GlobalArrayGet_;
-    const Grid& g = Y.Grid();
+    const Grid& g = ( toBeAttachedForPut_ ?
+	    GlobalArrayPut_->Grid() :
+	    GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     const Int numCoords = coords_.size();
 
@@ -250,7 +265,65 @@ void AxpyInterface2<T>::Attach( DistMatrix<T>& Z )
 	GlobalArrayGet_ 	= &Z;
 	toBeAttachedForGet_ 	= true;
 	
-	dataVectors_.resize(p);
+	if ( dataVectors_.empty() )
+	    dataVectors_.resize(p);
+	
+	if ( matrices_.empty() )
+	{
+	    struct matrix_params_ mp;
+	    mp.data_.resize(p);
+	    mp.requests_.resize(p);
+	    mp.statuses_.resize(p);   
+	    mp.base_ = NULL;
+	    // push back new matrix_params created
+	    // with default constructor
+	    matrices_.push_back( mp );
+	}
+
+	if ( coords_.empty() )
+	{
+	    struct coord_params_ cp;
+	    cp.coord_.resize(p);
+	    cp.requests_.resize(p);
+	    cp.statuses_.resize(p);   
+	    cp.base_ = NULL;
+	    // push back new matrix_params created
+	    // with default constructor
+	    coords_.push_back( cp );
+	}
+    }
+
+    mpi::Barrier (g.VCComm());
+}
+
+template<typename T>
+void AxpyInterface2<T>::Attach( const DistMatrix<T>& Z )
+{
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Attach"))
+    // attached_ will be only set in Attach
+    // and only unset in Detach
+    if (!attached_ && detached_)
+    {
+	attached_ = true;
+	detached_ = false;
+    }
+    else
+	LogicError("Must detach before reattaching.");
+
+    const Grid& g = Z.Grid();
+    const Int p = g.Size ();
+	
+    // the matrix base_ is not known until 
+    // an update operation (put/get/acc)
+    // so it is kept blank
+    // if DistMatrix is non-const, all one-sided
+    // transfers -- put, get and acc are possible
+    if( !toBeAttachedForGet_ )
+    {
+	GlobalArrayPut_ 	= 0;
+	toBeAttachedForPut_ 	= false;
+	GlobalArrayGet_ 	= &Z;
+	toBeAttachedForGet_ 	= true;
 	
 	if ( matrices_.empty() )
 	{
@@ -282,7 +355,7 @@ void AxpyInterface2<T>::Attach( DistMatrix<T>& Z )
 
 // end-to-end blocking put/acc routines
 template<typename T>
-void AxpyInterface2<T>::Eput( Matrix<T>& Z, Int i, Int j )
+void AxpyInterface2<T>::Eput( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Eput"))
 
@@ -311,8 +384,9 @@ void AxpyInterface2<T>::Eput( Matrix<T>& Z, Int i, Int j )
     const Int myProcessRow = g.Row();
     const Int myProcessCol = g.Col();
 
-    T* XBuffer = Z.Buffer();
-     
+    const T* XBuffer = Z.LockedBuffer();
+    const void* Buffer = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
+
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
 
@@ -340,7 +414,7 @@ void AxpyInterface2<T>::Eput( Matrix<T>& Z, Int i, Int j )
 	    const Int dindex =
 		NextIndexData (destination,
 			numEntries, 
-			XBuffer,
+			Buffer,
 			&matrix_index);
 
             DEBUG_ONLY (if                        
@@ -365,7 +439,7 @@ void AxpyInterface2<T>::Eput( Matrix<T>& Z, Int i, Int j )
 	    const Int cindex =
 		NextIndexCoord (i, j,
 			destination,
-			XBuffer,
+			Buffer,
 			&coord_index);
 
 	    Int *coord_ = reinterpret_cast<Int *>(coords_[coord_index].coord_[destination][cindex].data());
@@ -441,9 +515,15 @@ void AxpyInterface2<T>::Eput( Matrix<T>& Z, Int i, Int j )
     recvVector_.clear();
 }
 
+template<typename T>
+void AxpyInterface2<T>::Eput( Matrix<T>& Z, Int i, Int j )
+{
+    Eput( const_cast<const Matrix<T>&>(Z), i, j );
+}
+
 // end to end blocking routines
 template<typename T>
-void AxpyInterface2<T>::Eacc( Matrix<T>& Z, Int i, Int j )
+void AxpyInterface2<T>::Eacc( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Eacc"))
 
@@ -472,7 +552,8 @@ void AxpyInterface2<T>::Eacc( Matrix<T>& Z, Int i, Int j )
     const Int myProcessRow = g.Row();
     const Int myProcessCol = g.Col();
 
-    T* XBuffer = Z.Buffer();
+    const T* XBuffer = Z.LockedBuffer();
+    const void* Buffer = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
      
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
@@ -504,7 +585,7 @@ void AxpyInterface2<T>::Eacc( Matrix<T>& Z, Int i, Int j )
 	    const Int dindex =
 		NextIndexData (destination,
 			numEntries, 
-			XBuffer,
+			Buffer,
 			&matrix_index);
 
             DEBUG_ONLY (if                        
@@ -529,7 +610,7 @@ void AxpyInterface2<T>::Eacc( Matrix<T>& Z, Int i, Int j )
 	    const Int cindex =
 		NextIndexCoord (i, j,
 			destination,
-			XBuffer,
+			Buffer,
 			&coord_index);
 
 	    Int * coord_ = reinterpret_cast<Int *>(coords_[coord_index].coord_[destination][cindex].data());
@@ -604,6 +685,12 @@ void AxpyInterface2<T>::Eacc( Matrix<T>& Z, Int i, Int j )
 }
 
 template<typename T>
+void AxpyInterface2<T>::Eacc( Matrix<T>& Z, Int i, Int j )
+{
+    Eacc( const_cast<const Matrix<T>&>(Z), i, j );
+}
+
+template<typename T>
 void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Get"))
@@ -612,7 +699,7 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
     // the DistMatrix isn't attached
     if ( !toBeAttachedForGet_ )
 	LogicError ("Cannot perform this operation as matrix is not attached.");
-    DistMatrix<T>& X = *GlobalArrayGet_;
+    const DistMatrix<T>& X = *GlobalArrayGet_;
 
     const Int height = Z.Height ();
     const Int width = Z.Width ();
@@ -621,6 +708,8 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 	LogicError ("Invalid submatrix for Iget");
 
     T* XBuffer = Z.Buffer();
+    const void* Buffer = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
+
     const Grid & g = X.Grid ();
     const Int p = g.Size ();
     const Int r = g.Height ();
@@ -635,7 +724,7 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 	const Int cindex =
 		NextIndexCoord (i, j,
 			rank,
-			XBuffer,
+			Buffer,
 			&coord_index);
 	
 	Int *coord = reinterpret_cast<Int *>(coords_[coord_index].coord_[rank][cindex].data ());
@@ -680,7 +769,8 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 	    // Unpack the local matrix
 	    for (Int t = 0; t < localWidth; ++t)
 	    {
-		T *YCol = X.Buffer (0, rowShift + t * c);
+		//T *YCol = X.Buffer (0, rowShift + t * c);
+		T *YCol = Z.Buffer (0, rowShift + t * c);
 		const T *XCol = &recvBuffer[t * localHeight];
 		for (Int s = 0; s < localHeight; ++s)
 		    YCol[colShift + s * r] = XCol[s];
@@ -693,7 +783,7 @@ void AxpyInterface2<T>::Get( Matrix<T>& Z, Int i, Int j )
 
 // nonblocking, no local completion 
 template<typename T>
-void AxpyInterface2<T>::Iput( Matrix<T>& Z, Int i, Int j )
+void AxpyInterface2<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Iput"))
 
@@ -726,7 +816,9 @@ void AxpyInterface2<T>::Iput( Matrix<T>& Z, Int i, Int j )
     Int receivingCol = myProcessCol;
 
     const Int YLDim = Y.LDim ();
-    T* XBuffer = Z.Buffer();
+    
+    const T* XBuffer = Z.LockedBuffer();
+    const void* Buffer = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
 	
     for( Int step=0; step<p; ++step )
     {
@@ -744,7 +836,7 @@ void AxpyInterface2<T>::Iput( Matrix<T>& Z, Int i, Int j )
 	    const Int dindex =
 		NextIndexData (destination,
 			numEntries, 
-			XBuffer,
+			Buffer,
 			&matrix_index);
 	
 	    DEBUG_ONLY (if
@@ -770,7 +862,7 @@ void AxpyInterface2<T>::Iput( Matrix<T>& Z, Int i, Int j )
 	    const Int cindex =
 		NextIndexCoord (i, j,
 			destination,
-			XBuffer,
+			Buffer,
 			&coord_index);
 	    
 	    Int *coord_ = reinterpret_cast<Int *>(coords_[coord_index].coord_[destination][cindex].data());
@@ -791,6 +883,12 @@ void AxpyInterface2<T>::Iput( Matrix<T>& Z, Int i, Int j )
 }
 
 template<typename T>
+void AxpyInterface2<T>::Iput( Matrix<T>& Z, Int i, Int j )
+{
+    Iput( const_cast<const Matrix<T>&>(Z), i, j );
+}
+
+template<typename T>
 void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Iget"))
@@ -799,11 +897,12 @@ void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
     // the DistMatrix isn't attached
     if ( !toBeAttachedForGet_ )
 	LogicError ("Cannot perform this operation as matrix is not attached.");
-    DistMatrix<T>& X = *GlobalArrayGet_;
+    const DistMatrix<T>& X = *GlobalArrayGet_;
 
     const Int height = Z.Height ();
     const Int width = Z.Width ();
-    T* XBuffer = Z.Buffer();
+    
+    const void* Buffer = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
     
     Int coord_index;
     
@@ -820,7 +919,7 @@ void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
 	const Int cindex =
 	    NextIndexCoord (i, j,
 		    rank,
-		    XBuffer,
+		    Buffer,
 		    &coord_index);
 
 	Int *coord_ = reinterpret_cast<Int *>(coords_[coord_index].coord_[rank][cindex].data());
@@ -838,7 +937,7 @@ void AxpyInterface2<T>::Iget( Matrix<T>& Z, Int i, Int j )
 // accumulate = Update Y(i:i+height-1,j:j+width-1) += X,
 // where X is height x width
 template<typename T>
-void AxpyInterface2<T>::Iacc( Matrix<T>& Z, Int i, Int j )
+void AxpyInterface2<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Iacc"))
 
@@ -872,7 +971,9 @@ void AxpyInterface2<T>::Iacc( Matrix<T>& Z, Int i, Int j )
     Int receivingCol = myProcessCol;
 
     const Int YLDim = Y.LDim();        
-    T* XBuffer = Z.Buffer();
+    
+    const T* XBuffer = Z.LockedBuffer();
+    const void* Buffer = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
 
     for( Int step=0; step<p; ++step )
     {
@@ -889,7 +990,7 @@ void AxpyInterface2<T>::Iacc( Matrix<T>& Z, Int i, Int j )
 	    const Int dindex =
 		NextIndexData (destination,
 			numEntries, 
-			XBuffer,
+			Buffer,
 			&matrix_index);
 	
 	    DEBUG_ONLY (if
@@ -914,7 +1015,7 @@ void AxpyInterface2<T>::Iacc( Matrix<T>& Z, Int i, Int j )
 	    const Int cindex =
 		NextIndexCoord (i, j,
 			destination,
-			XBuffer,
+			Buffer,
 			&coord_index);
 	    
 	    Int *coord_ = reinterpret_cast<Int *>(coords_[coord_index].coord_[destination][cindex].data());
@@ -933,9 +1034,15 @@ void AxpyInterface2<T>::Iacc( Matrix<T>& Z, Int i, Int j )
     }
 }
 
+template<typename T>
+void AxpyInterface2<T>::Iacc( Matrix<T>& Z, Int i, Int j )
+{
+    Iacc( const_cast<const Matrix<T>&>(Z), i, j );
+}
+
 // nonblocking, local completion 
 template<typename T>
-void AxpyInterface2<T>::Put( Matrix<T>& Z, Int i, Int j )
+void AxpyInterface2<T>::Put( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Put"))
 
@@ -976,13 +1083,11 @@ void AxpyInterface2<T>::Put( Matrix<T>& Z, Int i, Int j )
     dataVectors_[my_rank].resize (numCreated + 1);
     dataVectors_[my_rank][numCreated].resize (width * height);
 
-    // TODO Buffer could be const, but at present
-    // NextIndexMatrix only supports non-const 
-    // pointers 
-    T* Buffer = Z.Buffer();
+    const void* Buffer = static_cast < void * >(const_cast < T * >(Z.LockedBuffer()));	
     T* ZBuffer = reinterpret_cast < T * >(dataVectors_[my_rank][numCreated].data());
 
-    MemCopy (ZBuffer, Buffer, height * width);
+    MemCopy (ZBuffer, reinterpret_cast < const T * >(Buffer), 
+	    height * width);
     T* XBuffer = reinterpret_cast < T * >(ZBuffer);
 
     for( Int step=0; step<p; ++step )
@@ -1046,16 +1151,16 @@ void AxpyInterface2<T>::Put( Matrix<T>& Z, Int i, Int j )
     }
 }
 
+template<typename T>
+void AxpyInterface2<T>::Put( Matrix<T>& Z, Int i, Int j )
+{
+    Put( const_cast<const Matrix<T>&>(Z), i, j );
+}
+
 // input buffer could be modified upon exit
 // from this function
-
-// as it turns out, it is perhaps impossible
-// to ensure local completion using mpi-2,
-// hence we memcpy the input buffer so that 
-// local buffer could be updated when this
-// function returns
 template<typename T>
-void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
+void AxpyInterface2<T>::Acc( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Acc"))
 
@@ -1097,13 +1202,11 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
     dataVectors_[my_rank].resize (numCreated + 1);
     dataVectors_[my_rank][numCreated].resize (width * height);
 
-    // TODO Buffer could be const, but at present
-    // NextIndexMatrix only supports non-const 
-    // pointers 
-    T* Buffer = Z.Buffer();
+    const void* Buffer = static_cast < void * >(const_cast < T * >(Z.LockedBuffer()));	
     T* ZBuffer = reinterpret_cast < T * >(dataVectors_[my_rank][numCreated].data());
 
-    MemCopy (ZBuffer, Buffer, height * width);
+    MemCopy (ZBuffer, reinterpret_cast < const T * >(Buffer), 
+	    height * width);
     T* XBuffer = reinterpret_cast < T * >(ZBuffer);
     
     for( Int step=0; step<p; ++step )
@@ -1167,27 +1270,34 @@ void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
     }
 }
 
+template<typename T>
+void AxpyInterface2<T>::Acc( Matrix<T>& Z, Int i, Int j )
+{
+    Acc( const_cast<const Matrix<T>&>(Z), i, j );
+}
+
 // waitany implementation
 // cannot use mpi::Waitany
 // as of now because request 
 // objects are vector of deques
 template<typename T>
-void AxpyInterface2<T>::WaitAny( Matrix<T>& Z )
+void AxpyInterface2<T>::WaitAny( const Matrix<T>& Z )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::WaitAny"))
-     if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
+     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError("Must initiate transfer at first.");
  
-    DistMatrix<T>& Y = *GlobalArrayGet_;
-    const Grid& g = Y.Grid();
+    const Grid& g = ( toBeAttachedForPut_ ?
+	    GlobalArrayPut_->Grid() :
+	    GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     Int matrixIndex, coordIndex;
     
     const Int numMatrices = matrices_.size();
     const Int numCoords = coords_.size();
     
-    const T *base_address = Z.LockedBuffer();
-
+    const void* base_address = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
+    
     // search for matrix base
     for (Int m = 0; m < numMatrices; m++)
     {
@@ -1255,21 +1365,28 @@ void AxpyInterface2<T>::WaitAny( Matrix<T>& Z )
 }
 
 template<typename T>
-void AxpyInterface2<T>::Wait( Matrix<T>& Z )
+void AxpyInterface2<T>::WaitAny( Matrix<T>& Z )
+{
+    WaitAny( const_cast<const Matrix<T>&>(Z) );
+}
+
+template<typename T>
+void AxpyInterface2<T>::Wait( const Matrix<T>& Z )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Wait"))
-     if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
+    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError("Must initiate transfer at first.");
  
-    DistMatrix<T>& Y = *GlobalArrayGet_;
-    const Grid& g = Y.Grid();
+    const Grid& g = ( toBeAttachedForPut_ ?
+	    GlobalArrayPut_->Grid() :
+	    GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     Int matrixIndex, coordIndex;
     
     const Int numMatrices = matrices_.size();
     const Int numCoords = coords_.size();
     
-    const T *base_address = Z.LockedBuffer();
+    const void* base_address = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
 
     // search for matrix base
     for (Int m = 0; m < numMatrices; m++)
@@ -1330,16 +1447,23 @@ void AxpyInterface2<T>::Wait( Matrix<T>& Z )
 }
 
 template<typename T>
+void AxpyInterface2<T>::Wait( Matrix<T>& Z )
+{
+    Wait( const_cast<const Matrix<T>&>(Z) );
+}
+
+template<typename T>
 void AxpyInterface2<T>::Waitall ()
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Waitall"))
-     if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
+     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError("Must initiate transfer at first.");
  
-    DistMatrix<T>& Y = *GlobalArrayGet_;
-    Int matrixIndex, coordIndex;
-    const Grid& g = Y.Grid();
+    const Grid& g = ( toBeAttachedForPut_ ?
+	    GlobalArrayPut_->Grid() :
+	    GlobalArrayGet_->Grid() );
     const Int p = g.Size();
+    Int matrixIndex, coordIndex;
     
     const Int numMatrices = matrices_.size();
     const Int numCoords = coords_.size();
@@ -1376,21 +1500,22 @@ void AxpyInterface2<T>::Waitall ()
 }
 
 template<typename T>
-bool AxpyInterface2<T>::Test( Matrix<T>& Z )
+bool AxpyInterface2<T>::Test( const Matrix<T>& Z )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Test"))
-     if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
+     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError("Must initiate transfer at first.");
  
-    DistMatrix<T>& Y = *GlobalArrayGet_;
-    const Grid& g = Y.Grid();
+    const Grid& g = ( toBeAttachedForPut_ ?
+	    GlobalArrayPut_->Grid() :
+	    GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     Int matrixIndex, coordIndex;
     
     const Int numMatrices = matrices_.size();
     const Int numCoords = coords_.size();
     
-    const T *base_address = Z.LockedBuffer();
+    const void* base_address = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
 
     // search for matrix base
     for (Int m = 0; m < numMatrices; m++)
@@ -1453,26 +1578,29 @@ bool AxpyInterface2<T>::Test( Matrix<T>& Z )
     return true;
 }
 
-// TODO Use mpi::Testany instead of mpi::Test
-// at present request object is vector
-// of deques, so cannot convert it to
-// an array required by Testany
 template<typename T>
-bool AxpyInterface2<T>::TestAny( Matrix<T>& Z )
+bool AxpyInterface2<T>::Test( Matrix<T>& Z )
+{
+    return Test( const_cast<const Matrix<T>&>(Z) );
+}
+
+template<typename T>
+bool AxpyInterface2<T>::TestAny( const Matrix<T>& Z )
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::TestAny"))
-     if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
+     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError("Must initiate transfer at first.");
  
-    DistMatrix<T>& Y = *GlobalArrayGet_;
-    const Grid& g = Y.Grid();
+    const Grid& g = ( toBeAttachedForPut_ ?
+	    GlobalArrayPut_->Grid() :
+	    GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     Int matrixIndex, coordIndex;
     
     const Int numMatrices = matrices_.size();
     const Int numCoords = coords_.size();
     
-    const T *base_address = Z.LockedBuffer();
+    const void* base_address = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
 
     // search for matrix base
     for (Int m = 0; m < numMatrices; m++)
@@ -1540,14 +1668,21 @@ bool AxpyInterface2<T>::TestAny( Matrix<T>& Z )
 }
 
 template<typename T>
+bool AxpyInterface2<T>::TestAny( Matrix<T>& Z )
+{
+    return TestAny( const_cast<const Matrix<T>&>(Z) );
+}
+
+template<typename T>
 bool AxpyInterface2<T>::Testall()
 {
     DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Testall"))
-     if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
+     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError("Must initiate transfer at first.");
  
-    DistMatrix<T>& Y = *GlobalArrayGet_;
-    const Grid& g = Y.Grid();
+    const Grid& g = ( toBeAttachedForPut_ ?
+	    GlobalArrayPut_->Grid() :
+	    GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     
     const Int numMatrices = matrices_.size();
@@ -1598,6 +1733,47 @@ bool AxpyInterface2<T>::Testall()
 
 // This is non-collective flush
 // This will ensure local+remote completion
+// if Z is  const then only Put/Acc is possible
+template<typename T>
+void AxpyInterface2<T>::Flush( const Matrix<T>& Z )
+{
+    DEBUG_ONLY(CallStackEntry cse("AxpyInterface2::Flush"))
+    
+    if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
+	LogicError("Must initiate transfer before flushing.");
+
+    const Grid& g = ( toBeAttachedForPut_ ?
+	    GlobalArrayPut_->Grid() :
+	    GlobalArrayGet_->Grid() );
+    
+    bool DONE = false;
+    mpi::Status status;	
+
+    while ( !DONE )
+    {		
+	if ( mpi::IProbe (mpi::ANY_SOURCE, mpi::ANY_TAG, g.VCComm (), status) )
+	{
+		switch (status.MPI_TAG)
+		{
+		    case DATA_PUT_TAG:
+			{
+			    HandleLocalToGlobalData ( Z, status.MPI_SOURCE );
+			    break;
+			}
+		    case DATA_ACC_TAG:
+			{
+			    HandleLocalToGlobalAcc ( Z, status.MPI_SOURCE );
+			    break;
+			}
+		}
+	}
+	// wait for requests to 
+	// complete one by one
+	WaitAny (Z);	
+	DONE = Test (Z);
+    }
+}
+
 template<typename T>
 void AxpyInterface2<T>::Flush( Matrix<T>& Z )
 {
@@ -1605,10 +1781,11 @@ void AxpyInterface2<T>::Flush( Matrix<T>& Z )
     
     if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
 	LogicError("Must initiate transfer before flushing.");
+
+    const Grid& g = ( toBeAttachedForPut_ ?
+	    GlobalArrayPut_->Grid() :
+	    GlobalArrayGet_->Grid() );
     
-    DistMatrix<T>& Y = *GlobalArrayPut_;
-    const Grid& g = Y.Grid();
-     
     bool DONE = false;
     mpi::Status status;	
 
@@ -1643,7 +1820,7 @@ void AxpyInterface2<T>::Flush( Matrix<T>& Z )
 }
 
 template < typename T > 
-void AxpyInterface2<T>::HandleLocalToGlobalData ( Matrix<T>& Z, Int source )
+void AxpyInterface2<T>::HandleLocalToGlobalData ( const Matrix<T>& Z, Int source )
 {
     DistMatrix<T> &Y = *GlobalArrayPut_;
     const Grid & g = Y.Grid ();
@@ -1677,7 +1854,7 @@ void AxpyInterface2<T>::HandleLocalToGlobalData ( Matrix<T>& Z, Int source )
 	    DATA_PUT_TAG, g.VCComm());
 
     // Update Y
-    const T *XBuffer = reinterpret_cast < const T * >(getBuffer);
+    const T *XBuffer = const_cast < const T * >(getBuffer);
     const Int colAlign = (Y.ColAlign() + i) % r;
     const Int rowAlign = (Y.RowAlign() + j) % c;
     const Int colShift = Shift (myRow, colAlign, r);
@@ -1699,9 +1876,15 @@ void AxpyInterface2<T>::HandleLocalToGlobalData ( Matrix<T>& Z, Int source )
     getVector_.clear();
 }
 
+template<typename T>
+void AxpyInterface2<T>::HandleLocalToGlobalData( Matrix<T>& Z, Int source )
+{
+    HandleLocalToGlobalData( const_cast<const Matrix<T>&>(Z), source );
+}
+
 // replica of above function except this accumulates
 template < typename T > 
-void AxpyInterface2<T>::HandleLocalToGlobalAcc ( Matrix<T>& Z, Int source )
+void AxpyInterface2<T>::HandleLocalToGlobalAcc ( const Matrix<T>& Z, Int source )
 {
     DistMatrix<T> &Y = *GlobalArrayPut_;
     const Grid & g = Y.Grid ();
@@ -1736,7 +1919,7 @@ void AxpyInterface2<T>::HandleLocalToGlobalAcc ( Matrix<T>& Z, Int source )
 	    DATA_ACC_TAG, g.VCComm());
 
     // Update Y
-    const T *XBuffer = reinterpret_cast < const T * >(getBuffer);
+    const T *XBuffer = const_cast < const T * >(getBuffer);
     const Int colAlign = (Y.ColAlign() + i) % r;
     const Int rowAlign = (Y.RowAlign() + j) % c;
     const Int colShift = Shift (myRow, colAlign, r);
@@ -1759,6 +1942,12 @@ void AxpyInterface2<T>::HandleLocalToGlobalAcc ( Matrix<T>& Z, Int source )
     getVector_.clear();
 }
 
+template<typename T>
+void AxpyInterface2<T>::HandleLocalToGlobalAcc( Matrix<T>& Z, Int source )
+{
+    HandleLocalToGlobalAcc( const_cast<const Matrix<T>&>(Z), source );
+}
+
 // handle request for data, post a matching isend
 template < typename T >
 void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z )
@@ -1768,7 +1957,7 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z )
     if ( !toBeAttachedForGet_ )
 	LogicError("Local matrix cannot be updated");
 
-    DistMatrix<T>& Y = *GlobalArrayGet_;
+    const DistMatrix<T>& Y = *GlobalArrayGet_;
     const Grid& g = Y.Grid();
     const Int r = g.Height();
     const Int c = g.Width();
@@ -1779,6 +1968,8 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z )
     Int i, j;
     Int matrix_index;
     std::vector<T> recvVector_;
+    
+    const void* Buffer = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
     
     const Int XLDim = Z.LDim();
     // local matrix width and height
@@ -1816,11 +2007,10 @@ void AxpyInterface2<T>::HandleGlobalToLocalData ( Matrix<T>& Z )
 	    DEBUG_ONLY (if (numEntries < Int (sizeof (T)))
 		    LogicError ("Count was too small");)
 
-	    T* XBuffer = Z.Buffer();
 	    const Int index =
 		NextIndexData (source,
 			numEntries, 
-			XBuffer,
+			Buffer,
 			&matrix_index);
 
 	    DEBUG_ONLY (if
@@ -1906,8 +2096,9 @@ void AxpyInterface2<T>::Detach()
     GlobalArrayPut_ 	= 0;
     GlobalArrayGet_ 	= 0;
 
-    dataVectors_.clear();
-    
+    if (!dataVectors_.empty())
+	dataVectors_.clear();
+
     matrices_.clear();
     coords_.clear();
 }

@@ -44,6 +44,7 @@ public:
     void Put( const Matrix<T>& Z, Int i, Int j );   
 
     // End to End blocking
+    // will be deprecated soon
     void Eacc(       Matrix<T>& Z, Int i, Int j );
     void Eacc( const Matrix<T>& Z, Int i, Int j );
 
@@ -69,7 +70,7 @@ private:
     // struct for passing data
     struct matrix_params_
     {
-	T *base_;
+	const void *base_;
 	std::vector<std::deque<std::vector<T>>>
 	    data_;
 	std::vector<std::deque<mpi::Request>> 
@@ -83,7 +84,7 @@ private:
     // struct for passing coordinates
     struct coord_params_
     {
-	T *base_;
+	const void *base_;
 	std::vector<std::deque<std::array<Int, 3>>>
 	    coord_;
 	std::vector<std::deque<mpi::Request>> 
@@ -101,10 +102,9 @@ private:
     std::vector<std::vector<std::vector< T >>>
         dataVectors_;
 
-    // TODO need to add const here...
-    DistMatrix<T,MC,MR>* GlobalArrayPut_;
-    DistMatrix<T,MC,MR>* GlobalArrayGet_;
-   
+    DistMatrix<T,MC,MR>* GlobalArrayPut_;   
+    const DistMatrix<T,MC,MR>* GlobalArrayGet_;
+
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
 	 attached_, detached_;
 
@@ -112,34 +112,34 @@ private:
     Int NextIndexData (
 	Int target,
 	Int dataSize, 
-	T * base_address,
+	const void* base_address,
 	Int *mindex);
    
     Int NextIndexCoord (
 	Int i, Int j,
 	Int target,
-	T * base_address,
+	const void* base_address,
 	Int *cindex);
 
     bool Testall();
-    bool Test(          Matrix<T>& Z );
-    bool Test(    const Matrix<T>& Z );  
+    bool Test(             Matrix<T>& Z );
+    bool Test(       const Matrix<T>& Z );  
     bool TestAny(          Matrix<T>& Z );
     bool TestAny(    const Matrix<T>& Z ); 
 
     void Waitall();
-    void Wait(          Matrix<T>& Z );
-    void Wait(    const Matrix<T>& Z );    
+    void Wait(             Matrix<T>& Z );
+    void Wait(       const Matrix<T>& Z );    
     void WaitAny(          Matrix<T>& Z );
     void WaitAny(    const Matrix<T>& Z );   
 
     // these are only used for nonblocking
     // update rountines
     void HandleGlobalToLocalData( Matrix<T>& Z );
+    
     void HandleLocalToGlobalData( Matrix<T>& Z, Int source );
     void HandleLocalToGlobalAcc(  Matrix<T>& Z, Int source );
 
-    void HandleGlobalToLocalData( const Matrix<T>& Z );
     void HandleLocalToGlobalData( const Matrix<T>& Z, Int source );
     void HandleLocalToGlobalAcc(  const Matrix<T>& Z, Int source );
 };
