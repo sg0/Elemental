@@ -108,35 +108,42 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
     // transfers -- put, get and acc are possible
     if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
     {
-        GlobalArrayPut_ 		= &Z;
-        toBeAttachedForPut_ 		= true;
-        GlobalArrayGet_ 		= &Z;
-        toBeAttachedForGet_ 		= true;
+	GlobalArrayPut_ 		= &Z;
+	toBeAttachedForPut_ 		= true;
+	GlobalArrayGet_ 		= &Z;
+	toBeAttachedForGet_ 		= true;
+
+	const Grid& g = Z.Grid();
+	const Int p = g.Size ();
+
+	if ( matrices_.empty() )
+	{
+	    struct matrix_params_ mp;
+	    mp.data_.resize(p);
+	    mp.requests_.resize(p);
+	    mp.statuses_.resize(p);   
+	    mp.base_ = NULL;
+	    // push back new matrix_params created
+	    // with default constructor
+	    matrices_.push_back( mp );
+	}
+
+	if (putVector_.empty())
+	{
+	    getVector_.resize( p );
+	    putVector_.resize( p );
+	}
+
+	// TODO rma related checks
+	// creation of window
+	const Int numEntries = Z.LocalHeight () * Z.LocalWidth ();
+	const Int bufferSize = numEntries * sizeof(T);
+	void* baseptr = reinterpret_cast< void * >(Z.Buffer ());
+	assert(baseptr != NULL);
+
+	mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
+	mpi::WindowLock (window);
     }
-    
-    const Grid& g = Z.Grid();
-    const Int p = g.Size ();
-
-    if (matrices_.size() != p)
-    {
-        matrices_.resize( p );
-    }
-
-    if (putVector_.size() != p)
-    {
-        getVector_.resize( p );
-        putVector_.resize( p );
-    }
-
-    // TODO rma related checks
-    // creation of window
-    const Int numEntries = Z.LocalHeight () * Z.LocalWidth ();
-    const Int bufferSize = numEntries * sizeof(T);
-    void* baseptr = reinterpret_cast<void*>(Z.Buffer ());
-    assert(baseptr != NULL);
-
-    mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
-    mpi::WindowLock (window);
 }
 
 // for gets
@@ -152,36 +159,30 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
     else
         LogicError("Must detach before reattaching.");
 
-    if( !toBeAttachedForGet_ && !toBeAttachedForPut_)
+    if( !toBeAttachedForGet_ )
     {
-        GlobalArrayGet_ 	= &X;
-        toBeAttachedForGet_ 	= true;
-        GlobalArrayPut_ 	= 0;
-        toBeAttachedForPut_ 	= false;
-    }
-    else
-        LogicError("Cannot update Global matrix.");
+	GlobalArrayGet_ 	= &X;
+	toBeAttachedForGet_ 	= true;
+	GlobalArrayPut_ 	= 0;
+	toBeAttachedForPut_ 	= false;
 
-    const Grid& g = X.Grid();
-    const Int p = g.Size ();
+	const Grid& g = X.Grid();
+	const Int p = g.Size ();
 
-    if (matrices_.size() != p)
-    {
-        matrices_.resize( p );
-    }
-    if (getVector_.size() != p)
-    {
-        getVector_.resize( p );
-    }
-    
-    //TODO rma related checks
-    const Int numEntries = X.LocalHeight () * X.LocalWidth ();
-    const Int bufferSize = numEntries * sizeof(T);
-    void* baseptr = static_cast<void*>(const_cast<T*>(X.LockedBuffer ()));
-    assert (baseptr != NULL);
+	if (getVector_.size() != p)
+	{
+	    getVector_.resize( p );
+	}
 
-    mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
-    mpi::WindowLock (window);
+	//TODO rma related checks
+	const Int numEntries = X.LocalHeight () * X.LocalWidth ();
+	const Int bufferSize = numEntries * sizeof(T);
+	void* baseptr = static_cast<void*>(const_cast<T*>(X.LockedBuffer ()));
+	assert (baseptr != NULL);
+
+	mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
+	mpi::WindowLock (window);
+    }
 }
 
 // for standard passive rma
@@ -213,8 +214,9 @@ Int RmaInterface<T>::NextIndex (
     assert ( base_address != NULL );
 
     Int matrixIndex = 0;
-    const DistMatrix<T>& Y = *GlobalArrayGet_;
-    const Grid& g = Y.Grid();
+    const Grid& g = ( toBeAttachedForPut_ ?
+	    GlobalArrayPut_->Grid() :
+	    GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     const Int numMatrices = matrices_.size();
 
@@ -286,7 +288,7 @@ Int RmaInterface<T>::NextIndex (
 
 // request based RMA operations
 template<typename T>
-void RmaInterface<T>::Rput( Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Rput( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Rput"))
 
@@ -348,7 +350,7 @@ void RmaInterface<T>::Rput( Matrix<T>& Z, Int i, Int j )
 			(Int (matrices_[matrix_index].data_[destination][index].size ()) !=
 			 numEntries) LogicError ("Error in NextIndex");)
 	    
-	    T *sendBuffer = matrices_[matrix_index].data_[destination][index].data ();
+	    T *sendBuffer = reinterpret_cast<T *>(matrices_[matrix_index].data_[destination][index].data ());
 	
             for( Int t=0; t<localWidth; ++t )
             {
@@ -370,10 +372,16 @@ void RmaInterface<T>::Rput( Matrix<T>& Z, Int i, Int j )
     }
 }
 
+template<typename T>
+void RmaInterface<T>::Rput( Matrix<T>& Z, Int i, Int j )
+{
+    Rput( const_cast<const Matrix<T>&>(Z), i, j );
+}
+
 // accumulate = Update Y(i:i+height-1,j:j+width-1) += X,
 // where X is height x width
 template<typename T>
-void RmaInterface<T>::Racc( Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Racc( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Racc"))
 
@@ -403,9 +411,9 @@ void RmaInterface<T>::Racc( Matrix<T>& Z, Int i, Int j )
     const Int height = Z.Height();
     const Int width = Z.Width();
     
-    const T* XBuffer = Z.LockedBuffer();
-    const void* Buffer = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
-    
+    const T* XBuffer = Z.LockedBuffer();    
+    const void* Buffer = static_cast < void * >(const_cast < T * >(Z.LockedBuffer()));	
+
     Int matrix_index;   
     
     const Int iLocalOffset = Length( i, Y.ColShift (), r );
@@ -436,8 +444,8 @@ void RmaInterface<T>::Racc( Matrix<T>& Z, Int i, Int j )
 			(Int (matrices_[matrix_index].data_[destination][index].size ()) !=
 			 numEntries) LogicError ("Error in NextIndex");)
 	    
-	    T *sendBuffer = matrices_[matrix_index].data_[destination][index].data ();
-
+	    T *sendBuffer = reinterpret_cast<T *>(matrices_[matrix_index].data_[destination][index].data ());
+	
             for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendBuffer[t*localHeight];
@@ -450,12 +458,18 @@ void RmaInterface<T>::Racc( Matrix<T>& Z, Int i, Int j )
 		mpi::Racc (&sendBuffer[t*localHeight], localHeight,
 			destination, disp, localHeight, window,
 			matrices_[matrix_index].requests_[destination][index]);
-            }
+	    }
         }
         receivingRow = (receivingRow + 1) % r;
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
     }
+}
+
+template<typename T>
+void RmaInterface<T>::Racc( Matrix<T>& Z, Int i, Int j )
+{
+    Racc( const_cast<const Matrix<T>&>(Z), i, j );
 }
 
 // Locally Blocking 
@@ -709,7 +723,7 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 
 // non-blocking interface
 template<typename T>
-void RmaInterface<T>::Iput( Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Iput"))
 
@@ -788,7 +802,7 @@ void RmaInterface<T>::Iput( Matrix<T>& Z, Int i, Int j )
 // accumulate = Update Y(i:i+height-1,j:j+width-1) += X,
 // where X is height x width
 template<typename T>
-void RmaInterface<T>::Iacc( Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY(CallStackEntry cse("RmaInterface::Iacc"))
 
@@ -838,8 +852,10 @@ void RmaInterface<T>::Iacc( Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-	    const Int index = RmaInterface<T>::NextIndex ( numEntries, 
-		    putVector_[destination]);
+	    const Int index = 
+		NextIndex ( 
+			numEntries, 
+			putVector_[destination]);
 
             T* sendBuffer = putVector_[destination][index].data();
 
@@ -859,6 +875,18 @@ void RmaInterface<T>::Iacc( Matrix<T>& Z, Int i, Int j )
         if( receivingRow == 0 )
             receivingCol = (receivingCol + 1) % c;
     }
+}
+
+template<typename T>
+void RmaInterface<T>::Iput( Matrix<T>& Z, Int i, Int j )
+{
+    Iput( const_cast<const Matrix<T>&>(Z), i, j );
+}
+
+template<typename T>
+void RmaInterface<T>::Iacc( Matrix<T>& Z, Int i, Int j )
+{
+    Iacc( const_cast<const Matrix<T>&>(Z), i, j );
 }
 
 // Local completion of all ops upon 

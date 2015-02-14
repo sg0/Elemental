@@ -818,7 +818,7 @@ void AxpyInterface2<T>::Iput( const Matrix<T>& Z, Int i, Int j )
     const Int YLDim = Y.LDim ();
     
     const T* XBuffer = Z.LockedBuffer();
-    const void* Buffer = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
+    const void* Buffer = static_cast< void * >(const_cast< T * >(Z.LockedBuffer()));	
 	
     for( Int step=0; step<p; ++step )
     {
