@@ -34,19 +34,19 @@ namespace mpi {
 // consensus instead of El strict EOM matching
 // see - Scalable communication protocols for 
 // dynamic sparse data exchange by Hoefler, et al
-#ifndef EL_USE_IBARRIER_FOR_AXPY
-#define EL_USE_IBARRIER_FOR_AXPY
-#endif
+//#ifndef EL_USE_IBARRIER_FOR_AXPY
+//#define EL_USE_IBARRIER_FOR_AXPY
+//#endif
 
-#ifndef EL_ENABLE_RMA_AXPY
-#define EL_ENABLE_RMA_AXPY
-#endif
+//#ifndef EL_ENABLE_RMA_AXPY
+//#define EL_ENABLE_RMA_AXPY
+//#endif
 
 // Use derived datatypes for strided
 // vector communication patterns
-#ifndef EL_USE_DERIVED_DATATYPE
-#define EL_USE_DERIVED_DATATYPE
-#endif
+//#ifndef EL_USE_DERIVED_DATATYPE
+//#define EL_USE_DERIVED_DATATYPE
+//#endif
 
 // explicit progress for RMA
 //#ifndef EL_EXPLICIT_PROGRESS
@@ -113,7 +113,7 @@ typedef MPI_Request Request;
 typedef MPI_Status Status;
 typedef MPI_Message Message;
 typedef MPI_User_function UserFunction;
-#if MPI_VERSION >= 3
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
 typedef MPI_Win Window;
 typedef enum
 {
@@ -246,6 +246,17 @@ void Translate
 ( Comm origComm, int size, const int* origRanks, 
   Comm newComm,                  int* newRanks );
 
+// Derived datatype
+// ================
+#ifdef EL_USE_DERIVED_DATATYPE
+// strided/vector to datatype
+void StridedDatatype (El_strided_t* stride_descr,
+	mpi::Datatype old_type, mpi::Datatype* new_type,
+	size_t* source_dims);
+void VectorDatatype (El_iov_t * vect_descr,
+	mpi::Datatype old_type, mpi::Datatype * new_type,
+	vector_pattern_t data_pattern);
+#endif // EL_USE_DERIVED_DATATYPE
 // MPI-3 one-sided
 // ===============
 #if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
@@ -254,17 +265,11 @@ void Translate
 void SetWindowProp ( Window& window, int prop );
 void CheckBounds ( Window & window, mpi::Datatype win_type, mpi::Datatype type, 
 size_t count, ptrdiff_t target_offset );
+#ifdef EL_EXPLICIT_PROGRESS
 void RmaProgress ( Comm comm );
+#endif
 long ReadInc (Window & win, Aint offset, 
 	long inc, int fop_root);
-
-// strided/vector to datatype
-void StridedDatatype (El_strided_t* stride_descr,
-	mpi::Datatype old_type, mpi::Datatype* new_type,
-	size_t* source_dims);
-void VectorDatatype (El_iov_t * vect_descr,
-	mpi::Datatype old_type, mpi::Datatype * new_type,
-	vector_pattern_t data_pattern);
 // Window creation/update/delete
 // -----------------------------
 void WindowLock( int rank, Window& window );

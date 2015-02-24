@@ -79,6 +79,11 @@
 #cmakedefine EL_VECTOR_WARNINGS
 #cmakedefine EL_AVOID_OMP_FMA
 
+/* MPI-3 related */
+#cmakedefine EL_ENABLE_RMA_AXPY
+#cmakedefine EL_USE_IBARRIER_FOR_AXPY
+
+
 #cmakedefine EL_DECLSPEC
 #ifdef EL_DECLSPEC
 # define EL_EXPORT __declspec(dllexport)

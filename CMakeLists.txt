@@ -83,6 +83,11 @@ option(EL_USE_64BIT_INTS "Use 64-bit integers where possible" OFF)
 option(EL_USE_CUSTOM_ALLTOALLV "Avoid MPI_Alltoallv for performance reasons" ON)
 option(EL_BARRIER_IN_ALLTOALLV "Barrier before posting non-blocking recvs" OFF)
 
+# MPI misc.
+# Enable MPI-3 routines
+option(EL_ENABLE_RMA_AXPY "Choose new Rma Axpy interface implemented using MPI-3 one sided routines" ON)
+option(EL_USE_IBARRIER_FOR_AXPY "Use MPI-3 IBarrier for synchronization in AxpyInterface" ON)
+
 # If the version of METIS packaged with Elemental is to be built (the default),
 # then no METIS-specific variables need to be specified, but if the user prefers
 # to use their own version, then the root path of the installation should be

@@ -403,124 +403,11 @@ void Translate
     Free (newGroup);
 }
 
-// MPI-3 RMA functions
-// ==================
-
-#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
-long ReadInc (Window & win, Aint offset, long inc, int fop_root)
-{
-    DEBUG_ONLY (CallStackEntry cse ("mpi::ReadInc"))
-    long otemp;			
-    SafeMpi ( MPI_Fetch_and_op (&inc, &otemp, MPI_LONG, fop_root, offset, MPI_SUM,
-	    win) );
-    SafeMpi ( MPI_Win_flush_local (fop_root, win) );
-
-    return otemp;
-}
-
-void SetWindowProp (Window & window, int prop)
-{
-    DEBUG_ONLY (CallStackEntry cse ("mpi::SetWindowProp"))
-    Info info;
-
-    SafeMpi (MPI_Info_create (&info));
-
-    if (prop & (1 << 0))	// strict
-        SafeMpi (MPI_Info_set
-                 (info, "accumulate_ordering",
-                  "rar,raw,war,waw"));
-
-
-    if (prop & (1 << 1))	// partial
-        SafeMpi (MPI_Info_set
-                 (info, "accumulate_ordering",
-                  "rar,waw"));
-
-    if (prop & (1 << 2))	// none
-        SafeMpi (MPI_Info_set
-                 (info, "accumulate_ops",
-                  "same_op_no_op"));
-
-    SafeMpi (MPI_Win_set_info (window, info));
-}
-
-//NOTE assuming MPI_MODE_NOCHECK
-void WindowLock (int rank, Window & window)
-{
-    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowLock"))
-    SafeMpi (MPI_Win_lock
-             (MPI_LOCK_SHARED, rank, MPI_MODE_NOCHECK,
-              window));
-}
-
-void WindowLock (Window & window)
-{
-    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowLock"))
-    SafeMpi (MPI_Win_lock_all
-             (MPI_MODE_NOCHECK, window));
-}
-
-void WindowUnlock (int rank, Window & window)
-{
-    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowUnlock"))
-    SafeMpi (MPI_Win_unlock (rank, window));
-}
-
-void WindowUnlock (Window & window)
-{
-    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowUnlock"))
-    SafeMpi (MPI_Win_unlock_all (window));
-}
-
-// RMA Utilities
-void WindowCreate (void *baseptr, int size, Comm comm, Window & window)
-{
-    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowCreate"))
-
-    // TODO use alloc_shm
-    SafeMpi (MPI_Win_create
-             (baseptr, (MPI_Aint) size, 1, MPI_INFO_NULL,
-              comm.comm, &window));
-#ifdef EL_NO_ACC_ORDERING
-    SetWindowProp (window, NO_ACC_ORDERING);
-#endif
-}
-
-void CheckBounds (Window & window, Datatype win_type, Datatype type,
-                  size_t count, ptrdiff_t target_offset)
-{
-    int flag, type_size, win_type_size;
-    size_t displ;
-    void * dest=NULL;
-
-    SafeMpi (MPI_Type_size (type, &type_size));
-    SafeMpi (MPI_Type_size (win_type, &win_type_size));
-    Aint lb, extent;
-
-    SafeMpi (MPI_Win_get_attr(window, MPI_WIN_BASE, dest, &flag /* unused */));
-
-    /* Calculate displacement from beginning of the window */
-    if (dest == MPI_BOTTOM)
-        displ = 0;
-    else
-        displ = (size_t) ((uint8_t*)((uint8_t*)dest + target_offset * type_size) - (uint8_t*)dest);
-
-    SafeMpi (MPI_Type_get_true_extent(type, &lb, &extent));
-
-    // invalid remote address
-    assert (displ >= 0 && displ < win_type_size);
-    // transfer out of range
-    assert (displ + count*extent <= win_type_size);
-}
-
-void RmaProgress ( Comm comm )
-{
-    int flag;
-    SafeMpi (MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, 
-		comm.comm, &flag, MPI_STATUS_IGNORE));
-}
-// TODO these functions for DDT creation are 
+// DERIVED Datatype creation
+// =========================
+// FIXME these functions for DDT creation are 
 // completely untested
+#ifdef EL_USE_DERIVED_DATATYPE
 void StridedDatatype (El_strided_t* stride_descr,
 	Datatype old_type, Datatype* new_type,
 	size_t* source_dims)
@@ -647,6 +534,126 @@ void VectorDatatype (El_iov_t * vect_descr,
 		    (const int *) vect_descr->sizes,
 		    vect_descr->offsets, old_type, new_type) );
 }
+#endif // EL_USE_DERIVED_DATATYPE
+
+// MPI-3 RMA functions
+// ==================
+
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
+long ReadInc (Window & win, Aint offset, long inc, int fop_root)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::ReadInc"))
+    long otemp;			
+    SafeMpi ( MPI_Fetch_and_op (&inc, &otemp, MPI_LONG, fop_root, offset, MPI_SUM,
+	    win) );
+    SafeMpi ( MPI_Win_flush_local (fop_root, win) );
+
+    return otemp;
+}
+
+void SetWindowProp (Window & window, int prop)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::SetWindowProp"))
+    Info info;
+
+    SafeMpi (MPI_Info_create (&info));
+
+    if (prop & (1 << 0))	// strict
+        SafeMpi (MPI_Info_set
+                 (info, "accumulate_ordering",
+                  "rar,raw,war,waw"));
+
+
+    if (prop & (1 << 1))	// partial
+        SafeMpi (MPI_Info_set
+                 (info, "accumulate_ordering",
+                  "rar,waw"));
+
+    if (prop & (1 << 2))	// none
+        SafeMpi (MPI_Info_set
+                 (info, "accumulate_ops",
+                  "same_op_no_op"));
+
+    SafeMpi (MPI_Win_set_info (window, info));
+}
+
+//NOTE assuming MPI_MODE_NOCHECK
+void WindowLock (int rank, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowLock"))
+    SafeMpi (MPI_Win_lock
+             (MPI_LOCK_SHARED, rank, MPI_MODE_NOCHECK,
+              window));
+}
+
+void WindowLock (Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowLock"))
+    SafeMpi (MPI_Win_lock_all
+             (MPI_MODE_NOCHECK, window));
+}
+
+void WindowUnlock (int rank, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowUnlock"))
+    SafeMpi (MPI_Win_unlock (rank, window));
+}
+
+void WindowUnlock (Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowUnlock"))
+    SafeMpi (MPI_Win_unlock_all (window));
+}
+
+// RMA Utilities
+void WindowCreate (void *baseptr, int size, Comm comm, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowCreate"))
+
+    // TODO use alloc_shm
+    SafeMpi (MPI_Win_create
+             (baseptr, (MPI_Aint) size, 1, MPI_INFO_NULL,
+              comm.comm, &window));
+#ifdef EL_NO_ACC_ORDERING
+    SetWindowProp (window, NO_ACC_ORDERING);
+#endif
+}
+
+void CheckBounds (Window & window, Datatype win_type, Datatype type,
+                  size_t count, ptrdiff_t target_offset)
+{
+    int flag, type_size, win_type_size;
+    size_t displ;
+    void * dest=NULL;
+
+    SafeMpi (MPI_Type_size (type, &type_size));
+    SafeMpi (MPI_Type_size (win_type, &win_type_size));
+    Aint lb, extent;
+
+    SafeMpi (MPI_Win_get_attr(window, MPI_WIN_BASE, dest, &flag /* unused */));
+
+    /* Calculate displacement from beginning of the window */
+    if (dest == MPI_BOTTOM)
+        displ = 0;
+    else
+        displ = (size_t) ((uint8_t*)((uint8_t*)dest + target_offset * type_size) - (uint8_t*)dest);
+
+    SafeMpi (MPI_Type_get_true_extent(type, &lb, &extent));
+
+    // invalid remote address
+    assert (displ >= 0 && displ < win_type_size);
+    // transfer out of range
+    assert (displ + count*extent <= win_type_size);
+}
+
+#ifdef EL_EXPLICIT_PROGRESS
+void RmaProgress ( Comm comm )
+{
+    int flag;
+    SafeMpi (MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, 
+		comm.comm, &flag, MPI_STATUS_IGNORE));
+}
+#endif
 
 void WindowFree (Window & window)
 {
