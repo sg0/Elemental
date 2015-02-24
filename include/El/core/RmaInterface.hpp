@@ -16,7 +16,7 @@
 #define EL_RMAINTERFACE_HPP
 
 namespace El {
-#if MPI_VERSION>=3
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
 template<typename T>
 class RmaInterface
 {
@@ -119,6 +119,6 @@ private:
     void WaitAny(       Matrix<T>& Z );
     void WaitAny( const Matrix<T>& Z );   
 };
-#endif //MPI-3
+#endif // EL_ENABLE_RMA_AXPY
 } // namespace El
 #endif // ifndef EL_RMAINTERFACE_HPP

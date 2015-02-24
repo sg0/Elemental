@@ -15,7 +15,7 @@ http://opensource.org/licenses/BSD-2-Clause
 #include "El.hpp"
 #include <cassert>
 
-#if MPI_VERSION>=3
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
 namespace El
 {
 template<typename T>
@@ -1281,4 +1281,5 @@ void RmaInterface<T>::Detach()
 #include "El/macros/Instantiate.h"
 
 } // namespace El
-#endif
+#endif // EL_ENABLE_RMA_AXPY
+

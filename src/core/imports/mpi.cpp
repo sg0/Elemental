@@ -10,7 +10,7 @@ http://opensource.org/licenses/BSD-2-Clause
 */
 
 #include "El.hpp"
-#include <assert.h>
+#include <cassert>
 
 typedef unsigned char* UCP;
 
@@ -406,7 +406,7 @@ void Translate
 // MPI-3 RMA functions
 // ==================
 
-#if MPI_VERSION>=3
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
 long ReadInc (Window & win, Aint offset, long inc, int fop_root)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::ReadInc"))
@@ -1363,7 +1363,7 @@ void FlushLocal (Window & window)
     DEBUG_ONLY (CallStackEntry cse ("mpi::FlushLocal"))
     SafeMpi (MPI_Win_flush_local_all (window));
 }
-#endif
+#endif // EL_ENABLE_RMA_AXPY
 
 // Various utilities
 // =================
@@ -1381,7 +1381,7 @@ void Barrier (Comm comm)
     SafeMpi (MPI_Barrier (comm.comm));
 }
 
-#if MPI_VERSION>=3
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
 void IBarrier (Comm comm, Request & request)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::IBarrier"))

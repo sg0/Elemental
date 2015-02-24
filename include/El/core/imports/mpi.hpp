@@ -34,13 +34,12 @@ namespace mpi {
 // consensus instead of El strict EOM matching
 // see - Scalable communication protocols for 
 // dynamic sparse data exchange by Hoefler, et al
-#ifndef EL_USE_NONBLOCKING_CONSENSUS
-#define EL_USE_NONBLOCKING_CONSENSUS
+#ifndef EL_USE_IBARRIER_FOR_AXPY
+#define EL_USE_IBARRIER_FOR_AXPY
 #endif
 
-// Experimental MPI performance enhancers
-#ifndef EL_MPI_EXPERIMENTAL
-#define EL_MPI_EXPERIMENTAL
+#ifndef EL_ENABLE_RMA_AXPY
+#define EL_ENABLE_RMA_AXPY
 #endif
 
 // Use derived datatypes for strided
@@ -57,6 +56,15 @@ namespace mpi {
 // no acc ordering
 //#ifndef EL_NO_ACC_ORDERING
 //#define EL_NO_ACC_ORDERING
+//#endif
+
+// put/get atomicity
+//#ifndef EL_ENSURE_PUT_ATOMICITY
+//#define EL_ENSURE_PUT_ATOMICITY
+//#endif
+
+//#ifndef EL_ENSURE_GET_ATOMICITY
+//#define EL_ENSURE_GET_ATOMICITY
 //#endif
 
 #ifndef EL_INT_SAFE_CAST
@@ -240,7 +248,7 @@ void Translate
 
 // MPI-3 one-sided
 // ===============
-#if MPI_VERSION>=3
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
 // Utilities
 // ---------
 void SetWindowProp ( Window& window, int prop );
@@ -343,11 +351,11 @@ void Flush( int target_rank, Window& window );
 void Flush( Window & window );
 void FlushLocal( int target_rank, Window& window );
 void FlushLocal( Window & window );
-#endif
+#endif // EL_ENABLE_RMA_AXPY
 
 // Utilities
 void Barrier( Comm comm );
-#if MPI_VERSION>=3
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
 void IBarrier( Comm comm, Request& request );
 #endif
 void RequestFree( Request& request );
