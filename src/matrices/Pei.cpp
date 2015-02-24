@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -15,7 +15,7 @@ void Pei( Matrix<T>& P, Int n, T alpha )
 {
     DEBUG_ONLY(CallStackEntry cse("Pei"))
     Ones( P, n, n );
-    UpdateDiagonal( P, alpha );
+    ShiftDiagonal( P, alpha );
 }
 
 template<typename T>
@@ -23,7 +23,7 @@ void Pei( AbstractDistMatrix<T>& P, Int n, T alpha )
 {
     DEBUG_ONLY(CallStackEntry cse("Pei"))
     Ones( P, n, n );
-    UpdateDiagonal( P, alpha );
+    ShiftDiagonal( P, alpha );
 }
 
 template<typename T>
@@ -31,7 +31,7 @@ void Pei( AbstractBlockDistMatrix<T>& P, Int n, T alpha )
 {
     DEBUG_ONLY(CallStackEntry cse("Pei"))
     Ones( P, n, n );
-    UpdateDiagonal( P, alpha );
+    ShiftDiagonal( P, alpha );
 }
 
 #define PROTO(T) \
@@ -39,10 +39,6 @@ void Pei( AbstractBlockDistMatrix<T>& P, Int n, T alpha )
   template void Pei( AbstractDistMatrix<T>& P, Int n, T alpha ); \
   template void Pei( AbstractBlockDistMatrix<T>& P, Int n, T alpha );
 
-PROTO(Int)
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#include "El/macros/Instantiate.h"
 
 } // namespace El

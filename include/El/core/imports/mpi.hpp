@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
                       2013, Jeff Hammond
    All rights reserved.
 
@@ -12,6 +12,7 @@
 #define EL_IMPORTS_MPI_HPP
 #include <limits>
 namespace El {
+
 namespace mpi {
 
 #if defined(EL_HAVE_MPI3_NONBLOCKING_COLLECTIVES) || \
@@ -176,6 +177,9 @@ const Op BINARY_XOR = MPI_BXOR;
 // Added constant(s)
 const int MIN_COLL_MSG = 1; // minimum message size for collectives
 inline int Pad( int count ) { return std::max(count,MIN_COLL_MSG); }
+
+bool CommSameSizeAsInteger();
+bool GroupSameSizeAsInteger();
 
 // Environment routines
 void Initialize( int& argc, char**& argv );
@@ -852,6 +856,20 @@ template<> inline Datatype TypeMap<ValueIntPair<float>>()
 { return ValueIntPairType<float>(); }
 template<> inline Datatype TypeMap<ValueIntPair<double>>()
 { return ValueIntPairType<double>(); }
+
+template<typename T>
+void SparseAllToAll
+( const std::vector<T>& sendBuffer,
+  const std::vector<int>& sendCounts, 
+  const std::vector<int>& sendOffs,
+        std::vector<T>& recvBuffer,
+  const std::vector<int>& recvCounts, 
+  const std::vector<int>& recvOffs,
+        mpi::Comm comm );
+
+void VerifySendsAndRecvs
+( const std::vector<int>& sendCounts,
+  const std::vector<int>& recvCounts, mpi::Comm comm );
 
 } // mpi
 } // elem

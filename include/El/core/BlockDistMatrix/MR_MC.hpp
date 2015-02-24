@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -20,35 +20,32 @@ namespace El {
 // rows of the process grid and the rows will be distributed within columns
 // of the process grid.
 template<typename T>
-class BlockDistMatrix<T,MR,MC> : public GeneralBlockDistMatrix<T,MR,MC>
+class BlockDistMatrix<T,MR,MC> : public AbstractBlockDistMatrix<T>
 {
 public:
     // Typedefs
     // ========
     typedef AbstractBlockDistMatrix<T> absType;
-    typedef GeneralBlockDistMatrix<T,MR,MC> genType;
     typedef BlockDistMatrix<T,MR,MC> type;
 
     // Constructors and destructors
     // ============================
 
-    // Inherited constructors are part of C++11 but not yet widely supported.
-    //using GeneralDistMatrix<T,MR,MC>::GeneralDistMatrix;
-
     // Create a 0 x 0 distributed matrix with default (and unpinned) block size
-    BlockDistMatrix( const El::Grid& g=DefaultGrid(), Int root=0 );
+    BlockDistMatrix( const El::Grid& g=DefaultGrid(), int root=0 );
     // Create a 0 x 0 distributed matrix with fixed block size
     BlockDistMatrix
-    ( const El::Grid& g, Int blockHeight, Int blockWidth, Int root=0 );
+    ( const El::Grid& g, Int blockHeight, Int blockWidth, int root=0 );
     // Create a height x width distributed matrix with default block size
     BlockDistMatrix
-    ( Int height, Int width, const El::Grid& g=DefaultGrid(), Int root=0 );
+    ( Int height, Int width, const El::Grid& g=DefaultGrid(), int root=0 );
     // Create a height x width distributed matrix with fixed block size
     BlockDistMatrix
     ( Int height, Int width, const El::Grid& g,
-      Int blockHeight, Int blockWidth, Int root=0 );
+      Int blockHeight, Int blockWidth, int root=0 );
     // Create a copy of distributed matrix A (redistributing if necessary)
     BlockDistMatrix( const type& A );
+    BlockDistMatrix( const absType& A );
     template<Dist U,Dist V> BlockDistMatrix( const BlockDistMatrix<T,U,V>& A );
     template<Dist U,Dist V> BlockDistMatrix( const DistMatrix<T,U,V>& A );
     // Move constructor
@@ -56,9 +53,17 @@ public:
     // Destructor
     ~BlockDistMatrix();
 
+    BlockDistMatrix<T,MR,MC>* Construct
+    ( const El::Grid& g, int root ) const override;
+    BlockDistMatrix<T,MC,MR>* ConstructTranspose
+    ( const El::Grid& g, int root ) const override;
+    BlockDistMatrix<T,MD,STAR>* ConstructDiagonal
+    ( const El::Grid& g, int root ) const override;
+
     // Assignment and reconfiguration
     // ==============================
     template<Dist U,Dist V> type& operator=( const DistMatrix<T,U,V>& A );
+    type& operator=( const absType& A );
     type& operator=( const BlockDistMatrix<T,MC,  MR  >& A );
     type& operator=( const BlockDistMatrix<T,MC,  STAR>& A );
     type& operator=( const BlockDistMatrix<T,STAR,MR  >& A );
@@ -79,16 +84,27 @@ public:
     // Basic queries
     // =============
     El::BlockDistData DistData() const override;
-    mpi::Comm DistComm() const override;
-    mpi::Comm CrossComm() const override;
+
+    Dist ColDist()             const override;
+    Dist RowDist()             const override;
+    Dist PartialColDist()      const override;
+    Dist PartialRowDist()      const override;
+    Dist PartialUnionColDist() const override;
+    Dist PartialUnionRowDist() const override;
+    Dist CollectedColDist()    const override;
+    Dist CollectedRowDist()    const override;
+
+    mpi::Comm DistComm()      const override;
+    mpi::Comm CrossComm()     const override;
     mpi::Comm RedundantComm() const override;
-    mpi::Comm ColComm() const override;
-    mpi::Comm RowComm() const override;
-    Int ColStride() const override;
-    Int RowStride() const override;
-    Int DistSize() const override;
-    Int CrossSize() const override;
-    Int RedundantSize() const override;
+    mpi::Comm ColComm()       const override;
+    mpi::Comm RowComm()       const override;
+
+    int ColStride()     const override;
+    int RowStride()     const override;
+    int DistSize()      const override;
+    int CrossSize()     const override;
+    int RedundantSize() const override;
 
 private:
     // Friend declarations

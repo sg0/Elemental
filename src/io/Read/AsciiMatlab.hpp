@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -15,7 +15,7 @@ namespace read {
 
 template<typename T>
 inline void
-AsciiMatlab( Matrix<T>& A, const std::string filename )
+AsciiMatlab( Matrix<T>& A, const string filename )
 {
     DEBUG_ONLY(CallStackEntry cse("read::AsciiMatlab"))
     std::ifstream file( filename.c_str() );
@@ -24,9 +24,9 @@ AsciiMatlab( Matrix<T>& A, const std::string filename )
     LogicError("Not yet written");
 }
 
-template<typename T,Dist U,Dist V>
+template<typename T>
 inline void
-AsciiMatlab( DistMatrix<T,U,V>& A, const std::string filename )
+AsciiMatlab( AbstractDistMatrix<T>& A, const string filename )
 {
     DEBUG_ONLY(CallStackEntry cse("read::AsciiMatlab"))
     std::ifstream file( filename.c_str() );
@@ -35,9 +35,9 @@ AsciiMatlab( DistMatrix<T,U,V>& A, const std::string filename )
     LogicError("Not yet written");
 }
 
-template<typename T,Dist U,Dist V>
+template<typename T>
 inline void
-AsciiMatlab( BlockDistMatrix<T,U,V>& A, const std::string filename )
+AsciiMatlab( AbstractBlockDistMatrix<T>& A, const string filename )
 {
     DEBUG_ONLY(CallStackEntry cse("read::AsciiMatlab"))
     std::ifstream file( filename.c_str() );

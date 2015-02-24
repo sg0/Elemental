@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -16,8 +16,8 @@ void Ris( Matrix<F>& R, Int n )
     DEBUG_ONLY(CallStackEntry cse("Ris"))
     R.Resize( n, n );
     const F oneHalf = F(1)/F(2);
-    IndexDependentFill
-    ( R, [=]( Int i, Int j ) { return oneHalf/(F(n-i-j)-oneHalf); } );
+    auto risFill = [=]( Int i, Int j ) { return oneHalf/(F(n-i-j)-oneHalf); };
+    IndexDependentFill( R, function<F(Int,Int)>(risFill) );
 }
 
 template<typename F>
@@ -26,8 +26,8 @@ void Ris( AbstractDistMatrix<F>& R, Int n )
     DEBUG_ONLY(CallStackEntry cse("Ris"))
     R.Resize( n, n );
     const F oneHalf = F(1)/F(2);
-    IndexDependentFill
-    ( R, [=]( Int i, Int j ) { return oneHalf/(F(n-i-j)-oneHalf); } );
+    auto risFill = [=]( Int i, Int j ) { return oneHalf/(F(n-i-j)-oneHalf); };
+    IndexDependentFill( R, function<F(Int,Int)>(risFill) );
 }
 
 template<typename F>
@@ -36,8 +36,8 @@ void Ris( AbstractBlockDistMatrix<F>& R, Int n )
     DEBUG_ONLY(CallStackEntry cse("Ris"))
     R.Resize( n, n );
     const F oneHalf = F(1)/F(2);
-    IndexDependentFill
-    ( R, [=]( Int i, Int j ) { return oneHalf/(F(n-i-j)-oneHalf); } );
+    auto risFill = [=]( Int i, Int j ) { return oneHalf/(F(n-i-j)-oneHalf); };
+    IndexDependentFill( R, function<F(Int,Int)>(risFill) );
 }
 
 #define PROTO(F) \
@@ -45,9 +45,7 @@ void Ris( AbstractBlockDistMatrix<F>& R, Int n )
   template void Ris( AbstractDistMatrix<F>& R, Int n ); \
   template void Ris( AbstractBlockDistMatrix<F>& R, Int n );
 
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#define EL_NO_INT_PROTO
+#include "El/macros/Instantiate.h"
 
 } // namespace El

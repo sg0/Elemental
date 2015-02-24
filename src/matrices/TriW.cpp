@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -11,53 +11,46 @@
 namespace El {
 
 template<typename T> 
-void TriW( Matrix<T>& A, Int m, Int n, T alpha, Int k )
+void TriW( Matrix<T>& A, Int n, T alpha, Int k )
 {
     DEBUG_ONLY(CallStackEntry cse("TriW"))
     if( k < 0 )
         LogicError("Number of superdiagonals must be non-negative");
     Zeros( A, n, n );
-    SetDiagonal( A, 1 );
+    FillDiagonal( A, T(1) );
     for( Int j=0; j<Min(n-1,k); ++j ) 
-        SetDiagonal( A, alpha, j+1 );
+        FillDiagonal( A, alpha, j+1 );
 }
 
 template<typename T>
-void TriW( AbstractDistMatrix<T>& A, Int m, Int n, T alpha, Int k )
+void TriW( AbstractDistMatrix<T>& A, Int n, T alpha, Int k )
 {
     DEBUG_ONLY(CallStackEntry cse("TriW"))
     if( k < 0 )
         LogicError("Number of superdiagonals must be non-negative");
     Zeros( A, n, n );
-    SetDiagonal( A, 1 );
+    FillDiagonal( A, T(1) );
     for( Int j=0; j<Min(n-1,k); ++j )
-        SetDiagonal( A, alpha, j+1 );
+        FillDiagonal( A, alpha, j+1 );
 }
 
 template<typename T>
-void TriW( AbstractBlockDistMatrix<T>& A, Int m, Int n, T alpha, Int k )
+void TriW( AbstractBlockDistMatrix<T>& A, Int n, T alpha, Int k )
 {
     DEBUG_ONLY(CallStackEntry cse("TriW"))
     if( k < 0 )
         LogicError("Number of superdiagonals must be non-negative");
     Zeros( A, n, n );
-    SetDiagonal( A, 1 );
+    FillDiagonal( A, T(1) );
     for( Int j=0; j<Min(n-1,k); ++j )
-        SetDiagonal( A, alpha, j+1 );
+        FillDiagonal( A, alpha, j+1 );
 }
 
 #define PROTO(T) \
-  template void TriW \
-  ( Matrix<T>& A, Int m, Int n, T alpha, Int k ); \
-  template void TriW \
-  ( AbstractDistMatrix<T>& A, Int m, Int n, T alpha, Int k ); \
-  template void TriW \
-  ( AbstractBlockDistMatrix<T>& A, Int m, Int n, T alpha, Int k );
+  template void TriW( Matrix<T>& A, Int n, T alpha, Int k ); \
+  template void TriW( AbstractDistMatrix<T>& A, Int n, T alpha, Int k ); \
+  template void TriW( AbstractBlockDistMatrix<T>& A, Int n, T alpha, Int k );
 
-PROTO(Int)
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#include "El/macros/Instantiate.h"
 
 } // namespace El

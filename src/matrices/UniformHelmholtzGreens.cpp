@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -13,10 +13,10 @@ namespace El {
 // Generate the "random Green's matrix" from 
 //   A. Goetschy and S. E. Skipetrov's "Non-Hermitian Euclidean random matrix
 //   theory".
-// It is essentially the 3D Helmholtz Green's function with source and target
-// points chosen uniformly from the unit ball. The behaviour of the spectrum
-// should change dramatically dependinging upon the number of points per 
-// wavelength-cubed.
+// It is essentially the 3D Helmholtz Green's function restricted to a set
+// of points chosen uniformly from the unit ball. The behaviour of the spectrum
+// is known to change dramatically dependinging upon the number of points 
+// sampled per wavelength-cubed.
 
 template<typename Real>
 void UniformHelmholtzGreens( Matrix<Complex<Real>>& A, Int n, Real lambda )
@@ -198,7 +198,8 @@ void UniformHelmholtzGreens
   template void UniformHelmholtzGreens \
   ( AbstractBlockDistMatrix<Complex<Real>>& A, Int n, Real lambda );
 
-PROTO(float)
-PROTO(double)
+#define EL_NO_INT_PROTO
+#define EL_NO_COMPLEX_PROTO
+#include "El/macros/Instantiate.h"
 
 } // namespace El

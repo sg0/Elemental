@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -16,8 +16,8 @@ void Parter( Matrix<F>& P, Int n )
     DEBUG_ONLY(CallStackEntry cse("Parter"))
     P.Resize( n, n );
     const F oneHalf = F(1)/F(2);
-    IndexDependentFill
-    ( P, [=]( Int i, Int j ) { return F(1)/(F(i)-F(j)+oneHalf); } );
+    auto parterFill = [=]( Int i, Int j ) { return F(1)/(F(i)-F(j)+oneHalf); };
+    IndexDependentFill( P, function<F(Int,Int)>(parterFill) );
 }
 
 template<typename F>
@@ -26,8 +26,8 @@ void Parter( AbstractDistMatrix<F>& P, Int n )
     DEBUG_ONLY(CallStackEntry cse("Parter"))
     P.Resize( n, n );
     const F oneHalf = F(1)/F(2);
-    IndexDependentFill
-    ( P, [=]( Int i, Int j ) { return F(1)/(F(i)-F(j)+oneHalf); } );
+    auto parterFill = [=]( Int i, Int j ) { return F(1)/(F(i)-F(j)+oneHalf); };
+    IndexDependentFill( P, function<F(Int,Int)>(parterFill) );
 }
 
 template<typename F>
@@ -36,8 +36,8 @@ void Parter( AbstractBlockDistMatrix<F>& P, Int n )
     DEBUG_ONLY(CallStackEntry cse("Parter"))
     P.Resize( n, n );
     const F oneHalf = F(1)/F(2);
-    IndexDependentFill
-    ( P, [=]( Int i, Int j ) { return F(1)/(F(i)-F(j)+oneHalf); } );
+    auto parterFill = [=]( Int i, Int j ) { return F(1)/(F(i)-F(j)+oneHalf); };
+    IndexDependentFill( P, function<F(Int,Int)>(parterFill) );
 }
 
 #define PROTO(F) \
@@ -45,9 +45,7 @@ void Parter( AbstractBlockDistMatrix<F>& P, Int n )
   template void Parter( AbstractDistMatrix<F>& P, Int n ); \
   template void Parter( AbstractBlockDistMatrix<F>& P, Int n );
 
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#define EL_NO_INT_PROTO
+#include "El/macros/Instantiate.h"
 
 } // namespace El

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
                       2013, Jeff Hammond
    All rights reserved.
 
@@ -7,7 +7,7 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-#include "El-lite.hpp"
+#include "El.hpp"
 #ifdef EL_HAVE_QT5
  #include <QApplication>
 #endif
@@ -29,7 +29,7 @@ Int blockHeight=32, blockWidth=32;
 std::mt19937 generator;
 
 // Debugging
-DEBUG_ONLY(std::stack<std::string> callStack)
+DEBUG_ONLY(std::stack<string> callStack)
 
 // Tuning parameters for basic routines
 Int localSymvFloatBlocksize = 64;
@@ -51,6 +51,12 @@ Int localTrrkComplexDoubleBlocksize = 64;
 ColorMap colorMap=RED_BLACK_GREEN;
 Int numDiscreteColors = 15;
 #ifdef EL_HAVE_QT5
+// The command-line arguments should be passed into Qt5 in a manner which
+// ensures that they do not fall out of scope until the last Qt5 call.
+// The best way to do so is to make a copy and pass in the copy.
+int argcSave;
+char** argvSave;
+
 bool guiDisabled;
 bool elemInitializedQt = false;
 bool elemOpenedWindow = false;
@@ -64,90 +70,77 @@ double minRealWindowVal, maxRealWindowVal,
 
 namespace El {
 
-void PrintVersion( std::ostream& os )
+void PrintVersion( ostream& os )
 {
     os << "Elemental version information:\n"
        << "  Git revision: " << EL_GIT_SHA1 << "\n"
        << "  Version:      " << EL_VERSION_MAJOR << "."
                              << EL_VERSION_MINOR << "\n"
        << "  Build type:   " << EL_CMAKE_BUILD_TYPE << "\n"
-       << std::endl;
+       << endl;
 }
 
-void PrintConfig( std::ostream& os )
+void PrintConfig( ostream& os )
 {
-    os << "Elemental configuration:\n"
-       << "  Math libraries:               " << EL_MATH_LIBS << "\n"
-       << "  Have FLAME bidiagonal SVD:    " 
+    os << 
+      "Elemental configuration:\n" <<
+      "  Math libraries:               " << EL_MATH_LIBS << "\n"
 #ifdef EL_HAVE_FLA_BSVD
-       << "YES\n"
+      "  Have FLAME bidiagonal SVD:    YES\n"
 #else
-       << "NO\n"
+      "  Have FLAME bidiagonal SVD:    NO\n"
 #endif
-       << "  Have OpenMP:                  "
 #ifdef EL_HAVE_OPENMP
-       << "YES\n"
+      "  Have OpenMP:                  YES\n"
 #else
-       << "NO\n"
+      "  Have OpenMP:                  NO\n"
 #endif
-       << "  Have Qt5:                     "
 #ifdef EL_HAVE_QT5
-       << "YES\n"
+      "  Have Qt5:                     YES\n"
 #else
-       << "NO\n"
+      "  Have Qt5:                     NO\n"
 #endif
-       << "  Have F90 interface:           "
-#ifdef EL_HAVE_F90_INTERFACE
-       << "YES\n"
-#else
-       << "NO\n"
-#endif
-       << "  Avoiding complex MPI:         "
 #ifdef EL_AVOID_COMPLEX_MPI
-       << "YES\n"
+      "  Avoiding complex MPI:         YES\n"
 #else
-       << "NO\n"
+      "  Avoiding complex MPI:         NO\n"
 #endif
-       << "  Have MPI_Reducescatter_block: "
 #ifdef EL_HAVE_MPI_REDUCE_SCATTER_BLOCK
-       << "YES\n"
+      "  Have MPI_Reducescatter_block: YES\n"
 #else
-       << "NO\n"
+      "  Have MPI_Reducescatter_block: NO\n"
 #endif
-       << "  Have MPI_IN_PLACE:            "
 #ifdef EL_HAVE_MPI_IN_PLACE
-       << "YES\n"
+      "  Have MPI_IN_PLACE:            YES\n"
 #else
-       << "NO\n"
+      "  Have MPI_IN_PLACE:            NO\n"
 #endif
-       << "  AllReduce ReduceScatterBlock: "
 #ifdef EL_REDUCE_SCATTER_BLOCK_VIA_ALLREDUCE
-       << "YES\n"
+      "  AllReduce ReduceScatterBlock: YES\n"
 #else
-       << "NO\n"
+      "  AllReduce ReduceScatterBlock: NO\n"
 #endif
-       << "  Use byte Allgathers:          "
 #ifdef EL_USE_BYTE_ALLGATHERS
-       << "YES\n"
+      "  Use byte AllGathers:          YES\n"
 #else
-       << "NO\n"
+      "  Use byte AllGathers:          NO\n"
 #endif
-       << std::endl;
+       << endl;
 }
 
-void PrintCCompilerInfo( std::ostream& os )
+void PrintCCompilerInfo( ostream& os )
 {
     os << "Elemental's C compiler info:\n"
        << "  EL_CMAKE_C_COMPILER:    " << EL_CMAKE_C_COMPILER << "\n"
        << "  EL_MPI_C_COMPILER:      " << EL_MPI_C_COMPILER << "\n"
        << "  EL_MPI_C_INCLUDE_PATH:  " << EL_MPI_C_INCLUDE_PATH << "\n"
        << "  EL_MPI_C_COMPILE_FLAGS: " << EL_MPI_C_COMPILE_FLAGS << "\n"
-       << "  EL_MPI_C_LINK_FLAGS:    " << EL_MPI_C_LINK_FLAGS << "\n"
+       << "  EL_MPI_LINK_FLAGS:      " << EL_MPI_LINK_FLAGS << "\n"
        << "  EL_MPI_C_LIBRARIES:     " << EL_MPI_C_LIBRARIES << "\n"
-       << std::endl;
+       << endl;
 }
 
-void PrintCxxCompilerInfo( std::ostream& os )
+void PrintCxxCompilerInfo( ostream& os )
 {
     os << "Elemental's C++ compiler info:\n"
        << "  EL_CMAKE_CXX_COMPILER:    " << EL_CMAKE_CXX_COMPILER << "\n"
@@ -155,9 +148,18 @@ void PrintCxxCompilerInfo( std::ostream& os )
        << "  EL_MPI_CXX_COMPILER:      " << EL_MPI_CXX_COMPILER << "\n"
        << "  EL_MPI_CXX_INCLUDE_PATH:  " << EL_MPI_CXX_INCLUDE_PATH << "\n"
        << "  EL_MPI_CXX_COMPILE_FLAGS: " << EL_MPI_CXX_COMPILE_FLAGS << "\n"
-       << "  EL_MPI_CXX_LINK_FLAGS:    " << EL_MPI_CXX_LINK_FLAGS << "\n"
+       << "  EL_MPI_LINK_FLAGS:        " << EL_MPI_LINK_FLAGS << "\n"
        << "  EL_MPI_CXX_LIBRARIES:     " << EL_MPI_CXX_LIBRARIES << "\n"
-       << std::endl;
+       << endl;
+}
+
+bool Using64BitInt()
+{
+#ifdef EL_USE_64BIT_INTS
+    return true;
+#else
+    return false;
+#endif
 }
 
 void SetColorMap( ColorMap map )
@@ -214,7 +216,7 @@ double MaxImagWindowVal()
 void UpdateMinRealWindowVal( double minVal )
 {
     if( ::haveMinRealWindowVal )
-        ::minRealWindowVal = std::min( ::minRealWindowVal, minVal );
+        ::minRealWindowVal = Min( ::minRealWindowVal, minVal );
     else
         ::minRealWindowVal = minVal;
     ::haveMinRealWindowVal = true;
@@ -223,7 +225,7 @@ void UpdateMinRealWindowVal( double minVal )
 void UpdateMaxRealWindowVal( double maxVal )
 {
     if( ::haveMaxRealWindowVal )
-        ::maxRealWindowVal = std::max( ::maxRealWindowVal, maxVal );
+        ::maxRealWindowVal = Max( ::maxRealWindowVal, maxVal );
     else
         ::maxRealWindowVal = maxVal;
     ::haveMaxRealWindowVal = true;
@@ -232,7 +234,7 @@ void UpdateMaxRealWindowVal( double maxVal )
 void UpdateMinImagWindowVal( double minVal )
 {
     if( ::haveMinImagWindowVal )
-        ::minImagWindowVal = std::min( ::minImagWindowVal, minVal );
+        ::minImagWindowVal = Min( ::minImagWindowVal, minVal );
     else
         ::minImagWindowVal = minVal;
     ::haveMinImagWindowVal = true;
@@ -241,7 +243,7 @@ void UpdateMinImagWindowVal( double minVal )
 void UpdateMaxImagWindowVal( double maxVal )
 {
     if( ::haveMaxImagWindowVal )
-        ::maxImagWindowVal = std::max( ::maxImagWindowVal, maxVal );
+        ::maxImagWindowVal = Max( ::maxImagWindowVal, maxVal );
     else
         ::maxImagWindowVal = maxVal;
     ::haveMaxImagWindowVal = true;
@@ -276,8 +278,8 @@ void Initialize( int& argc, char**& argv )
         const Int commRank = mpi::Rank( mpi::COMM_WORLD );
         if( provided != mpi::THREAD_MULTIPLE && commRank == 0 )
         {
-            std::cerr << "WARNING: Could not achieve THREAD_MULTIPLE support."
-                      << std::endl;
+            cerr << "WARNING: Could not achieve THREAD_MULTIPLE support."
+                 << endl;
         }
 #else
         mpi::Initialize( argc, argv );
@@ -305,10 +307,20 @@ void Initialize( int& argc, char**& argv )
         for( int i=1; i<argc; ++i )
             if( !qstrcmp(argv[i],"-no-gui") )
                 ::guiDisabled = true;
+
+        ::argcSave = argc;
+        ::argvSave = new char*[argc+1];
+        for( int i=0; i<argc; ++i )
+        {
+            ::argvSave[i] = new char[std::strlen(argv[i])+1];
+            std::strcpy( ::argvSave[i], argv[i] );
+        }
+       ::argvSave[argc] = nullptr;
+       
         if( ::guiDisabled )
-            ::coreApp = new QCoreApplication( argc, argv );
+            ::coreApp = new QCoreApplication( ::argcSave, ::argvSave );
         else
-            ::coreApp = new QApplication( argc, argv );        
+            ::coreApp = new QApplication( ::argcSave, ::argvSave );        
         ::elemInitializedQt = true;
     }
 #endif
@@ -360,45 +372,37 @@ void Finalize()
     --::numElemInits;
 
     if( mpi::Finalized() )
-    {
-        std::cerr << "Warning: MPI was finalized before Elemental." 
-                  << std::endl;
-    }
+        cerr << "Warning: MPI was finalized before Elemental." << endl;
     if( ::numElemInits == 0 )
     {
         delete ::args;
         ::args = 0;
 
-        if( ::elemInitializedMpi )
-        {
-            // Destroy the types and ops needed for ValueInt
-            mpi::DestroyValueIntType<Int>();
-            mpi::DestroyValueIntType<float>();
-            mpi::DestroyValueIntType<double>();
-            mpi::DestroyMaxLocOp<Int>();
-            mpi::DestroyMaxLocOp<float>();
-            mpi::DestroyMaxLocOp<double>();
-            mpi::DestroyMinLocOp<Int>();
-            mpi::DestroyMinLocOp<float>();
-            mpi::DestroyMinLocOp<double>();
+        // Destroy the types and ops needed for ValueInt
+        mpi::DestroyValueIntType<Int>();
+        mpi::DestroyValueIntType<float>();
+        mpi::DestroyValueIntType<double>();
+        mpi::DestroyMaxLocOp<Int>();
+        mpi::DestroyMaxLocOp<float>();
+        mpi::DestroyMaxLocOp<double>();
+        mpi::DestroyMinLocOp<Int>();
+        mpi::DestroyMinLocOp<float>();
+        mpi::DestroyMinLocOp<double>();
 
-            // Do the same for ValueIntPair
-            mpi::DestroyValueIntPairType<Int>();
-            mpi::DestroyValueIntPairType<float>();
-            mpi::DestroyValueIntPairType<double>();
-            mpi::DestroyMaxLocPairOp<Int>();
-            mpi::DestroyMaxLocPairOp<float>();
-            mpi::DestroyMaxLocPairOp<double>();
-            mpi::DestroyMinLocPairOp<Int>();
-            mpi::DestroyMinLocPairOp<float>();
-            mpi::DestroyMinLocPairOp<double>();
+        // Do the same for ValueIntPair
+        mpi::DestroyValueIntPairType<Int>();
+        mpi::DestroyValueIntPairType<float>();
+        mpi::DestroyValueIntPairType<double>();
+        mpi::DestroyMaxLocPairOp<Int>();
+        mpi::DestroyMaxLocPairOp<float>();
+        mpi::DestroyMaxLocPairOp<double>();
+        mpi::DestroyMinLocPairOp<Int>();
+        mpi::DestroyMinLocPairOp<float>();
+        mpi::DestroyMinLocPairOp<double>();
 
-            // Delete the default grid
-            delete ::defaultGrid;
-            ::defaultGrid = 0;
-
-            mpi::Finalize();
-        }
+        // Delete the default grid
+        delete ::defaultGrid;
+        ::defaultGrid = 0;
 
 #ifdef EL_HAVE_QT5
         if( ::elemInitializedQt )
@@ -408,11 +412,17 @@ void Finalize()
             else
                 ::coreApp->exit();
             delete ::coreApp;
+
+            // Delete the copies of argc and argv
+            for( int i=0; i<::argcSave; ++i )
+                delete[] ::argvSave[i]; 
+            delete[] ::argvSave;
         }
 #endif
+        if( ::elemInitializedMpi )
+            mpi::Finalize();
 
-        delete ::defaultGrid;
-        ::defaultGrid = 0;
+
         while( ! ::blocksizeStack.empty() )
             ::blocksizeStack.pop();
     }
@@ -467,7 +477,7 @@ std::mt19937& Generator()
 // If we are not in RELEASE mode, then implement wrappers for a CallStack
 DEBUG_ONLY(
 
-    void PushCallStack( std::string s )
+    void PushCallStack( string s )
     { 
 #ifdef EL_HAVE_OPENMP
         if( omp_get_thread_num() != 0 )
@@ -485,9 +495,9 @@ DEBUG_ONLY(
         ::callStack.pop(); 
     }
 
-    void DumpCallStack( std::ostream& os )
+    void DumpCallStack( ostream& os )
     {
-        std::ostringstream msg;
+        ostringstream msg;
         while( ! ::callStack.empty() )
         {
             msg << "[" << ::callStack.size() << "]: " << ::callStack.top() 
@@ -595,5 +605,91 @@ Int LocalTrrkBlocksize<Complex<float>>()
 template<>
 Int LocalTrrkBlocksize<Complex<double>>()
 { return ::localTrrkComplexDoubleBlocksize; }
+
+template<typename T>
+bool IsSorted( const vector<T>& x )
+{
+    const Int vecLength = x.size();
+    for( Int i=1; i<vecLength; ++i )
+    {
+        if( x[i] < x[i-1] )
+            return false;
+    }
+    return true;
+}
+
+// While is_strictly_sorted exists in Boost, it does not exist in the STL (yet)
+template<typename T>
+bool IsStrictlySorted( const vector<T>& x )
+{
+    const Int vecLength = x.size();
+    for( Int i=1; i<vecLength; ++i )
+    {
+        if( x[i] <= x[i-1] )
+            return false;
+    }
+    return true;
+}
+
+void Union
+( vector<Int>& both, const vector<Int>& first, const vector<Int>& second )
+{
+    both.resize( first.size()+second.size() );
+    vector<Int>::iterator it = std::set_union
+      ( first.begin(), first.end(), second.begin(), second.end(),
+        both.begin() );
+    both.resize( Int(it-both.begin()) );
+}
+
+vector<Int>
+Union( const vector<Int>& first, const vector<Int>& second )
+{
+    vector<Int> both;
+    Union( both, first, second );
+    return both;
+}
+
+void RelativeIndices
+( vector<Int>& relInds, const vector<Int>& sub, const vector<Int>& full )
+{
+    const Int numSub = sub.size();
+    relInds.resize( numSub );
+    vector<Int>::const_iterator it = full.begin();
+    for( Int i=0; i<numSub; ++i )
+    {
+        const Int index = sub[i];
+        it = std::lower_bound( it, full.end(), index );
+        DEBUG_ONLY(
+            if( it == full.end() )
+                LogicError("Index was not found");
+        )
+        relInds[i] = Int(it-full.begin());
+    }
+}
+
+vector<Int> RelativeIndices( const vector<Int>& sub, const vector<Int>& full )
+{
+    vector<Int> relInds;
+    RelativeIndices( relInds, sub, full );
+    return relInds;
+}
+
+Int Find( const vector<Int>& sortedInds, Int index, string msg )
+{
+    DEBUG_ONLY(CallStackEntry cse("Find"))
+    vector<Int>::const_iterator vecIt;
+    vecIt = std::lower_bound( sortedInds.begin(), sortedInds.end(), index );
+    DEBUG_ONLY(
+        if( vecIt == sortedInds.end() )
+            LogicError( msg );
+    )
+    return vecIt - sortedInds.begin();
+}
+
+#define EL_NO_COMPLEX_PROTO
+#define PROTO(T) \
+  template bool IsSorted( const vector<T>& x ); \
+  template bool IsStrictlySorted( const vector<T>& x );
+#include "El/macros/Instantiate.h"
 
 } // namespace El

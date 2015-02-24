@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -15,7 +15,8 @@
 //     R = | 0    I      phi H_k |,
 //         | 0    0        I     |
 //
-// 0 < mu << 1, and phi^2 + zeta^2 = 1.
+// where H_k is the 2^k x 2^k Hadamard matrix, 0 < mu << 1, and 
+// phi^2 + zeta^2 = 1.
 //
 
 namespace El {
@@ -47,12 +48,12 @@ inline void MakeExtendedKahan
     // Start by setting A to the identity, and then modify the necessary 
     // l x l blocks of its 3 x 3 partitioning.
     MakeIdentity( A );
-    auto ABlock = View( A, 2*l, 2*l, l, l );
+    auto ABlock = A( IR(2*l,3*l), IR(2*l,3*l) );
     Scale( mu, ABlock );
-    ABlock = View( A, 0, l, l, l );
+    ABlock = A( IR(0,l), IR(l,2*l) );
     Walsh( ABlock, k );
     Scale( -phi, ABlock );
-    ABlock = View( A, l, 2*l, l, l );
+    ABlock = A( IR(l,2*l), IR(2*l,3*l) );
     Walsh( ABlock, k );
     Scale( phi, ABlock );
 
@@ -66,9 +67,9 @@ inline void MakeExtendedKahan
     }
 }
 
-template<typename F,Dist U,Dist V>
+template<typename F>
 inline void MakeExtendedKahan
-( DistMatrix<F,U,V>& A, Base<F> phi, Base<F> mu )
+( AbstractDistMatrix<F>& A, Base<F> phi, Base<F> mu )
 {
     DEBUG_ONLY(CallStackEntry cse("MakeExtendedKahan"))
     typedef Base<F> Real;
@@ -93,14 +94,16 @@ inline void MakeExtendedKahan
     // Start by setting A to the identity, and then modify the necessary 
     // l x l blocks of its 3 x 3 partitioning.
     MakeIdentity( A );
-    auto ABlock = View( A, 2*l, 2*l, l, l );
-    Scale( mu, ABlock );
-    ABlock = View( A, 0, l, l, l );
-    Walsh( ABlock, k );
-    Scale( -phi, ABlock );
-    ABlock = View( A, l, 2*l, l, l );
-    Walsh( ABlock, k );
-    Scale( phi, ABlock );
+    unique_ptr<AbstractDistMatrix<F>> 
+        ABlock( A.Construct(A.Grid(),A.Root()) );
+    View( *ABlock, A, IR(2*l,3*l), IR(2*l,3*l) );
+    Scale( mu, *ABlock );
+    View( *ABlock, A, IR(0,l), IR(l,2*l) );
+    Walsh( *ABlock, k );
+    Scale( -phi, *ABlock );
+    View( *ABlock, A, IR(l,2*l), IR(2*l,3*l) );
+    Walsh( *ABlock, k );
+    Scale( phi, *ABlock );
 
     // Now scale A by S
     const Real zeta = Sqrt(Real(1)-phi*phi);
@@ -122,8 +125,8 @@ void ExtendedKahan( Matrix<F>& A, Int k, Base<F> phi, Base<F> mu )
     MakeExtendedKahan( A, phi, mu );
 }
 
-template<typename F,Dist U,Dist V>
-void ExtendedKahan( DistMatrix<F,U,V>& A, Int k, Base<F> phi, Base<F> mu )
+template<typename F>
+void ExtendedKahan( AbstractDistMatrix<F>& A, Int k, Base<F> phi, Base<F> mu )
 {
     DEBUG_ONLY(CallStackEntry cse("ExtendedKahan"))
     const Int n = 3*(1u<<k);
@@ -131,30 +134,13 @@ void ExtendedKahan( DistMatrix<F,U,V>& A, Int k, Base<F> phi, Base<F> mu )
     MakeExtendedKahan( A, phi, mu );
 }
 
-#define PROTO_DIST(F,U,V) \
-  template void ExtendedKahan \
-  ( DistMatrix<F,U,V>& A, Int k, Base<F> phi, Base<F> mu );
-
 #define PROTO(F) \
-  template void ExtendedKahan( Matrix<F>& A, Int k, Base<F> phi, Base<F> mu ); \
-  PROTO_DIST(F,CIRC,CIRC) \
-  PROTO_DIST(F,MC,  MR  ) \
-  PROTO_DIST(F,MC,  STAR) \
-  PROTO_DIST(F,MD,  STAR) \
-  PROTO_DIST(F,MR,  MC  ) \
-  PROTO_DIST(F,MR,  STAR) \
-  PROTO_DIST(F,STAR,MC  ) \
-  PROTO_DIST(F,STAR,MD  ) \
-  PROTO_DIST(F,STAR,MR  ) \
-  PROTO_DIST(F,STAR,STAR) \
-  PROTO_DIST(F,STAR,VC  ) \
-  PROTO_DIST(F,STAR,VR  ) \
-  PROTO_DIST(F,VC,  STAR) \
-  PROTO_DIST(F,VR,  STAR)
+  template void ExtendedKahan \
+  ( Matrix<F>& A, Int k, Base<F> phi, Base<F> mu ); \
+  template void ExtendedKahan \
+  ( AbstractDistMatrix<F>& A, Int k, Base<F> phi, Base<F> mu );
 
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#define EL_NO_INT_PROTO
+#include "El/macros/Instantiate.h"
 
 } // namespace El

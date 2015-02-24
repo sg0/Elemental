@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2013, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -16,12 +16,13 @@
 #define EL_CMAKE_BUILD_TYPE "@CMAKE_BUILD_TYPE@"
 #cmakedefine EL_RELEASE
 
+#define EL_MPI_LINK_FLAGS      "@MPI_LINK_FLAGS@"
+
 /* C compiler info */
 #define EL_CMAKE_C_COMPILER    "@CMAKE_C_COMPILER@"
 #define EL_MPI_C_COMPILER      "@MPI_C_COMPILER@"
 #define EL_MPI_C_INCLUDE_PATH  "@MPI_C_INCLUDE_PATH@"
 #define EL_MPI_C_COMPILE_FLAGS "@MPI_C_COMPILE_FLAGS@"
-#define EL_MPI_C_LINK_FLAGS    "@MPI_C_LINK_FLAGS@"
 #define EL_MPI_C_LIBRARIES     "@MPI_C_LIBRARIES@"
 
 /* C++ compiler info */
@@ -30,7 +31,6 @@
 #define EL_MPI_CXX_COMPILER      "@MPI_CXX_COMPILER@"
 #define EL_MPI_CXX_INCLUDE_PATH  "@MPI_CXX_INCLUDE_PATH@"
 #define EL_MPI_CXX_COMPILE_FLAGS "@MPI_CXX_COMPILE_FLAGS@"
-#define EL_MPI_CXX_LINK_FLAGS    "@MPI_CXX_LINK_FLAGS@"
 #define EL_MPI_CXX_LIBRARIES     "@MPI_CXX_LIBRARIES@"
 
 /* Math libraries */
@@ -66,20 +66,26 @@
 #cmakedefine EL_USE_BYTE_ALLGATHERS
 #cmakedefine EL_USE_64BIT_INTS
 
+/* Sparse-direct configuration */
+#cmakedefine EL_USE_CUSTOM_ALLTOALLV
+#cmakedefine EL_BARRIER_IN_ALLTOALLV
+#cmakedefine EL_HAVE_METIS
+#cmakedefine EL_HAVE_PARMETIS
+
 /* Advanced configuration options */
 #cmakedefine EL_ZERO_INIT
 #cmakedefine EL_CACHE_WARNINGS
 #cmakedefine EL_UNALIGNED_WARNINGS
 #cmakedefine EL_VECTOR_WARNINGS
-#cmakedefine EL_POOL_MEMORY
 #cmakedefine EL_AVOID_OMP_FMA
 
-#cmakedefine EL_HAVE_VALGRIND
-#if defined(EL_HAVE_VALGRIND)
-# include <valgrind/valgrind.h>
-# define EL_RUNNING_ON_VALGRIND RUNNING_ON_VALGRIND
+#cmakedefine EL_DECLSPEC
+#ifdef EL_DECLSPEC
+# define EL_EXPORT __declspec(dllexport)
 #else
-# define EL_RUNNING_ON_VALGRIND 0
+# define EL_EXPORT
 #endif
+
+#cmakedefine EL_HAVE_VALGRIND
 
 #endif /* EL_CONFIG_H */

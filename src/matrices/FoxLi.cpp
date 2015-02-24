@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -29,7 +29,7 @@ void FoxLi( Matrix<Complex<Real>>& A, Int n, Real omega )
     }
     Matrix<Real> x, Z;
     HermitianTridiagEig( d, e, x, Z, UNSORTED );
-    auto z = LockedView( Z, 0, 0, 1, n );
+    auto z = Z( IR(0,1), IR(0,n) );
     Matrix<Real> sqrtWeights( z ), sqrtWeightsTrans;
     for( Int j=0; j<n; ++j )
         sqrtWeights.Set( 0, j, Sqrt(2)*Abs(sqrtWeights.Get(0,j)) );
@@ -54,13 +54,16 @@ void FoxLi( Matrix<Complex<Real>>& A, Int n, Real omega )
     DiagonalScale( RIGHT, NORMAL, sqrtWeightsTrans, A );
 }
 
-template<typename Real,Dist U,Dist V>
-void FoxLi( DistMatrix<Complex<Real>,U,V>& A, Int n, Real omega )
+template<typename Real>
+void FoxLi( AbstractDistMatrix<Complex<Real>>& APre, Int n, Real omega )
 {
     DEBUG_ONLY(CallStackEntry cse("FoxLi"))
     typedef Complex<Real> C;
     const Real pi = 4*Atan( Real(1) );
     const C phi = Sqrt( C(0,omega/pi) ); 
+
+    auto APtr = WriteProxy<C,MC,MR>( &APre );
+    auto& A = *APtr;
     
     // Compute Gauss quadrature points and weights
     const Grid& g = A.Grid();
@@ -76,7 +79,7 @@ void FoxLi( DistMatrix<Complex<Real>,U,V>& A, Int n, Real omega )
     DistMatrix<Real,VR,STAR> x(g);
     DistMatrix<Real,STAR,VR> Z(g);
     HermitianTridiagEig( d, e, x, Z, UNSORTED );
-    auto z = LockedView( Z, 0, 0, 1, n );
+    auto z = Z( IR(0,1), IR(0,n) );
     DistMatrix<Real,STAR,VR> sqrtWeights( z );
     for( Int jLoc=0; jLoc<sqrtWeights.LocalWidth(); ++jLoc )
         sqrtWeights.SetLocal
@@ -85,20 +88,18 @@ void FoxLi( DistMatrix<Complex<Real>,U,V>& A, Int n, Real omega )
 
     // Form the integral operator
     A.Resize( n, n );
-    const Dist UGath = GatheredDist<U>();
-    const Dist VGath = GatheredDist<V>();
-    DistMatrix<Real,U,VGath> x_U_VGath( A.Grid() );
-    DistMatrix<Real,V,UGath> x_V_UGath( A.Grid() );
-    x_U_VGath.AlignWith( A ); 
-    x_V_UGath.AlignWith( A );
-    x_U_VGath = x;
-    x_V_UGath = x;
+    DistMatrix<Real,MC,STAR> x_MC_STAR( A.Grid() );
+    DistMatrix<Real,MR,STAR> x_MR_STAR( A.Grid() );
+    x_MC_STAR.AlignWith( A ); 
+    x_MR_STAR.AlignWith( A );
+    x_MC_STAR = x;
+    x_MR_STAR = x;
     for( Int jLoc=0; jLoc<A.LocalWidth(); ++jLoc )
     {
         for( Int iLoc=0; iLoc<A.LocalHeight(); ++iLoc )
         {
-            const Real diff = x_U_VGath.GetLocal(iLoc,0)-
-                              x_V_UGath.GetLocal(jLoc,0);
+            const Real diff = x_MC_STAR.GetLocal(iLoc,0)-
+                              x_MR_STAR.GetLocal(jLoc,0);
             const Real theta = -omega*Pow(diff,2);
             const Real realPart = Cos(theta);
             const Real imagPart = Sin(theta);
@@ -113,27 +114,13 @@ void FoxLi( DistMatrix<Complex<Real>,U,V>& A, Int n, Real omega )
     DiagonalScale( RIGHT, NORMAL, sqrtWeightsTrans, A );
 }
 
-#define PROTO_DIST(Real,U,V) \
-  template void FoxLi( DistMatrix<Complex<Real>,U,V>& A, Int n, Real omega ); 
-
 #define PROTO(Real) \
   template void FoxLi( Matrix<Complex<Real>>& A, Int n, Real omega ); \
-  PROTO_DIST(Real,CIRC,CIRC) \
-  PROTO_DIST(Real,MC,  MR  ) \
-  PROTO_DIST(Real,MC,  STAR) \
-  PROTO_DIST(Real,MD,  STAR) \
-  PROTO_DIST(Real,MR,  MC  ) \
-  PROTO_DIST(Real,MR,  STAR) \
-  PROTO_DIST(Real,STAR,MC  ) \
-  PROTO_DIST(Real,STAR,MD  ) \
-  PROTO_DIST(Real,STAR,MR  ) \
-  PROTO_DIST(Real,STAR,STAR) \
-  PROTO_DIST(Real,STAR,VC  ) \
-  PROTO_DIST(Real,STAR,VR  ) \
-  PROTO_DIST(Real,VC,  STAR) \
-  PROTO_DIST(Real,VR,  STAR)
+  template void FoxLi \
+  ( AbstractDistMatrix<Complex<Real>>& A, Int n, Real omega );
 
-//PROTO(float)
-PROTO(double)
+#define EL_NO_INT_PROTO
+#define EL_NO_COMPLEX_PROTO
+#include "El/macros/Instantiate.h"
 
 } // namespace El

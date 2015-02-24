@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -57,7 +57,7 @@ main( int argc, char* argv[] )
             std::cout << std::endl;
         }
         
-        auto ASub = A.GetSubmatrix( rowInds, colInds );
+        auto ASub = GetSubmatrix( A, rowInds, colInds );
         if( display )
             Display( ASub, "ASub" );
         if( print )
@@ -68,7 +68,7 @@ main( int argc, char* argv[] )
             Display( ASub, "Scrambled ASub" );
         if( print )
             Print( ASub, "Scrambled ASub" );
-        A.SetSubmatrix( rowInds, colInds, ASub );
+        SetSubmatrix( A, rowInds, colInds, ASub );
        
         if( display )
             Display( A, "Modified Fourier matrix" );

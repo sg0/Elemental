@@ -1,0 +1,820 @@
+/*
+   Copyright (c) 2009-2015, Jack Poulson
+   All rights reserved.
+
+   This file is part of Elemental and is under the BSD 2-Clause License, 
+   which can be found in the LICENSE file in the root directory, or at 
+   http://opensource.org/licenses/BSD-2-Clause
+*/
+#include "El.hpp"
+#include "El.h"
+using namespace El;
+
+extern "C" {
+
+/* HermitianSDCCtrl */
+ElError ElHermitianSDCCtrlDefault_s( ElHermitianSDCCtrl_s* ctrl )
+{
+    ctrl->cutoff = 256;
+    ctrl->maxInnerIts = 2;
+    ctrl->maxOuterIts = 10;
+    ctrl->tol = 0;
+    ctrl->spreadFactor = 1e-6f;
+    ctrl->progress = false;
+    return EL_SUCCESS;
+}
+ElError ElHermitianSDCCtrlDefault_d( ElHermitianSDCCtrl_d* ctrl )
+{
+    ctrl->cutoff = 256;
+    ctrl->maxInnerIts = 2;
+    ctrl->maxOuterIts = 10;
+    ctrl->tol = 0;
+    ctrl->spreadFactor = 1e-6;
+    ctrl->progress = false;
+    return EL_SUCCESS;
+}
+
+/* HermitianEigSubset */
+ElError ElHermitianEigSubsetDefault_s( ElHermitianEigSubset_s* subset )
+{
+    subset->indexSubset = false;
+    subset->lowerIndex = 0;
+    subset->upperIndex = 0;
+    subset->rangeSubset = false;
+    subset->lowerBound = 0;
+    subset->upperBound = 0;
+    return EL_SUCCESS;
+}
+ElError ElHermitianEigSubsetDefault_d( ElHermitianEigSubset_d* subset )
+{
+    subset->indexSubset = false;
+    subset->lowerIndex = 0;
+    subset->upperIndex = 0;
+    subset->rangeSubset = false;
+    subset->lowerBound = 0;
+    subset->upperBound = 0;
+    return EL_SUCCESS;
+}
+
+/* HermitianEigCtrl */
+ElError ElHermitianEigCtrlDefault_s( ElHermitianEigCtrl_s* ctrl )
+{
+    ElHermitianTridiagCtrlDefault_s( &ctrl->tridiagCtrl );
+    ElHermitianSDCCtrlDefault_s( &ctrl->sdcCtrl );
+    ctrl->useSDC = false;
+    return EL_SUCCESS;
+}
+ElError ElHermitianEigCtrlDefault_d( ElHermitianEigCtrl_d* ctrl )
+{
+    ElHermitianTridiagCtrlDefault_d( &ctrl->tridiagCtrl );
+    ElHermitianSDCCtrlDefault_d( &ctrl->sdcCtrl );
+    ctrl->useSDC = false;
+    return EL_SUCCESS;
+}
+ElError ElHermitianEigCtrlDefault_c( ElHermitianEigCtrl_c* ctrl )
+{
+    ElHermitianTridiagCtrlDefault_c( &ctrl->tridiagCtrl );
+    ElHermitianSDCCtrlDefault_s( &ctrl->sdcCtrl );
+    ctrl->useSDC = false;
+    return EL_SUCCESS;
+}
+ElError ElHermitianEigCtrlDefault_z( ElHermitianEigCtrl_z* ctrl )
+{
+    ElHermitianTridiagCtrlDefault_z( &ctrl->tridiagCtrl );
+    ElHermitianSDCCtrlDefault_d( &ctrl->sdcCtrl );
+    ctrl->useSDC = false;
+    return EL_SUCCESS;
+}
+
+/* PolarCtrl */
+ElError ElPolarCtrlDefault( ElPolarCtrl* ctrl )
+{
+    ctrl->qdwh = false;
+    ctrl->colPiv = false;
+    ctrl->maxIts = 20;
+    ctrl->numIts = 0;
+    return EL_SUCCESS;
+}
+
+/* SVDCtrl */
+ElError ElSVDCtrlDefault_s( ElSVDCtrl_s* ctrl )
+{
+    ctrl->seqQR = false;
+    ctrl->valChanRatio = 1.2;
+    ctrl->fullChanRatio = 1.5;
+    ctrl->thresholded = false;
+    ctrl->relative = true;
+    ctrl->tol = 0;
+    return EL_SUCCESS;
+}
+ElError ElSVDCtrlDefault_d( ElSVDCtrl_d* ctrl )
+{
+    ctrl->seqQR = false;
+    ctrl->valChanRatio = 1.2;
+    ctrl->fullChanRatio = 1.5;
+    ctrl->thresholded = false;
+    ctrl->relative = true;
+    ctrl->tol = 0;
+    return EL_SUCCESS;
+}
+
+/* HessQRCtrl */
+ElError ElHessQRCtrlDefault( ElHessQRCtrl* ctrl )
+{
+    ctrl->distAED = false;
+    ctrl->blockHeight = DefaultBlockHeight();
+    ctrl->blockWidth = DefaultBlockWidth();
+    return EL_SUCCESS;
+}
+
+/* SDCCtrl */
+ElError ElSDCCtrlDefault_s( ElSDCCtrl_s* ctrl )
+{
+    ctrl->cutoff = 256;
+    ctrl->maxInnerIts = 2;
+    ctrl->maxOuterIts = 10;
+    ctrl->tol = 0;
+    ctrl->spreadFactor = 1e-6f;
+    ctrl->random = true;
+    ctrl->progress = false;
+    ElSignCtrlDefault_s( &ctrl->signCtrl );
+    return EL_SUCCESS;
+}
+ElError ElSDCCtrlDefault_d( ElSDCCtrl_d* ctrl )
+{
+    ctrl->cutoff = 256;
+    ctrl->maxInnerIts = 2;
+    ctrl->maxOuterIts = 10;
+    ctrl->tol = 0;
+    ctrl->spreadFactor = 1e-6;
+    ctrl->random = true;
+    ctrl->progress = false;
+    ElSignCtrlDefault_d( &ctrl->signCtrl );
+    return EL_SUCCESS;
+}
+
+/* SchurCtrl */
+ElError ElSchurCtrlDefault_s( ElSchurCtrl_s* ctrl )
+{
+    ctrl->useSDC = false;
+    ElHessQRCtrlDefault( &ctrl->qrCtrl );
+    ElSDCCtrlDefault_s( &ctrl->sdcCtrl );
+    return EL_SUCCESS; 
+}
+ElError ElSchurCtrlDefault_d( ElSchurCtrl_d* ctrl )
+{
+    ctrl->useSDC = false;
+    ElHessQRCtrlDefault( &ctrl->qrCtrl );
+    ElSDCCtrlDefault_d( &ctrl->sdcCtrl );
+    return EL_SUCCESS; 
+}
+
+ElError ElSnapshotCtrlDefault( ElSnapshotCtrl* ctrl )
+{
+    ctrl->realSize = 0;
+    ctrl->imagSize = 0;
+    ctrl->imgSaveFreq = -1;
+    ctrl->numSaveFreq = -1;
+    ctrl->imgDispFreq = -1;
+    ctrl->imgSaveCount = 0;
+    ctrl->numSaveCount = 0;
+    ctrl->imgDispCount = 0;
+    ctrl->imgBase = "ps";
+    ctrl->numBase = "ps";
+    ctrl->imgFormat = EL_PNG;
+    ctrl->numFormat = EL_ASCII_MATLAB;
+    ctrl->itCounts = true;
+    return EL_SUCCESS;
+}
+ElError ElSnapshotCtrlDestroy( const ElSnapshotCtrl* ctrl )
+{
+    delete ctrl->imgBase;
+    delete ctrl->numBase;
+    delete ctrl;
+    return EL_SUCCESS;
+}
+
+ElError ElPseudospecCtrlDefault_s( ElPseudospecCtrl_s* ctrl )
+{
+    ctrl->norm = EL_PS_TWO_NORM;
+    ctrl->blockWidth = 10;
+    ctrl->schur = true;
+    ctrl->forceComplexSchur = false;
+    ctrl->forceComplexPs = false;
+    ElSchurCtrlDefault_s( &ctrl->schurCtrl );
+    ctrl->maxIts = 200;
+    ctrl->tol = 1e-6f;
+    ctrl->deflate = true;
+    ctrl->arnoldi = true;
+    ctrl->basisSize = 10;
+    ctrl->reorthog = true;
+    ctrl->progress = false;
+    ElSnapshotCtrlDefault( &ctrl->snapCtrl );
+    return EL_SUCCESS;
+}
+ElError ElPseudospecCtrlDestroy_s( const ElPseudospecCtrl_s* ctrl )
+{
+    ElSnapshotCtrlDestroy( &ctrl->snapCtrl );
+    delete ctrl;
+    return EL_SUCCESS;
+}
+
+ElError ElPseudospecCtrlDefault_d( ElPseudospecCtrl_d* ctrl )
+{
+    ctrl->norm = EL_PS_TWO_NORM;
+    ctrl->blockWidth = 10;
+    ctrl->schur = true;
+    ctrl->forceComplexSchur = false;
+    ctrl->forceComplexPs = false;
+    ElSchurCtrlDefault_d( &ctrl->schurCtrl );
+    ctrl->maxIts = 200;
+    ctrl->tol = 1e-6;
+    ctrl->deflate = true;
+    ctrl->arnoldi = true;
+    ctrl->basisSize = 10;
+    ctrl->reorthog = true;
+    ctrl->progress = false;
+    ElSnapshotCtrlDefault( &ctrl->snapCtrl );
+    return EL_SUCCESS;
+}
+ElError ElPseudospecCtrlDestroy_d( const ElPseudospecCtrl_d* ctrl )
+{
+    ElSnapshotCtrlDestroy( &ctrl->snapCtrl );
+    delete ctrl;
+    return EL_SUCCESS;
+}
+
+#define C_PROTO_FIELD(SIG,SIGBASE,F) \
+  /* HermitianEig
+     ============ */ \
+  /* Return all eigenvalues
+     ---------------------- */ \
+  ElError ElHermitianEig_ ## SIG \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIG A, ElMatrix_ ## SIGBASE w, \
+    ElSortType sort ) \
+  { EL_TRY( HermitianEig( CReflect(uplo), *CReflect(A), *CReflect(w), \
+                          CReflect(sort) ) ) } \
+  ElError ElHermitianEigDist_ ## SIG \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE w, \
+    ElSortType sort ) \
+  { EL_TRY( HermitianEig( CReflect(uplo), *CReflect(A), *CReflect(w), \
+                          CReflect(sort) ) ) } \
+  /* Return all eigenpairs
+     --------------------- */ \
+  ElError ElHermitianEigPair_ ## SIG \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIG A, ElMatrix_ ## SIGBASE w, \
+    ElMatrix_ ## SIG Z, ElSortType sort ) \
+  { EL_TRY( HermitianEig( CReflect(uplo), *CReflect(A), *CReflect(w), \
+                          *CReflect(Z), CReflect(sort) ) ) } \
+  ElError ElHermitianEigPairDist_ ## SIG \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE w, \
+    ElDistMatrix_ ## SIG Z, ElSortType sort ) \
+  { EL_TRY( HermitianEig( CReflect(uplo), *CReflect(A), *CReflect(w), \
+                          *CReflect(Z), CReflect(sort) ) ) } \
+  /* Return a subset of eigenvalues 
+     ------------------------------ */ \
+  ElError ElHermitianEigPartial_ ## SIG \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIG A, ElMatrix_ ## SIGBASE w, \
+    ElSortType sort, ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( HermitianEig( CReflect(uplo), *CReflect(A), *CReflect(w), \
+                          CReflect(sort), CReflect(subset) ) ) } \
+  ElError ElHermitianEigPartialDist_ ## SIG \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE w, \
+    ElSortType sort, ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( HermitianEig( CReflect(uplo), *CReflect(A), *CReflect(w), \
+                          CReflect(sort), CReflect(subset) ) ) } \
+  /* Return a subset of eigenpairs
+     ----------------------------- */ \
+  ElError ElHermitianEigPairPartial_ ## SIG \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIG A, ElMatrix_ ## SIGBASE w, \
+    ElMatrix_ ## SIG Z, ElSortType sort, \
+    ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( HermitianEig( CReflect(uplo), *CReflect(A), *CReflect(w), \
+                          *CReflect(Z), CReflect(sort), CReflect(subset) ) ) } \
+  ElError ElHermitianEigPairPartialDist_ ## SIG \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE w, \
+    ElDistMatrix_ ## SIG Z, ElSortType sort, \
+    ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( HermitianEig( CReflect(uplo), *CReflect(A), *CReflect(w), \
+                          *CReflect(Z), CReflect(sort), CReflect(subset) ) ) } \
+  /* SkewHermitianEig
+     ================ */ \
+  /* Return all eigenvalues
+     ---------------------- */ \
+  ElError ElSkewHermitianEig_ ## SIG \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIG A, ElMatrix_ ## SIGBASE w, \
+    ElSortType sort ) \
+  { EL_TRY( SkewHermitianEig( CReflect(uplo), *CReflect(A), *CReflect(w), \
+                              CReflect(sort) ) ) } \
+  ElError ElSkewHermitianEigDist_ ## SIG \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE w, \
+    ElSortType sort ) \
+  { EL_TRY( SkewHermitianEig( CReflect(uplo), *CReflect(A), *CReflect(w), \
+                              CReflect(sort) ) ) } \
+  /* Return a subset of eigenvalues 
+     ------------------------------ */ \
+  ElError ElSkewHermitianEigPartial_ ## SIG \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIG A, ElMatrix_ ## SIGBASE w, \
+    ElSortType sort, ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( SkewHermitianEig( CReflect(uplo), *CReflect(A), *CReflect(w), \
+                          CReflect(sort), CReflect(subset) ) ) } \
+  ElError ElSkewHermitianEigPartialDist_ ## SIG \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE w, \
+    ElSortType sort, ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( SkewHermitianEig( CReflect(uplo), *CReflect(A), *CReflect(w), \
+                          CReflect(sort), CReflect(subset) ) ) } \
+  /* HermitianGenDefEig
+     ================== */ \
+  /* Return all eigenvalues
+     ---------------------- */ \
+  ElError ElHermitianGenDefEig_ ## SIG \
+  ( ElPencil pencil, ElUpperOrLower uplo, \
+    ElMatrix_ ## SIG A, ElMatrix_ ## SIG B, ElMatrix_ ## SIGBASE w, \
+    ElSortType sort ) \
+  { EL_TRY( HermitianGenDefEig( \
+      CReflect(pencil), CReflect(uplo), *CReflect(A), *CReflect(B), \
+      *CReflect(w), CReflect(sort) ) ) } \
+  ElError ElHermitianGenDefEigDist_ ## SIG \
+  ( ElPencil pencil, ElUpperOrLower uplo, \
+    ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIG B, \
+    ElDistMatrix_ ## SIGBASE w, ElSortType sort ) \
+  { EL_TRY( HermitianGenDefEig( \
+      CReflect(pencil), CReflect(uplo), *CReflect(A), *CReflect(B), \
+      *CReflect(w), CReflect(sort) ) ) } \
+  /* Return all eigenpairs
+     --------------------- */ \
+  ElError ElHermitianGenDefEigPair_ ## SIG \
+  ( ElPencil pencil, ElUpperOrLower uplo, \
+    ElMatrix_ ## SIG A, ElMatrix_ ## SIG B, ElMatrix_ ## SIGBASE w, \
+    ElMatrix_ ## SIG Z, ElSortType sort ) \
+  { EL_TRY( HermitianGenDefEig( \
+      CReflect(pencil), CReflect(uplo), *CReflect(A), *CReflect(B), \
+      *CReflect(w), *CReflect(Z), CReflect(sort) ) ) } \
+  ElError ElHermitianGenDefEigPairDist_ ## SIG \
+  ( ElPencil pencil, ElUpperOrLower uplo, \
+    ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIG B, \
+    ElDistMatrix_ ## SIGBASE w, ElDistMatrix_ ## SIG Z, ElSortType sort ) \
+  { EL_TRY( HermitianGenDefEig( \
+      CReflect(pencil), CReflect(uplo), *CReflect(A), *CReflect(B), \
+      *CReflect(w), *CReflect(Z), CReflect(sort) ) ) } \
+  /* Return a subset of eigenvalues 
+     ------------------------------ */ \
+  ElError ElHermitianGenDefEigPartial_ ## SIG \
+  ( ElPencil pencil, ElUpperOrLower uplo, \
+    ElMatrix_ ## SIG A, ElMatrix_ ## SIG B, ElMatrix_ ## SIGBASE w, \
+    ElSortType sort, ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( HermitianGenDefEig( \
+      CReflect(pencil), CReflect(uplo), *CReflect(A), *CReflect(B), \
+      *CReflect(w), CReflect(sort), CReflect(subset) ) ) } \
+  ElError ElHermitianGenDefEigPartialDist_ ## SIG \
+  ( ElPencil pencil, ElUpperOrLower uplo, \
+    ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIG B, \
+    ElDistMatrix_ ## SIGBASE w, ElSortType sort, \
+    ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( HermitianGenDefEig( \
+      CReflect(pencil), CReflect(uplo), *CReflect(A), *CReflect(B), \
+      *CReflect(w), CReflect(sort), CReflect(subset) ) ) } \
+  /* Return a subset of eigenpairs
+     ----------------------------- */ \
+  ElError ElHermitianGenDefEigPairPartial_ ## SIG \
+  ( ElPencil pencil, ElUpperOrLower uplo, \
+    ElMatrix_ ## SIG A, ElMatrix_ ## SIG B, \
+    ElMatrix_ ## SIGBASE w, ElMatrix_ ## SIG Z, ElSortType sort, \
+    ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( HermitianGenDefEig( \
+      CReflect(pencil), CReflect(uplo), *CReflect(A), *CReflect(B), \
+      *CReflect(w), *CReflect(Z), CReflect(sort), CReflect(subset) ) ) } \
+  ElError ElHermitianGenDefEigPairPartialDist_ ## SIG \
+  ( ElPencil pencil, ElUpperOrLower uplo, \
+    ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIG B, \
+    ElDistMatrix_ ## SIGBASE w, ElDistMatrix_ ## SIG Z, ElSortType sort, \
+    ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( HermitianGenDefEig( \
+      CReflect(pencil), CReflect(uplo), *CReflect(A), *CReflect(B), \
+      *CReflect(w), *CReflect(Z), CReflect(sort), CReflect(subset) ) ) } \
+  /* HermitianTridiagEig
+     =================== */ \
+  /* Compute all eigenvalues
+     ----------------------- */ \
+  ElError ElHermitianTridiagEig_ ## SIG \
+  ( ElMatrix_ ## SIGBASE d, ElMatrix_ ## SIG dSub, \
+    ElMatrix_ ## SIGBASE w, ElSortType sort ) \
+  { EL_TRY( HermitianTridiagEig( \
+      *CReflect(d), *CReflect(dSub), *CReflect(w), \
+      CReflect(sort) ) ) } \
+  ElError ElHermitianTridiagEigDist_ ## SIG \
+  ( ElConstDistMatrix_ ## SIGBASE d, ElConstDistMatrix_ ## SIG dSub, \
+    ElDistMatrix_ ## SIGBASE w, ElSortType sort ) \
+  { EL_TRY( HermitianTridiagEig( \
+      *CReflect(d), *CReflect(dSub), *CReflect(w), \
+      CReflect(sort) ) ) } \
+  /* Compute all eigenpairs
+     ---------------------- */ \
+  ElError ElHermitianTridiagEigPair_ ## SIG \
+  ( ElMatrix_ ## SIGBASE d, ElMatrix_ ## SIG dSub, \
+    ElMatrix_ ## SIGBASE w, ElMatrix_ ## SIG Z, ElSortType sort ) \
+  { EL_TRY( HermitianTridiagEig( \
+      *CReflect(d), *CReflect(dSub), *CReflect(w), *CReflect(Z), \
+      CReflect(sort) ) ) } \
+  ElError ElHermitianTridiagEigPairDist_ ## SIG \
+  ( ElConstDistMatrix_ ## SIGBASE d, ElConstDistMatrix_ ## SIG dSub, \
+    ElDistMatrix_ ## SIGBASE w, ElDistMatrix_ ## SIG Z, ElSortType sort ) \
+  { EL_TRY( HermitianTridiagEig( \
+      *CReflect(d), *CReflect(dSub), *CReflect(w), *CReflect(Z), \
+      CReflect(sort) ) ) } \
+  /* Compute a subset of eigenvalues
+     ------------------------------- */ \
+  ElError ElHermitianTridiagEigPartial_ ## SIG \
+  ( ElMatrix_ ## SIGBASE d, ElMatrix_ ## SIG dSub, \
+    ElMatrix_ ## SIGBASE w, \
+    ElSortType sort, ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( HermitianTridiagEig( \
+      *CReflect(d), *CReflect(dSub), *CReflect(w), \
+      CReflect(sort), CReflect(subset) ) ) } \
+  ElError ElHermitianTridiagEigPartialDist_ ## SIG \
+  ( ElConstDistMatrix_ ## SIGBASE d, ElConstDistMatrix_ ## SIG dSub, \
+    ElDistMatrix_ ## SIGBASE w, \
+    ElSortType sort, ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( HermitianTridiagEig( \
+      *CReflect(d), *CReflect(dSub), *CReflect(w), \
+      CReflect(sort), CReflect(subset) ) ) } \
+  /* Compute a subset of eigenpairs
+     ------------------------------ */ \
+  ElError ElHermitianTridiagEigPairPartial_ ## SIG \
+  ( ElMatrix_ ## SIGBASE d, ElMatrix_ ## SIG dSub, \
+    ElMatrix_ ## SIGBASE w, ElMatrix_ ## SIG Z, \
+    ElSortType sort, ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( HermitianTridiagEig( \
+      *CReflect(d), *CReflect(dSub), *CReflect(w), *CReflect(Z), \
+      CReflect(sort), CReflect(subset) ) ) } \
+  ElError ElHermitianTridiagEigPairPartialDist_ ## SIG \
+  ( ElConstDistMatrix_ ## SIGBASE d, ElConstDistMatrix_ ## SIG dSub, \
+    ElDistMatrix_ ## SIGBASE w, ElDistMatrix_ ## SIG Z, \
+    ElSortType sort, ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( HermitianTridiagEig( \
+      *CReflect(d), *CReflect(dSub), *CReflect(w), *CReflect(Z), \
+      CReflect(sort), CReflect(subset) ) ) } \
+  /* Polar decomposition
+     =================== */ \
+  /* Compute just the polar factor
+     ----------------------------- */ \
+  ElError ElPolar_ ## SIG ( ElMatrix_ ## SIG A ) \
+  { EL_TRY( Polar( *CReflect(A) ) ) } \
+  ElError ElPolarDist_ ## SIG ( ElDistMatrix_ ## SIG A ) \
+  { EL_TRY( Polar( *CReflect(A) ) ) } \
+   ElError ElHermitianPolar_ ## SIG \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIG A ) \
+  { EL_TRY( HermitianPolar( CReflect(uplo), *CReflect(A) ) ) } \
+  ElError ElHermitianPolarDist_ ## SIG \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIG A ) \
+  { EL_TRY( HermitianPolar( CReflect(uplo), *CReflect(A) ) ) } \
+  /* Compute the entire polar decomposition
+     -------------------------------------- */ \
+  ElError ElPolarDecomp_ ## SIG ( ElMatrix_ ## SIG A, ElMatrix_ ## SIG P ) \
+  { EL_TRY( Polar( *CReflect(A), *CReflect(P) ) ) } \
+  ElError ElPolarDecompDist_ ## SIG \
+  ( ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIG P ) \
+  { EL_TRY( Polar( *CReflect(A), *CReflect(P) ) ) } \
+  ElError ElHermitianPolarDecomp_ ## SIG \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIG A, ElMatrix_ ## SIG P ) \
+  { EL_TRY( HermitianPolar( CReflect(uplo), *CReflect(A), *CReflect(P) ) ) } \
+  ElError ElHermitianPolarDecompDist_ ## SIG \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIG P ) \
+  { EL_TRY( HermitianPolar( CReflect(uplo), *CReflect(A), *CReflect(P) ) ) } \
+  /* Singular Value Decomposition
+     ============================ */ \
+  /* Compute the singular values
+     --------------------------- */ \
+  ElError ElSingularValues_ ## SIG \
+  ( ElMatrix_ ## SIG A, ElMatrix_ ## SIGBASE s ) \
+  { EL_TRY( SVD( *CReflect(A), *CReflect(s) ) ) } \
+  ElError ElSingularValuesDist_ ## SIG \
+  ( ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE s ) \
+  { EL_TRY( SVD( *CReflect(A), *CReflect(s) ) ) } \
+  /* Compute the full SVD
+     -------------------- */ \
+  ElError ElSVD_ ## SIG \
+  ( ElMatrix_ ## SIG A, ElMatrix_ ## SIGBASE s, ElMatrix_ ## SIG V ) \
+  { EL_TRY( SVD( *CReflect(A), *CReflect(s), *CReflect(V) ) ) } \
+  ElError ElSVDDist_ ## SIG \
+  ( ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE s, \
+    ElDistMatrix_ ## SIG V ) \
+  { EL_TRY( SVD( *CReflect(A), *CReflect(s), *CReflect(V) ) ) } \
+  /* Hermitian Singular Value Decomposition
+     ====================================== */ \
+  /* Compute the singular values
+     --------------------------- */ \
+  ElError ElHermitianSingularValues_ ## SIG \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIG A, ElMatrix_ ## SIGBASE s ) \
+  { EL_TRY( HermitianSVD( CReflect(uplo), *CReflect(A), *CReflect(s) ) ) } \
+  ElError ElHermitianSingularValuesDist_ ## SIG \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE s ) \
+  { EL_TRY( HermitianSVD( CReflect(uplo), *CReflect(A), *CReflect(s) ) ) } \
+  /* Compute the full SVD
+     -------------------- */ \
+  ElError ElHermitianSVD_ ## SIG \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIG A, ElMatrix_ ## SIGBASE s, \
+    ElMatrix_ ## SIG U, ElMatrix_ ## SIG V ) \
+  { EL_TRY( HermitianSVD( CReflect(uplo), *CReflect(A), \
+      *CReflect(s), *CReflect(U), *CReflect(V) ) ) } \
+  ElError ElHermitianSVDDist_ ## SIG \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE s, \
+    ElDistMatrix_ ## SIG U, ElDistMatrix_ ## SIG V ) \
+  { EL_TRY( HermitianSVD( CReflect(uplo), *CReflect(A), \
+      *CReflect(s), *CReflect(U), *CReflect(V) ) ) }
+
+#define C_PROTO_COMPLEX_ONLY(SIG,SIGBASE,F) \
+  /* Schur decomposition
+     =================== */ \
+  /* Compute the eigenvalues (and possibly Schur factor) 
+     --------------------------------------------------- */ \
+  ElError ElSchur_ ## SIGBASE \
+  ( ElMatrix_ ## SIGBASE A, ElMatrix_ ## SIG w, bool fullTriangle ) \
+  { EL_TRY( Schur( *CReflect(A), *CReflect(w), fullTriangle ) ) } \
+  ElError ElSchurDist_ ## SIGBASE \
+  ( ElDistMatrix_ ## SIGBASE A, ElDistMatrix_ ## SIG w, bool fullTriangle ) \
+  { EL_TRY( Schur( *CReflect(A), *CReflect(w), fullTriangle ) ) } \
+  ElError ElSchur_ ## SIG \
+  ( ElMatrix_ ## SIG A, ElMatrix_ ## SIG w, bool fullTriangle ) \
+  { EL_TRY( Schur( *CReflect(A), *CReflect(w), fullTriangle ) ) } \
+  ElError ElSchurDist_ ## SIG \
+  ( ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIG w, bool fullTriangle ) \
+  { EL_TRY( Schur( *CReflect(A), *CReflect(w), fullTriangle ) ) } \
+  /* Compute the eigvalues and Schur vectors (and possibly Schur factor)
+     ------------------------------------------------------------------- */ \
+  ElError ElSchurDecomp_ ## SIGBASE \
+  ( ElMatrix_ ## SIGBASE A, ElMatrix_ ## SIG w, ElMatrix_ ## SIGBASE Q, \
+    bool fullTriangle ) \
+  { EL_TRY( Schur( \
+      *CReflect(A), *CReflect(w), *CReflect(Q), fullTriangle ) ) } \
+  ElError ElSchurDecompDist_ ## SIGBASE \
+  ( ElDistMatrix_ ## SIGBASE A, ElDistMatrix_ ## SIG w, \
+    ElDistMatrix_ ## SIGBASE Q, bool fullTriangle ) \
+  { EL_TRY( Schur( \
+      *CReflect(A), *CReflect(w), *CReflect(Q), fullTriangle ) ) } \
+  ElError ElSchurDecomp_ ## SIG \
+  ( ElMatrix_ ## SIG A, ElMatrix_ ## SIG w, \
+    ElMatrix_ ## SIG Q, bool fullTriangle ) \
+  { EL_TRY( Schur( \
+      *CReflect(A), *CReflect(w), *CReflect(Q), fullTriangle ) ) } \
+  ElError ElSchurDecompDist_ ## SIG \
+  ( ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIG w, \
+    ElDistMatrix_ ## SIG Q, bool fullTriangle ) \
+  { EL_TRY( Schur( *CReflect(A), *CReflect(w), *CReflect(Q), fullTriangle ) ) }\
+  /* SkewHermitianEig
+     ================ */ \
+  /* Return all eigenpairs
+     --------------------- */ \
+  ElError ElSkewHermitianEigPair_ ## SIGBASE \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIGBASE A, ElMatrix_ ## SIGBASE w, \
+    ElMatrix_ ## SIG Z, ElSortType sort ) \
+  { EL_TRY( SkewHermitianEig( \
+      CReflect(uplo), *CReflect(A), *CReflect(w), *CReflect(Z), \
+      CReflect(sort) ) ) } \
+  ElError ElSkewHermitianEigPair_ ## SIG \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIG A, ElMatrix_ ## SIGBASE w, \
+    ElMatrix_ ## SIG Z, ElSortType sort ) \
+  { EL_TRY( SkewHermitianEig( \
+      CReflect(uplo), *CReflect(A), *CReflect(w), *CReflect(Z), \
+      CReflect(sort) ) ) } \
+  ElError ElSkewHermitianEigPairDist_ ## SIGBASE \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIGBASE A, \
+    ElDistMatrix_ ## SIGBASE w, ElDistMatrix_ ## SIG Z, ElSortType sort ) \
+  { EL_TRY( SkewHermitianEig( \
+      CReflect(uplo), *CReflect(A), *CReflect(w), *CReflect(Z), \
+      CReflect(sort) ) ) } \
+  ElError ElSkewHermitianEigPairDist_ ## SIG \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE w, \
+    ElDistMatrix_ ## SIG Z, ElSortType sort ) \
+  { EL_TRY( SkewHermitianEig( \
+      CReflect(uplo), *CReflect(A), *CReflect(w), *CReflect(Z), \
+      CReflect(sort) ) ) } \
+  /* Return a subset of eigenpairs
+     ----------------------------- */ \
+  ElError ElSkewHermitianEigPairPartial_ ## SIGBASE \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIGBASE A, ElMatrix_ ## SIGBASE w, \
+    ElMatrix_ ## SIG Z, ElSortType sort, \
+    ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( SkewHermitianEig( \
+      CReflect(uplo), *CReflect(A), *CReflect(w), \
+      *CReflect(Z), CReflect(sort), CReflect(subset) ) ) } \
+  ElError ElSkewHermitianEigPairPartial_ ## SIG \
+  ( ElUpperOrLower uplo, ElMatrix_ ## SIG A, ElMatrix_ ## SIGBASE w, \
+    ElMatrix_ ## SIG Z, ElSortType sort, \
+    ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( SkewHermitianEig( \
+      CReflect(uplo), *CReflect(A), *CReflect(w), \
+      *CReflect(Z), CReflect(sort), CReflect(subset) ) ) } \
+  ElError ElSkewHermitianEigPairPartialDist_ ## SIGBASE \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIGBASE A, \
+    ElDistMatrix_ ## SIGBASE w, ElDistMatrix_ ## SIG Z, ElSortType sort, \
+    ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( SkewHermitianEig( \
+      CReflect(uplo), *CReflect(A), *CReflect(w), \
+      *CReflect(Z), CReflect(sort), CReflect(subset) ) ) } \
+  ElError ElSkewHermitianEigPairPartialDist_ ## SIG \
+  ( ElUpperOrLower uplo, ElDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE w, \
+    ElDistMatrix_ ## SIG Z, ElSortType sort, \
+    ElHermitianEigSubset_ ## SIGBASE subset ) \
+  { EL_TRY( SkewHermitianEig( \
+      CReflect(uplo), *CReflect(A), *CReflect(w), \
+      *CReflect(Z), CReflect(sort), CReflect(subset) ) ) } \
+  /* Pseudospectra
+     ============= */ \
+  /* (Pseudo-)Spectral portrait
+     -------------------------- */ \
+  ElError ElSpectralPortrait_ ## SIGBASE \
+  ( ElConstMatrix_ ## SIGBASE A, ElMatrix_ ## SIGBASE invNormMap, \
+    ElInt realSize, ElInt imagSize, ElSpectralBox_ ## SIGBASE* boxC ) \
+  { EL_TRY( \
+      SpectralBox<Base<F>> box; \
+      SpectralPortrait( *CReflect(A), *CReflect(invNormMap), \
+        realSize, imagSize, box ); \
+      *boxC = CReflect(box) ) } \
+  ElError ElSpectralPortrait_ ## SIG \
+  ( ElConstMatrix_ ## SIG A, ElMatrix_ ## SIGBASE invNormMap, \
+    ElInt realSize, ElInt imagSize, ElSpectralBox_ ## SIGBASE* boxC ) \
+  { EL_TRY( \
+      SpectralBox<Base<F>> box; \
+      SpectralPortrait( *CReflect(A), *CReflect(invNormMap), \
+        realSize, imagSize, box ); \
+      *boxC = CReflect(box) ) } \
+  ElError ElSpectralPortraitDist_ ## SIGBASE \
+  ( ElConstDistMatrix_ ## SIGBASE A, ElDistMatrix_ ## SIGBASE invNormMap, \
+    ElInt realSize, ElInt imagSize, ElSpectralBox_ ## SIGBASE* boxC ) \
+  { EL_TRY( \
+      SpectralBox<Base<F>> box; \
+      SpectralPortrait( *CReflect(A), *CReflect(invNormMap), \
+        realSize, imagSize, box ); \
+      *boxC = CReflect(box) ) } \
+  ElError ElSpectralPortraitDist_ ## SIG \
+  ( ElConstDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE invNormMap, \
+    ElInt realSize, ElInt imagSize, ElSpectralBox_ ## SIGBASE* boxC ) \
+  { EL_TRY( \
+      SpectralBox<Base<F>> box; \
+      SpectralPortrait( *CReflect(A), *CReflect(invNormMap), \
+        realSize, imagSize, box ); \
+      *boxC = CReflect(box) ) } \
+  /* Expert version */ \
+  ElError ElSpectralPortraitX_ ## SIGBASE \
+  ( ElConstMatrix_ ## SIGBASE A, ElMatrix_ ## SIGBASE invNormMap, \
+    ElInt realSize, ElInt imagSize, ElSpectralBox_ ## SIGBASE* boxC, \
+    ElPseudospecCtrl_ ## SIGBASE ctrl ) \
+  { EL_TRY( \
+      SpectralBox<Base<F>> box; \
+      SpectralPortrait( \
+        *CReflect(A), *CReflect(invNormMap), realSize, imagSize, box, \
+        CReflect(ctrl) ); \
+      *boxC = CReflect(box) ) } \
+  ElError ElSpectralPortraitX_ ## SIG \
+  ( ElConstMatrix_ ## SIG A, ElMatrix_ ## SIGBASE invNormMap, \
+    ElInt realSize, ElInt imagSize, ElSpectralBox_ ## SIGBASE* boxC, \
+    ElPseudospecCtrl_ ## SIGBASE ctrl ) \
+  { EL_TRY( \
+      SpectralBox<Base<F>> box; \
+      SpectralPortrait( \
+        *CReflect(A), *CReflect(invNormMap), realSize, imagSize, box, \
+        CReflect(ctrl) ); \
+      *boxC = CReflect(box) ) } \
+  ElError ElSpectralPortraitXDist_ ## SIGBASE \
+  ( ElConstDistMatrix_ ## SIGBASE A, ElDistMatrix_ ## SIGBASE invNormMap, \
+    ElInt realSize, ElInt imagSize, ElSpectralBox_ ## SIGBASE* boxC, \
+    ElPseudospecCtrl_ ## SIGBASE ctrl ) \
+  { EL_TRY( \
+      SpectralBox<Base<F>> box; \
+      SpectralPortrait( \
+        *CReflect(A), *CReflect(invNormMap), realSize, imagSize, box, \
+        CReflect(ctrl) ); \
+      *boxC = CReflect(box) ) } \
+  ElError ElSpectralPortraitXDist_ ## SIG \
+  ( ElConstDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE invNormMap, \
+    ElInt realSize, ElInt imagSize, ElSpectralBox_ ## SIGBASE* boxC, \
+    ElPseudospecCtrl_ ## SIGBASE ctrl ) \
+  { EL_TRY( \
+      SpectralBox<Base<F>> box; \
+      SpectralPortrait( \
+        *CReflect(A), *CReflect(invNormMap), realSize, imagSize, box, \
+        CReflect(ctrl) ); \
+      *boxC = CReflect(box) ) } \
+  /* (Pseudo-)Spectral window
+     ------------------------ */ \
+  ElError ElSpectralWindow_ ## SIGBASE \
+  ( ElConstMatrix_ ## SIGBASE A, ElMatrix_ ## SIGBASE invNormMap, \
+    CREFLECT(F) center, Base<F> realWidth, Base<F> imagWidth, \
+    ElInt realSize, ElInt imagSize ) \
+  { EL_TRY( SpectralWindow( \
+      *CReflect(A), *CReflect(invNormMap), \
+      CReflect(center), realWidth, imagWidth, realSize, imagSize ) ) } \
+  ElError ElSpectralWindow_ ## SIG \
+  ( ElConstMatrix_ ## SIG A, ElMatrix_ ## SIGBASE invNormMap, \
+    CREFLECT(F) center, Base<F> realWidth, Base<F> imagWidth, \
+    ElInt realSize, ElInt imagSize ) \
+  { EL_TRY( SpectralWindow( \
+      *CReflect(A), *CReflect(invNormMap), \
+      CReflect(center), realWidth, imagWidth, realSize, imagSize ) ) } \
+  ElError ElSpectralWindowDist_ ## SIGBASE \
+  ( ElConstDistMatrix_ ## SIGBASE A, ElDistMatrix_ ## SIGBASE invNormMap, \
+    CREFLECT(F) center, Base<F> realWidth, Base<F> imagWidth, \
+    ElInt realSize, ElInt imagSize ) \
+  { EL_TRY( SpectralWindow( \
+      *CReflect(A), *CReflect(invNormMap), \
+      CReflect(center), realWidth, imagWidth, realSize, imagSize ) ) } \
+  ElError ElSpectralWindowDist_ ## SIG \
+  ( ElConstDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE invNormMap, \
+    CREFLECT(F) center, Base<F> realWidth, Base<F> imagWidth, \
+    ElInt realSize, ElInt imagSize ) \
+  { EL_TRY( SpectralWindow( \
+      *CReflect(A), *CReflect(invNormMap), \
+      CReflect(center), realWidth, imagWidth, realSize, imagSize ) ) } \
+  /* Expert version */ \
+  ElError ElSpectralWindowX_ ## SIGBASE \
+  ( ElConstMatrix_ ## SIGBASE A, ElMatrix_ ## SIGBASE invNormMap, \
+    CREFLECT(F) center, Base<F> realWidth, Base<F> imagWidth, \
+    ElInt realSize, ElInt imagSize, ElPseudospecCtrl_ ## SIGBASE ctrl ) \
+  { EL_TRY( SpectralWindow( \
+      *CReflect(A), *CReflect(invNormMap), \
+      CReflect(center), realWidth, imagWidth, \
+      realSize, imagSize, CReflect(ctrl) ) ) } \
+  ElError ElSpectralWindowX_ ## SIG \
+  ( ElConstMatrix_ ## SIG A, ElMatrix_ ## SIGBASE invNormMap, \
+    CREFLECT(F) center, Base<F> realWidth, Base<F> imagWidth, \
+    ElInt realSize, ElInt imagSize, ElPseudospecCtrl_ ## SIGBASE ctrl ) \
+  { EL_TRY( SpectralWindow( \
+      *CReflect(A), *CReflect(invNormMap), \
+      CReflect(center), realWidth, imagWidth, \
+      realSize, imagSize, CReflect(ctrl) ) ) } \
+  ElError ElSpectralWindowXDist_ ## SIGBASE \
+  ( ElConstDistMatrix_ ## SIGBASE A, ElDistMatrix_ ## SIGBASE invNormMap, \
+    CREFLECT(F) center, Base<F> realWidth, Base<F> imagWidth, \
+    ElInt realSize, ElInt imagSize, ElPseudospecCtrl_ ## SIGBASE ctrl ) \
+  { EL_TRY( SpectralWindow( \
+      *CReflect(A), *CReflect(invNormMap), \
+      CReflect(center), realWidth, imagWidth, \
+      realSize, imagSize, CReflect(ctrl) ) ) } \
+  ElError ElSpectralWindowXDist_ ## SIG \
+  ( ElConstDistMatrix_ ## SIG A, ElDistMatrix_ ## SIGBASE invNormMap, \
+    CREFLECT(F) center, Base<F> realWidth, Base<F> imagWidth, \
+    ElInt realSize, ElInt imagSize, ElPseudospecCtrl_ ## SIGBASE ctrl ) \
+  { EL_TRY( SpectralWindow( \
+      *CReflect(A), *CReflect(invNormMap), \
+      CReflect(center), realWidth, imagWidth, \
+      realSize, imagSize, CReflect(ctrl) ) ) } \
+  /* (Pseudo-)Spectral Cloud
+     ----------------------- */ \
+  ElError ElSpectralCloud_ ## SIGBASE \
+  ( ElConstMatrix_ ## SIGBASE A, ElConstMatrix_ ## SIG shifts, \
+    ElMatrix_ ## SIGBASE invNorms ) \
+  { EL_TRY( SpectralCloud( \
+      *CReflect(A), *CReflect(shifts), *CReflect(invNorms) ) ) } \
+  ElError ElSpectralCloud_ ## SIG \
+  ( ElConstMatrix_ ## SIG A, ElConstMatrix_ ## SIG shifts, \
+    ElMatrix_ ## SIGBASE invNorms ) \
+  { EL_TRY( SpectralCloud( \
+      *CReflect(A), *CReflect(shifts), *CReflect(invNorms) ) ) } \
+  ElError ElSpectralCloudDist_ ## SIGBASE \
+  ( ElConstDistMatrix_ ## SIGBASE A, ElConstDistMatrix_ ## SIG shifts, \
+    ElDistMatrix_ ## SIGBASE invNorms ) \
+  { EL_TRY( SpectralCloud( \
+      *CReflect(A), *CReflect(shifts), *CReflect(invNorms) ) ) } \
+  ElError ElSpectralCloudDist_ ## SIG \
+  ( ElConstDistMatrix_ ## SIG A, ElConstDistMatrix_ ## SIG shifts, \
+    ElDistMatrix_ ## SIGBASE invNorms ) \
+  { EL_TRY( SpectralCloud( \
+      *CReflect(A), *CReflect(shifts), *CReflect(invNorms) ) ) } \
+  /* Expert version */ \
+  ElError ElSpectralCloudX_ ## SIGBASE \
+  ( ElConstMatrix_ ## SIGBASE A, ElConstMatrix_ ## SIG shifts, \
+    ElMatrix_ ## SIGBASE invNorms, ElPseudospecCtrl_ ## SIGBASE ctrl ) \
+  { EL_TRY( SpectralCloud( \
+      *CReflect(A), *CReflect(shifts), *CReflect(invNorms), \
+      CReflect(ctrl) ) ) } \
+  ElError ElSpectralCloudX_ ## SIG \
+  ( ElConstMatrix_ ## SIG A, ElConstMatrix_ ## SIG shifts, \
+    ElMatrix_ ## SIGBASE invNorms, ElPseudospecCtrl_ ## SIGBASE ctrl ) \
+  { EL_TRY( SpectralCloud( \
+      *CReflect(A), *CReflect(shifts), *CReflect(invNorms), \
+      CReflect(ctrl) ) ) } \
+  ElError ElSpectralCloudXDist_ ## SIGBASE \
+  ( ElConstDistMatrix_ ## SIGBASE A, ElConstDistMatrix_ ## SIG shifts, \
+    ElDistMatrix_ ## SIGBASE invNorms, ElPseudospecCtrl_ ## SIGBASE ctrl ) \
+  { EL_TRY( SpectralCloud( \
+      *CReflect(A), *CReflect(shifts), *CReflect(invNorms), \
+      CReflect(ctrl) ) ) } \
+  ElError ElSpectralCloudXDist_ ## SIG \
+  ( ElConstDistMatrix_ ## SIG A, ElConstDistMatrix_ ## SIG shifts, \
+    ElDistMatrix_ ## SIGBASE invNorms, ElPseudospecCtrl_ ## SIGBASE ctrl ) \
+  { EL_TRY( SpectralCloud( \
+      *CReflect(A), *CReflect(shifts), *CReflect(invNorms), \
+      CReflect(ctrl) ) ) }
+
+#define C_PROTO_REAL(SIG,F) \
+  C_PROTO_FIELD(SIG,SIG,F)
+
+#define C_PROTO_COMPLEX(SIG,SIGBASE,F) \
+  C_PROTO_FIELD(SIG,SIGBASE,F) \
+  C_PROTO_COMPLEX_ONLY(SIG,SIGBASE,F) \
+
+#define EL_NO_INT_PROTO
+#include "El/macros/CInstantiate.h"
+
+} // extern "C"

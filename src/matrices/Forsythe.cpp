@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -44,10 +44,6 @@ void Forsythe( AbstractBlockDistMatrix<T>& J, Int n, T alpha, T lambda )
   template void Forsythe \
   ( AbstractBlockDistMatrix<T>& J, Int n, T alpha, T lambda );
 
-PROTO(Int)
-PROTO(float) 
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#include "El/macros/Instantiate.h"
 
 } // namespace El

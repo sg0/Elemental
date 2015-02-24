@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -18,109 +18,62 @@ void Hanowa( Matrix<T>& A, Int n, T mu )
         LogicError("n must be an even integer");
     A.Resize( n, n );
     const Int m = n/2;
-    std::vector<T> d(m);
+    vector<T> d(m);
 
     for( Int j=0; j<m; ++j )
         d[j] = mu;
-    auto ABlock = View( A, 0, 0, m, m );
+    auto ABlock = A( IR(0,m), IR(0,m) );
     Diagonal( ABlock, d );
-    ABlock = View( A, m, m, m, m );
+    ABlock = A( IR(m,2*m), IR(m,2*m) );
     Diagonal( ABlock, d );
 
     for( Int j=0; j<m; ++j )
         d[j] = -(j+1);
-    ABlock = View( A, 0, m, m, m );
+    ABlock = A( IR(0,m), IR(m,2*m) );
     Diagonal( ABlock, d );
 
     for( Int j=0; j<m; ++j )
         d[j] = j+1;
-    ABlock = View( A, m, 0, m, m );
+    ABlock = A( IR(m,2*m), IR(0,m) );
     Diagonal( ABlock, d );
 }
 
-template<typename T,Dist U,Dist V>
-void Hanowa( DistMatrix<T,U,V>& A, Int n, T mu )
+template<typename T>
+void Hanowa( AbstractDistMatrix<T>& A, Int n, T mu )
 {
     DEBUG_ONLY(CallStackEntry cse("Hanowa"))
     if( n % 2 != 0 )
         LogicError("n must be an even integer");
     A.Resize( n, n );
     const Int m = n/2;
-    std::vector<T> d(m);
+    vector<T> d(m);
 
     for( Int j=0; j<m; ++j )
         d[j] = mu;
-    auto ABlock = View( A, 0, 0, m, m );
-    Diagonal( ABlock, d );
-    ABlock = View( A, m, m, m, m );
-    Diagonal( ABlock, d );
+    unique_ptr<AbstractDistMatrix<T>> 
+      ABlock( A.Construct(A.Grid(),A.Root()) );
+    View( *ABlock, A, IR(0,m), IR(0,m) );
+    Diagonal( *ABlock, d );
+    View( *ABlock, A, IR(m,2*m), IR(m,2*m) );
+    Diagonal( *ABlock, d );
 
     for( Int j=0; j<m; ++j )
         d[j] = -(j+1);
-    ABlock = View( A, 0, m, m, m );
-    Diagonal( ABlock, d );
+    View( *ABlock, A, IR(0,m), IR(m,2*m) );
+    Diagonal( *ABlock, d );
 
     for( Int j=0; j<m; ++j )
         d[j] = j+1;
-    ABlock = View( A, m, 0, m, m );
-    Diagonal( ABlock, d );
+    View( *ABlock, A, IR(m,2*m), IR(0,m) );
+    Diagonal( *ABlock, d );
 }
 
-/*
-template<typename T,Dist U,Dist V>
-void Hanowa( BlockDistMatrix<T,U,V>& A, Int n, T mu )
-{
-    DEBUG_ONLY(CallStackEntry cse("Hanowa"))
-    if( n % 2 != 0 )
-        LogicError("n must be an even integer");
-    A.Resize( n, n );
-    const Int m = n/2;
-    std::vector<T> d(m);
-
-    for( Int j=0; j<m; ++j )
-        d[j] = mu;
-    auto ABlock = View( A, 0, 0, m, m );
-    Diagonal( ABlock, d );
-    ABlock = View( A, m, m, m, m );
-    Diagonal( ABlock, d );
-
-    for( Int j=0; j<m; ++j )
-        d[j] = -(j+1);
-    ABlock = View( A, 0, m, m, m );
-    Diagonal( ABlock, d );
-
-    for( Int j=0; j<m; ++j )
-        d[j] = j+1;
-    ABlock = View( A, m, 0, m, m );
-    Diagonal( ABlock, d );
-}
-*/
-
-#define PROTO_DIST(T,U,V) \
-  template void Hanowa( DistMatrix<T,U,V>& A, Int n, T mu );
-  //template void Hanowa( BlockDistMatrix<T,U,V>& A, Int n, T mu );
+// TODO: AbstractBlockDistMatrix version
 
 #define PROTO(T) \
   template void Hanowa( Matrix<T>& A, Int n, T mu ); \
-  PROTO_DIST(T,CIRC,CIRC) \
-  PROTO_DIST(T,MC,  MR  ) \
-  PROTO_DIST(T,MC,  STAR) \
-  PROTO_DIST(T,MD,  STAR) \
-  PROTO_DIST(T,MR,  MC  ) \
-  PROTO_DIST(T,MR,  STAR) \
-  PROTO_DIST(T,STAR,MC  ) \
-  PROTO_DIST(T,STAR,MD  ) \
-  PROTO_DIST(T,STAR,MR  ) \
-  PROTO_DIST(T,STAR,STAR) \
-  PROTO_DIST(T,STAR,VC  ) \
-  PROTO_DIST(T,STAR,VR  ) \
-  PROTO_DIST(T,VC,  STAR) \
-  PROTO_DIST(T,VR,  STAR)
+  template void Hanowa( AbstractDistMatrix<T>& A, Int n, T mu );
 
-PROTO(Int)
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#include "El/macros/Instantiate.h"
 
 } // namespace El

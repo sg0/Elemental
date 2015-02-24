@@ -1,12 +1,12 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-#include "El-lite.hpp"
+#include "El.hpp"
 
 namespace {
 El::mpi::Datatype typeIntInt;
@@ -140,9 +140,9 @@ void CreateValueIntType()
 
     ValueInt<T> v;
     MPI_Aint startAddr, valueAddr, indexAddr;
-    MPI_Address( &v,       &startAddr );
-    MPI_Address( &v.value, &valueAddr );
-    MPI_Address( &v.index, &indexAddr );
+    MPI_Get_address( &v,       &startAddr );
+    MPI_Get_address( &v.value, &valueAddr );
+    MPI_Get_address( &v.index, &indexAddr );
 
     MPI_Aint displs[2];
     displs[0] = valueAddr - startAddr;
@@ -181,9 +181,9 @@ void CreateValueIntPairType()
 
     ValueIntPair<T> v;
     MPI_Aint startAddr, valueAddr, indexAddr;
-    MPI_Address( &v,        &startAddr );
-    MPI_Address( &v.value,  &valueAddr );
-    MPI_Address( v.indices, &indexAddr );
+    MPI_Get_address( &v,        &startAddr );
+    MPI_Get_address( &v.value,  &valueAddr );
+    MPI_Get_address( v.indices, &indexAddr );
 
     MPI_Aint displs[2];
     displs[0] = valueAddr - startAddr;

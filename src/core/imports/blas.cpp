@@ -1,12 +1,12 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-#include "El-lite.hpp"
+#include "El.hpp"
 
 using El::scomplex;
 using El::dcomplex;
@@ -185,12 +185,12 @@ void EL_BLAS(zhemv)
 
 void EL_BLAS(cher)
 ( const char* uplo, const int* m,
-  const scomplex* alpha,
+  const float* alpha,
   const scomplex* x, const int* incx,
         scomplex* A, const int* lda  );
 void EL_BLAS(zher)
 ( const char* uplo, const int* m,
-  const dcomplex* alpha,
+  const double* alpha,
   const dcomplex* x, const int* incx,
         dcomplex* A, const int* lda  );
 
@@ -350,7 +350,7 @@ void EL_BLAS(cher2k)
   const scomplex* alpha,
   const scomplex* A, const int* lda,
   const scomplex* B, const int* ldb,
-  const scomplex* beta,
+  const float* beta,
         scomplex* C, const int* ldc );
 void EL_BLAS(zher2k)
 ( const char* uplo, const char* trans,
@@ -358,22 +358,22 @@ void EL_BLAS(zher2k)
   const dcomplex* alpha,
   const dcomplex* A, const int* lda,
   const dcomplex* B, const int* ldb,
-  const dcomplex* beta,
+  const double* beta,
         dcomplex* C, const int* ldc );
 
 void EL_BLAS(cherk)
 ( const char* uplo, const char* trans,
   const int* n, const int* k,
-  const scomplex* alpha,
+  const float* alpha,
   const scomplex* A, const int* lda,
-  const scomplex* beta,
+  const float* beta,
         scomplex* C, const int* ldc );
 void EL_BLAS(zherk)
 ( const char* uplo, const char* trans,
   const int* n, const int* k,
-  const dcomplex* alpha,
+  const double* alpha,
   const dcomplex* A, const int* lda,
-  const dcomplex* beta,
+  const double* beta,
         dcomplex* C, const int* ldc );
 
 void EL_BLAS(ssymm)
@@ -798,12 +798,12 @@ void Her
 
 void Her
 ( char uplo, int m,
-  scomplex alpha, const scomplex* x, int incx, scomplex* A, int lda )
+  float alpha, const scomplex* x, int incx, scomplex* A, int lda )
 { EL_BLAS(cher)( &uplo, &m, &alpha, x, &incx, A, &lda ); }
 
 void Her
 ( char uplo, int m,
-  dcomplex alpha, const dcomplex* x, int incx, dcomplex* A, int lda )
+  double alpha, const dcomplex* x, int incx, dcomplex* A, int lda )
 { EL_BLAS(zher)( &uplo, &m, &alpha, x, &incx, A, &lda ); }
 
 void Her2
@@ -977,6 +977,33 @@ void Gemm
   float alpha, const float* A, int lda, const float* B, int ldb,
   float beta,        float* C, int ldc )
 {
+    DEBUG_ONLY(
+      CallStackEntry cse("blas::Gemm");
+      if( transA == 'N' )
+      {
+          if( lda < Max(m,1) )
+              LogicError("lda was too small: lda=",lda,",m=",m);
+      }
+      else
+      {
+          if( lda < Max(k,1) )
+              LogicError("lda was too small: lda=",lda,",k=",k);
+      }
+
+      if( transB == 'N' )
+      {
+          if( ldb < Max(k,1) )
+              LogicError("ldb was too small: ldb=",ldb,",k=",k);
+      }
+      else
+      {
+          if( ldb < Max(n,1) )
+              LogicError("ldb was too small: ldb=",ldb,",n=",n);
+      }
+
+      if( ldc < Max(m,1) )
+          LogicError("ldc was too small: ldc=",ldc,",m=",m);
+    )
     const char fixedTransA = ( transA == 'C' ? 'T' : transA );
     const char fixedTransB = ( transB == 'C' ? 'T' : transB );
     EL_BLAS(sgemm)
@@ -990,6 +1017,34 @@ void Gemm
   double alpha, const double* A, int lda, const double* B, int ldb,
   double beta,        double* C, int ldc )
 {
+    DEBUG_ONLY(
+      CallStackEntry cse("blas::Gemm");
+
+      if( transA == 'N' )
+      {
+          if( lda < Max(m,1) )
+              LogicError("lda was too small: lda=",lda,",m=",m);
+      }
+      else
+      {
+          if( lda < Max(k,1) )
+              LogicError("lda was too small: lda=",lda,",k=",k);
+      }      
+
+      if( transB == 'N' )
+      {
+          if( ldb < Max(k,1) )
+              LogicError("ldb was too small: ldb=",ldb,",k=",k);
+      }
+      else
+      {
+          if( ldb < Max(n,1) )
+              LogicError("ldb was too small: ldb=",ldb,",n=",n);
+      }
+
+      if( ldc < Max(m,1) )
+          LogicError("ldc was too small: ldc=",ldc,",m=",m);
+    )
     const char fixedTransA = ( transA == 'C' ? 'T' : transA );
     const char fixedTransB = ( transB == 'C' ? 'T' : transB );
     EL_BLAS(dgemm)
@@ -1002,6 +1057,34 @@ void Gemm
   scomplex alpha, const scomplex* A, int lda, const scomplex* B, int ldb,
   scomplex beta,        scomplex* C, int ldc )
 {
+    DEBUG_ONLY(
+      CallStackEntry cse("blas::Gemm");
+
+      if( transA == 'N' )
+      {
+          if( lda < Max(m,1) )
+              LogicError("lda was too small: lda=",lda,",m=",m);
+      }
+      else
+      {
+          if( lda < Max(k,1) )
+              LogicError("lda was too small: lda=",lda,",k=",k);
+      }      
+
+      if( transB == 'N' )
+      {
+          if( ldb < Max(k,1) )
+              LogicError("ldb was too small: ldb=",ldb,",k=",k);
+      }
+      else
+      {
+          if( ldb < Max(n,1) )
+              LogicError("ldb was too small: ldb=",ldb,",n=",n);
+      }
+
+      if( ldc < Max(m,1) )
+          LogicError("ldc was too small: ldc=",ldc,",m=",m);
+    )
     EL_BLAS(cgemm)
     ( &transA, &transB, &m, &n, &k,
       &alpha, A, &lda, B, &ldb, &beta, C, &ldc );
@@ -1012,6 +1095,34 @@ void Gemm
   dcomplex alpha, const dcomplex* A, int lda, const dcomplex* B, int ldb,
   dcomplex beta,        dcomplex* C, int ldc )
 {
+    DEBUG_ONLY(
+      CallStackEntry cse("blas::Gemm");
+
+      if( transA == 'N' )
+      {
+          if( lda < Max(m,1) )
+              LogicError("lda was too small: lda=",lda,",m=",m);
+      }
+      else
+      {
+          if( lda < Max(k,1) )
+              LogicError("lda was too small: lda=",lda,",k=",k);
+      }      
+
+      if( transB == 'N' )
+      {
+          if( ldb < Max(k,1) )
+              LogicError("ldb was too small: ldb=",ldb,",k=",k);
+      }
+      else
+      {
+          if( ldb < Max(n,1) )
+              LogicError("ldb was too small: ldb=",ldb,",n=",n);
+      }
+
+      if( ldc < Max(m,1) )
+          LogicError("ldc was too small: ldc=",ldc,",m=",m);
+    )
     EL_BLAS(zgemm)
     ( &transA, &transB, &m, &n, &k,
       &alpha, A, &lda, B, &ldb, &beta, C, &ldc );
@@ -1080,7 +1191,7 @@ void Her2k
 void Her2k
 ( char uplo, char trans, int n, int k,
   scomplex alpha, const scomplex* A, int lda, const scomplex* B, int ldb,
-  scomplex beta,        scomplex* C, int ldc )
+  float beta,           scomplex* C, int ldc )
 {
     EL_BLAS(cher2k)
     ( &uplo, &trans, &n, &k, &alpha, A, &lda, B, &ldb, &beta, C, &ldc );
@@ -1089,7 +1200,7 @@ void Her2k
 void Her2k
 ( char uplo, char trans, int n, int k,
   dcomplex alpha, const dcomplex* A, int lda, const dcomplex* B, int ldb,
-  dcomplex beta,        dcomplex* C, int ldc )
+  double beta,          dcomplex* C, int ldc )
 {
     EL_BLAS(zher2k)
     ( &uplo, &trans, &n, &k, &alpha, A, &lda, B, &ldb, &beta, C, &ldc );
@@ -1117,14 +1228,14 @@ void Herk
 
 void Herk
 ( char uplo, char trans, int n, int k,
-  scomplex alpha, const scomplex* A, int lda,
-  scomplex beta,        scomplex* C, int ldc )
+  float alpha, const scomplex* A, int lda,
+  float beta,        scomplex* C, int ldc )
 { EL_BLAS(cherk)( &uplo, &trans, &n, &k, &alpha, A, &lda, &beta, C, &ldc ); }
 
 void Herk
 ( char uplo, char trans, int n, int k,
-  dcomplex alpha, const dcomplex* A, int lda,
-  dcomplex beta,        dcomplex* C, int ldc )
+  double alpha, const dcomplex* A, int lda,
+  double beta,        dcomplex* C, int ldc )
 { EL_BLAS(zherk)( &uplo, &trans, &n, &k, &alpha, A, &lda, &beta, C, &ldc ); }
 
 void Symm

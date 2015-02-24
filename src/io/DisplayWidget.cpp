@@ -1,13 +1,12 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-#include "El-lite.hpp"
-#include "El/io.hpp"
+#include "El.hpp"
 
 #ifdef EL_HAVE_QT5
 
@@ -54,8 +53,8 @@ void DisplayWidget<T>::DisplayReal( const Matrix<T>* A )
     {
         for( Int i=0; i<m; ++i )
         {
-            minVal = std::min( minVal, A->GetRealPart(i,j) );
-            maxVal = std::max( maxVal, A->GetRealPart(i,j) );
+            minVal = Min( minVal, A->GetRealPart(i,j) );
+            maxVal = Max( maxVal, A->GetRealPart(i,j) );
         }
     }
 
@@ -120,8 +119,8 @@ void DisplayWidget<T>::DisplayImag( const Matrix<T>* A )
     {
         for( Int i=0; i<m; ++i )
         {
-            minVal = std::min( minVal, A->GetImagPart(i,j) );
-            maxVal = std::max( maxVal, A->GetImagPart(i,j) );
+            minVal = Min( minVal, A->GetImagPart(i,j) );
+            maxVal = Max( maxVal, A->GetImagPart(i,j) );
         }
     }
 
@@ -170,29 +169,17 @@ void DisplayWidget<T>::DisplayImag
 }
 
 template<typename T>
-void DisplayWidget<T>::SavePng( std::string basename ) const
+void DisplayWidget<T>::SavePng( string basename ) const
 {
     DEBUG_ONLY(CallStackEntry cse("DisplayWidget::SavePng"))
-    std::string filename = basename + ".png";
+    string filename = basename + ".png";
     QFile file( filename.c_str() );
     file.open( QIODevice::WriteOnly );
     pixmap_.save( &file, "PNG" );
 }
 
-#define PROTO(T) template class DisplayWidget<T>
-
-PROTO(Int);
-#ifndef EL_DISABLE_FLOAT
-PROTO(float);
-#ifndef EL_DISABLE_COMPLEX
-PROTO(Complex<float>);
-#endif // ifndef EL_DISABLE_COMPLEX
-#endif // ifndef EL_DISABLE_FLOAT
-
-PROTO(double);
-#ifndef EL_DISABLE_COMPLEX
-PROTO(Complex<double>);
-#endif // ifndef EL_DISABLE_COMPLEX
+#define PROTO(T) template class DisplayWidget<T>;
+#include "El/macros/Instantiate.h"
 
 } // namespace El
 

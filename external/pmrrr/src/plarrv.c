@@ -49,13 +49,13 @@
 #include <pthread.h>
 #include "mpi.h"
 #include "pmrrr.h"
-#include "plarrv.h"
-#include "process_task.h"
-#include "global.h"
-#include "rrr.h"
-#include "queue.h"
-#include "structs.h"
-#include "counter.h"
+#include "pmrrr/plarrv.h"
+#include "pmrrr/process_task.h"
+#include "pmrrr/global.h"
+#include "pmrrr/rrr.h"
+#include "pmrrr/queue.h"
+#include "pmrrr/structs.h"
+#include "pmrrr/counter.h"
 
 
 static int assign_to_proc(proc_t *procinfo, in_t *Dstruct,
@@ -84,7 +84,6 @@ int plarrv(proc_t *procinfo, in_t *Dstruct, val_t *Wstruct,
 	   int *myfirstp)
 {
   /* Input variables */
-  int            pid     = procinfo->pid;
   int            nthreads = procinfo->nthreads;
   int            n        = Dstruct->n;
   double         *W       = Wstruct->W;

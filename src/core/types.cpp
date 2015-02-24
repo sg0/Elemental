@@ -1,12 +1,12 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-#include "El-lite.hpp"
+#include "El.hpp"
 
 namespace El {
 
@@ -22,12 +22,13 @@ std::string DistToString( Dist dist )
     std::string distString;
     switch( dist )
     {
-        case MC: distString = "MC"; break;
-        case MD: distString = "MD"; break;
-        case MR: distString = "MR"; break;
-        case VC: distString = "VC"; break;
-        case VR: distString = "VR"; break;
-        default: distString = "* "; break;
+        case CIRC: distString = "o "; break;
+        case MC:   distString = "MC";   break;
+        case MD:   distString = "MD";   break;
+        case MR:   distString = "MR";   break;
+        case VC:   distString = "VC";   break;
+        case VR:   distString = "VR";   break;
+        default:   distString = "* ";   break;
     }
     return distString;
 }
@@ -49,6 +50,8 @@ Dist StringToDist( std::string s )
         dist = VR;
     else if( s == "* " || s == " *" || s == "*" )
         dist = STAR;
+    else if( s == "o " || s == " o" || s == "o" )
+        dist = CIRC;
     else
         LogicError
         ("StringToDist expects string in "

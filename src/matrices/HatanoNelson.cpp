@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -20,88 +20,52 @@ void HatanoNelson
     if( n < 3 )
         LogicError("Hatano Nelson requires at least a 3x3 matrix");
     Zeros( A, n, n );
-    auto d = A.GetDiagonal();
-    MakeUniform( d, center, radius );
-    A.SetDiagonal( d );
-    SetDiagonal( A, Exp(g),   1 );
-    SetDiagonal( A, Exp(-g), -1 );
+
+    Matrix<F> d;
+    Uniform( d, n, 1, center, radius );
+    SetDiagonal( A, d );
+
+    FillDiagonal( A, Exp(g), 1 );
     if( periodic )
-    {
-        A.Set( 0,   n-1, Exp(-g) );
-        A.Set( n-1, 0,   Exp( g) );
-    }
+        A.Set( n-1, 0, Exp(g) );
+
+    FillDiagonal( A, Exp(-g), -1 );
+    if( periodic )
+        A.Set( 0, n-1, Exp(-g) );
 }
 
-template<typename F,Dist U,Dist V>
+template<typename F>
 void HatanoNelson
-( DistMatrix<F,U,V>& A, Int n, F center, Base<F> radius, F g, bool periodic )
+( AbstractDistMatrix<F>& A, Int n, 
+  F center, Base<F> radius, F g, bool periodic )
 {
     DEBUG_ONLY(CallStackEntry cse("HatanoNelson"))
     if( n < 3 )
         LogicError("Hatano Nelson requires at least a 3x3 matrix");
-    Zeros( A, n, n );
-    auto d = A.GetDiagonal();
-    MakeUniform( d, center, radius );
-    A.SetDiagonal( d );
-    SetDiagonal( A, Exp(g),   1 );
-    SetDiagonal( A, Exp(-g), -1 );
-    if( periodic )
-    {
-        A.Set( 0,   n-1, Exp(-g) );
-        A.Set( n-1, 0,   Exp( g) );
-    }
-}
 
-template<typename F,Dist U,Dist V>
-void HatanoNelson
-( BlockDistMatrix<F,U,V>& A, Int n, F center, Base<F> radius, F g, 
-  bool periodic )
-{
-    DEBUG_ONLY(CallStackEntry cse("HatanoNelson"))
-    if( n < 3 )
-        LogicError("Hatano Nelson requires at least a 3x3 matrix");
     Zeros( A, n, n );
-    auto d = A.GetDiagonal();
-    MakeUniform( d, center, radius );
-    A.SetDiagonal( d );
-    SetDiagonal( A, Exp(g),   1 );
-    SetDiagonal( A, Exp(-g), -1 );
-    if( periodic )
-    {
-        A.Set( 0,   n-1, Exp(-g) );
-        A.Set( n-1, 0,   Exp( g) );
-    }
-}
 
-#define PROTO_DIST(F,U,V) \
-  template void HatanoNelson \
-  ( DistMatrix<F,U,V>& A, Int n, F center, Base<F> radius, F g, \
-    bool periodic ); \
-  template void HatanoNelson \
-  ( BlockDistMatrix<F,U,V>& A, Int n, F center, Base<F> radius, F g, \
-    bool periodic ); 
+    DistMatrix<F,MC,STAR> d(A.Grid());
+    Uniform( d, n, 1, center, radius );
+    SetDiagonal( A, d );
+
+    FillDiagonal( A, Exp(g), 1 );
+    if( periodic )
+        A.Set( n-1, 0, Exp(g) );
+
+    FillDiagonal( A, Exp(-g), -1 );
+    if( periodic )
+        A.Set( 0, n-1, Exp(-g) );
+}
 
 #define PROTO(F) \
   template void HatanoNelson \
   ( Matrix<F>& A, Int n, F center, Base<F> radius, F g, bool periodic ); \
-  PROTO_DIST(F,CIRC,CIRC) \
-  PROTO_DIST(F,MC,  MR  ) \
-  PROTO_DIST(F,MC,  STAR) \
-  PROTO_DIST(F,MD,  STAR) \
-  PROTO_DIST(F,MR,  MC  ) \
-  PROTO_DIST(F,MR,  STAR) \
-  PROTO_DIST(F,STAR,MC  ) \
-  PROTO_DIST(F,STAR,MD  ) \
-  PROTO_DIST(F,STAR,MR  ) \
-  PROTO_DIST(F,STAR,STAR) \
-  PROTO_DIST(F,STAR,VC  ) \
-  PROTO_DIST(F,STAR,VR  ) \
-  PROTO_DIST(F,VC,  STAR) \
-  PROTO_DIST(F,VR,  STAR)
+  template void HatanoNelson \
+  ( AbstractDistMatrix<F>& A, Int n, \
+    F center, Base<F> radius, F g, bool periodic );
 
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#define EL_NO_INT_PROTO
+#include "El/macros/Instantiate.h"
 
 } // namespace El

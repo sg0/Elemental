@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -28,7 +28,7 @@ public:
     void DisplayImag( const Matrix<T>* A, Base<T> minVal, Base<T> maxVal );
     // TODO: Add colorbar
 
-    void SavePng( std::string basename ) const;
+    void SavePng( string basename ) const;
 
 protected:
     void paintEvent( QPaintEvent* event );

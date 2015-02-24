@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    Copyright (c) 2011, The University of Texas at Austin
    All rights reserved.
 
@@ -11,11 +11,11 @@
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-#include "El-lite.hpp"
+#include "El.hpp"
 
 namespace El
 {
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
 #else  
   template < typename T > bool AxpyInterface < T >::Finished ()
   {
@@ -286,20 +286,16 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, DistMatrix<T>& Z )
 
     const Int p = Z.Grid().Size();
     
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
 #else
     sentEomTo_.resize( p, false );
     haveEomFrom_.resize( p, false );
+    eomSendRequests_.resize( p );
 #endif
 
     sendingData_.resize( p );
     sendingRequest_.resize( p );
     sendingReply_.resize( p );
-
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-#else
-    eomSendRequests_.resize( p );
-#endif
 
     dataSendRequests_.resize( p );
     requestSendRequests_.resize( p );
@@ -329,20 +325,16 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
 
     const Int p = X.Grid ().Size ();
 
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
 #else
     sentEomTo_.resize (p, false);
     haveEomFrom_.resize (p, false);
+    eomSendRequests_.resize (p);
 #endif
 
     sendingData_.resize (p);
     sendingRequest_.resize (p);
     sendingReply_.resize (p);
-
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-#else
-    eomSendRequests_.resize (p);
-#endif
 
     dataSendRequests_.resize (p);
     requestSendRequests_.resize (p);
@@ -401,22 +393,18 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
       }
     const Int p = Z.Grid ().Size ();
 
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
 #else
-    // eom
     sentEomTo_.resize (p, false);
     haveEomFrom_.resize (p, false);
+    eomSendRequests_.resize (p);
 #endif    
+    
     // request objects
     sendingRequest_.resize (p);
     sendingData_.resize (p);
     sendingReply_.resize (p);
 
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-#else   
-    eomSendRequests_.resize (p);
-#endif     
-  
     // ready-to-send 
     requestSendRequests_.resize (p);
     replySendRequests_.resize (p);
@@ -446,22 +434,18 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
       }
     const Int p = X.Grid ().Size ();
 
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
 #else 
     // eom   
     sentEomTo_.resize (p, false);
     haveEomFrom_.resize (p, false);
+    eomSendRequests_.resize (p);
 #endif
 
     // ready-to-send 
     sendingRequest_.resize (p);
     sendingData_.resize (p);
     sendingReply_.resize (p);
-
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-#else    
-    eomSendRequests_.resize (p);
-#endif
 
     // ready-to-send 
     requestSendRequests_.resize (p);
@@ -710,7 +694,7 @@ AxpyInterface<T>::AxpyInterface( AxpyType type, const DistMatrix<T>& X )
     return numCreated;
   }
  
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
 template < typename T > bool AxpyInterface < T >::ReturnRequestStatuses ()
   {
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::ReturnRequestStatuses"))
@@ -776,34 +760,34 @@ template < typename T > bool AxpyInterface < T >::ReturnRequestStatuses ()
 #endif
 
 template < typename T > void AxpyInterface < T >::Detach ()
-  {
+{
     DEBUG_ONLY (CallStackEntry cse ("AxpyInterface::Detach"))
-      if (!attachedForLocalToGlobal_ && !attachedForGlobalToLocal_)
-	  LogicError ("Must attach before detaching.");
-    
+	if (!attachedForLocalToGlobal_ && !attachedForGlobalToLocal_)
+	    LogicError ("Must attach before detaching.");
+
     const Grid & g = (attachedForLocalToGlobal_ ?
 	    localToGlobalMat_->Grid () : globalToLocalMat_->
 	    Grid ());
-    const Int me = g.VCRank ();
 
-    if (attachedForLocalToGlobal_)
-    {
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-	bool DONE = false;
-	mpi::Request nb_bar_request;
-	bool nb_bar_active = false;
-	
-	while (!DONE)
+    // nonblocking consensus
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
+    bool DONE = false;
+    mpi::Request nb_bar_request;
+    bool nb_bar_active = false;
+
+    while( !DONE )
+#else
+    while( !Finished() )
+#endif
 	{
-	    // probes for incoming message and
-	    // receive
-	    HandleLocalToGlobalData ();
-	    
+	    if( attachedForLocalToGlobal_ )
+		HandleLocalToGlobalData();
+	    else
+		HandleGlobalToLocalRequest();
+
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
 	    if (nb_bar_active)
-	    {
-		// test/wait for IBarrier completion
 		DONE = mpi::Test (nb_bar_request);
-	    }
 	    else
 	    {
 		if ( ReturnRequestStatuses() )
@@ -813,66 +797,24 @@ template < typename T > void AxpyInterface < T >::Detach ()
 		    nb_bar_active = true;
 		}
 	    }
-	}
-	mpi::Barrier (g.VCComm ());
 #else
-            while (!Finished ())
-            {
-                    HandleLocalToGlobalData ();
-                    HandleEoms ();
-            }
-            mpi::Barrier (g.VCComm ());
+	    HandleEoms();
 #endif
-    }
-    else
-    {
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-	bool DONE = false;
-	mpi::Request nb_bar_request;
-	bool nb_bar_active = false;
-	
-	while ( !DONE )
-	{
-	    // probes for incoming request message 
-	    // and sends
-	    HandleGlobalToLocalRequest ();
-	    
-	    if (nb_bar_active)
-	    {
-		// test/wait for IBarrier completion
-		DONE = mpi::Test (nb_bar_request);
-	    }
-	    else
-	    {
-		if ( ReturnRequestStatuses() )
-		{
-		    // all ssends are complete, start nonblocking barrier
-		    mpi::IBarrier (g.VCComm (), nb_bar_request);
-		    nb_bar_active = true;
-		}
-	    }
 	}
-	mpi::Barrier (g.VCComm ());
-#else
-            while (!Finished ())
-            {
-                    HandleGlobalToLocalRequest ();
-                    HandleEoms ();
-            }
-            mpi::Barrier (g.VCComm ());
-#endif
-    }
-             
+
+    mpi::Barrier (g.VCComm ());
+
     attachedForLocalToGlobal_ = false;
     attachedForGlobalToLocal_ = false;
     recvVector_.clear();
-    
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
 #else
     sentEomTo_.clear();
     haveEomFrom_.clear();
+    eomSendRequests_.clear();
 #endif
-     
+
     sendingData_.clear();
     sendingRequest_.clear();
     sendingReply_.clear();
@@ -880,20 +822,13 @@ template < typename T > void AxpyInterface < T >::Detach ()
     dataVectors_.clear();
     requestVectors_.clear();
     replyVectors_.clear();
- 
+
     dataSendRequests_.clear();
     requestSendRequests_.clear();
     replySendRequests_.clear();
+}
 
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
-#else   
-    eomSendRequests_.clear();
-#endif 
- }
+#define PROTO(T) template class AxpyInterface<T>;
+#include "El/macros/Instantiate.h"
 
-  template class AxpyInterface < Int >;
-  template class AxpyInterface < float >;
-  template class AxpyInterface < double >;
-  template class AxpyInterface < Complex < float >>;
-  template class AxpyInterface < Complex < double >>;
-}				// namespace El
+} // namespace El

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -15,7 +15,7 @@ namespace read {
 
 template<typename T>
 inline void
-BinaryFlat( Matrix<T>& A, Int height, Int width, const std::string filename )
+BinaryFlat( Matrix<T>& A, Int height, Int width, const string filename )
 {
     DEBUG_ONLY(CallStackEntry cse("read::BinaryFlat"))
     std::ifstream file( filename.c_str(), std::ios::binary );
@@ -36,10 +36,10 @@ BinaryFlat( Matrix<T>& A, Int height, Int width, const std::string filename )
             file.read( (char*)A.Buffer(0,j), height*sizeof(T) );
 }
 
-template<typename T,Dist U,Dist V>
+template<typename T>
 inline void
 BinaryFlat
-( DistMatrix<T,U,V>& A, Int height, Int width, const std::string filename )
+( AbstractDistMatrix<T>& A, Int height, Int width, const string filename )
 {
     DEBUG_ONLY(CallStackEntry cse("read::BinaryFlat"))
     std::ifstream file( filename.c_str(), std::ios::binary );
@@ -53,7 +53,7 @@ BinaryFlat
         ("Expected file to be ",numBytesExp," bytes but found ",numBytes);
 
     A.Resize( height, width );
-    if( U == A.UGath && V == A.VGath )
+    if( A.ColStride() == 1 && A.RowStride() == 1 )
     {
         if( A.CrossRank() == A.Root() )
         {
@@ -64,7 +64,7 @@ BinaryFlat
                     file.read( (char*)A.Buffer(0,j), height*sizeof(T) );
         }
     }
-    else if( U == A.UGath )
+    else if( A.ColStride() == 1 )
     {
         const Int localWidth = A.LocalWidth();
         for( Int jLoc=0; jLoc<localWidth; ++jLoc )
@@ -95,10 +95,10 @@ BinaryFlat
     }
 }
 
-template<typename T,Dist U,Dist V>
+template<typename T>
 inline void
 BinaryFlat
-( BlockDistMatrix<T,U,V>& A, Int height, Int width, const std::string filename )
+( AbstractBlockDistMatrix<T>& A, Int height, Int width, const string filename )
 {
     DEBUG_ONLY(CallStackEntry cse("read::BinaryFlat"))
     std::ifstream file( filename.c_str(), std::ios::binary );
@@ -112,7 +112,7 @@ BinaryFlat
         ("Expected file to be ",numBytesExp," bytes but found ",numBytes);
 
     A.Resize( height, width );
-    if( U == A.UGath && V == A.VGath )
+    if( A.ColStride() == 1 && A.RowStride() == 1 )
     {
         if( A.CrossRank() == A.Root() )
         {
@@ -123,7 +123,7 @@ BinaryFlat
                     file.read( (char*)A.Buffer(0,j), height*sizeof(T) );
         }
     }
-    else if( U == A.UGath )
+    else if( A.ColStride() == 1 )
     {
         const Int localWidth = A.LocalWidth();
         for( Int jLoc=0; jLoc<localWidth; ++jLoc )

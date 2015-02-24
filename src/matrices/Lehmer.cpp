@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -15,10 +15,11 @@ void Lehmer( Matrix<F>& L, Int n )
 {
     DEBUG_ONLY(CallStackEntry cse("Lehmer"))
     L.Resize( n, n );
-    IndexDependentFill
-    ( L, []( Int i, Int j ) 
-         { if( i < j ) { return F(i+1)/F(j+1); }
-           else        { return F(j+1)/F(i+1); } } );
+    auto lehmerFill = 
+      []( Int i, Int j ) -> F
+      { if( i < j ) { return F(i+1)/F(j+1); }
+        else        { return F(j+1)/F(i+1); } };
+    IndexDependentFill( L, function<F(Int,Int)>(lehmerFill) );
 }
 
 template<typename F>
@@ -26,10 +27,11 @@ void Lehmer( AbstractDistMatrix<F>& L, Int n )
 {
     DEBUG_ONLY(CallStackEntry cse("Lehmer"))
     L.Resize( n, n );
-    IndexDependentFill
-    ( L, []( Int i, Int j ) 
-         { if( i < j ) { return F(i+1)/F(j+1); }
-           else        { return F(j+1)/F(i+1); } } );
+    auto lehmerFill = 
+      []( Int i, Int j ) -> F
+      { if( i < j ) { return F(i+1)/F(j+1); }
+        else        { return F(j+1)/F(i+1); } };
+    IndexDependentFill( L, function<F(Int,Int)>(lehmerFill) );
 }
 
 template<typename F>
@@ -37,10 +39,11 @@ void Lehmer( AbstractBlockDistMatrix<F>& L, Int n )
 {
     DEBUG_ONLY(CallStackEntry cse("Lehmer"))
     L.Resize( n, n );
-    IndexDependentFill
-    ( L, []( Int i, Int j ) 
-         { if( i < j ) { return F(i+1)/F(j+1); }
-           else        { return F(j+1)/F(i+1); } } );
+    auto lehmerFill = 
+      []( Int i, Int j ) -> F
+      { if( i < j ) { return F(i+1)/F(j+1); }
+        else        { return F(j+1)/F(i+1); } };
+    IndexDependentFill( L, function<F(Int,Int)>(lehmerFill) );
 }
 
 #define PROTO(F) \
@@ -48,9 +51,7 @@ void Lehmer( AbstractBlockDistMatrix<F>& L, Int n )
   template void Lehmer( AbstractDistMatrix<F>& L, Int n ); \
   template void Lehmer( AbstractBlockDistMatrix<F>& L, Int n );
 
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#define EL_NO_INT_PROTO
+#include "El/macros/Instantiate.h"
 
 } // namespace El

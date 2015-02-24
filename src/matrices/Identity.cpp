@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -15,7 +15,7 @@ void MakeIdentity( Matrix<T>& I )
 {
     DEBUG_ONLY(CallStackEntry cse("MakeIdentity"))
     Zero( I );
-    SetDiagonal( I, T(1) );
+    FillDiagonal( I, T(1) );
 }
 
 template<typename T>
@@ -23,7 +23,7 @@ void MakeIdentity( AbstractDistMatrix<T>& I )
 {
     DEBUG_ONLY(CallStackEntry cse("MakeIdentity"))
     Zero( I );
-    SetDiagonal( I, T(1) );
+    FillDiagonal( I, T(1) );
 }
 
 template<typename T>
@@ -31,7 +31,7 @@ void MakeIdentity( AbstractBlockDistMatrix<T>& I )
 {
     DEBUG_ONLY(CallStackEntry cse("MakeIdentity"))
     Zero( I );
-    SetDiagonal( I, T(1) );
+    FillDiagonal( I, T(1) );
 }
 
 template<typename T>
@@ -66,10 +66,6 @@ void Identity( AbstractBlockDistMatrix<T>& I, Int m, Int n )
   template void Identity( AbstractDistMatrix<T>& I, Int m, Int n ); \
   template void Identity( AbstractBlockDistMatrix<T>& I, Int m, Int n );
 
-PROTO(Int)
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#include "El/macros/Instantiate.h"
 
 } // namespace El

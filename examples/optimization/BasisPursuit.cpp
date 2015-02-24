@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -28,7 +28,6 @@ main( int argc, char* argv[] )
         const Int m = Input("--m","height of matrix",100);
         const Int n = Input("--n","width of matrix",200);
         const Int maxIter = Input("--maxIter","maximum # of iter's",500);
-        const Real probNnz = Input("--probNnz","prob. of nonzero x entry",0.1);
         const Real rho = Input("--rho","augmented Lagrangian param.",1.);
         const Real alpha = Input("--alpha","over-relaxation",1.2);
         const Real absTol = Input("--absTol","absolute tolerance",1e-6);
@@ -52,17 +51,17 @@ main( int argc, char* argv[] )
         if( display )
             Display( A, "A" );
 
-        DistMatrix<C> z;
-        BasisPursuit
-        ( A, b, z, rho, alpha, maxIter, absTol, relTol, usePinv, pinvTol,
+        DistMatrix<C> x;
+        bp::ADMM
+        ( A, b, x, rho, alpha, maxIter, absTol, relTol, usePinv, pinvTol,
           progress );
         if( print )
-            Print( z, "z" );
-        const Int zZeroNorm = ZeroNorm( z );
+            Print( x, "x" );
+        const Int xZeroNorm = ZeroNorm( x );
         if( mpi::Rank(mpi::COMM_WORLD) == 0 )
-            std::cout << "|| z     ||_0 = " << zZeroNorm << "\n" << std::endl;
+            cout << "|| x ||_0 = " << xZeroNorm << "\n" << endl;
     }
-    catch( std::exception& e ) { ReportException(e); }
+    catch( exception& e ) { ReportException(e); }
 
     Finalize();
     return 0;

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -14,7 +14,7 @@ namespace El {
 //   f(z) = 2i z^{-1} + z^2 + 7/10 z^3.
 // Please see 
 //   L. Reichel and L. N. Trefethen, "Eigenvalues and pseudo-eigenvalues of 
-//   "Toeplitz matrices", Linear Algebra Appl., 1992.
+//   Toeplitz matrices", Linear Algebra Appl., 1992.
 
 template<typename Real> 
 void BullsHead( Matrix<Complex<Real>>& A, Int n )
@@ -24,9 +24,9 @@ void BullsHead( Matrix<Complex<Real>>& A, Int n )
         LogicError("Must be at least 4x4 to have a third-order symbol");
     typedef Complex<Real> C;
     Zeros( A, n, n );
-    SetDiagonal( A, C(0,2),            1 );
-    SetDiagonal( A, 1,                -2 );
-    SetDiagonal( A, Real(7)/Real(10), -3 );
+    FillDiagonal( A, C(0,2),      1 );
+    FillDiagonal( A, C(1),       -2 );
+    FillDiagonal( A, C(7)/C(10), -3 );
 }
 
 template<typename Real>
@@ -37,9 +37,9 @@ void BullsHead( AbstractDistMatrix<Complex<Real>>& A, Int n )
         LogicError("Must be at least 4x4 to have a third-order symbol");
     typedef Complex<Real> C;
     Zeros( A, n, n );
-    SetDiagonal( A, C(0,2),            1 );
-    SetDiagonal( A, 1,                -2 );
-    SetDiagonal( A, Real(7)/Real(10), -3 );
+    FillDiagonal( A, C(0,2),      1 );
+    FillDiagonal( A, C(1),       -2 );
+    FillDiagonal( A, C(7)/C(10), -3 );
 }
 
 template<typename Real>
@@ -50,9 +50,9 @@ void BullsHead( AbstractBlockDistMatrix<Complex<Real>>& A, Int n )
         LogicError("Must be at least 4x4 to have a third-order symbol");
     typedef Complex<Real> C;
     Zeros( A, n, n );
-    SetDiagonal( A, C(0,2),            1 );
-    SetDiagonal( A, 1,                -2 );
-    SetDiagonal( A, Real(7)/Real(10), -3 );
+    FillDiagonal( A, C(0,2),      1 );
+    FillDiagonal( A, C(1),       -2 );
+    FillDiagonal( A, C(7)/C(10), -3 );
 }
 
 #define PROTO(Real) \
@@ -60,7 +60,8 @@ void BullsHead( AbstractBlockDistMatrix<Complex<Real>>& A, Int n )
    template void BullsHead( AbstractDistMatrix<Complex<Real>>& A, Int n ); \
    template void BullsHead( AbstractBlockDistMatrix<Complex<Real>>& A, Int n );
 
-PROTO(float)
-PROTO(double)
+#define EL_NO_INT_PROTO
+#define EL_NO_COMPLEX_PROTO
+#include "El/macros/Instantiate.h"
 
 } // namespace El

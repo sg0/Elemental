@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -27,16 +27,16 @@ void Riffle( Matrix<F>& P, Int n )
 
     const Real gamma = n*Log(Real(2));
 
-    Zeros( P, n, n );
-    for( Int j=0; j<n; ++j )
-    {
-        for( Int i=0; i<n; ++i )
-        {
-            const Int k = 2*i - j + 1;
-            if( k >= 0 && k <= n+1 )
-                P.Set( i, j, Exp(logBinom[k]-gamma+logEuler[j]-logEuler[i]) );
-        }
-    }
+    P.Resize( n, n );
+    auto riffleFill = 
+      [&]( Int i, Int j ) -> F
+      { const Int k = 2*i - j + 1;
+        if( k >= 0 && k <= n+1 )
+            return Exp(logBinom[k]-gamma+logEuler[j]-logEuler[i]);
+        else
+            return Base<F>(0); 
+      };
+    IndexDependentFill( P, function<F(Int,Int)>(riffleFill) );
 }
 
 template<typename F>
@@ -50,21 +50,16 @@ void Riffle( AbstractDistMatrix<F>& P, Int n )
 
     const Real gamma = n*Log(Real(2));
 
-    Zeros( P, n, n );
-    const Int mLoc = P.LocalHeight();
-    const Int nLoc = P.LocalWidth();
-    for( Int jLoc=0; jLoc<nLoc; ++jLoc )
-    {
-        const Int j = P.GlobalCol(jLoc);
-        for( Int iLoc=0; iLoc<mLoc; ++iLoc )
-        {
-            const Int i = P.GlobalRow(iLoc);
-            const Int k = 2*i - j + 1;
-            if( k >= 0 && k <= n+1 )
-                P.SetLocal
-                ( iLoc, jLoc, Exp(logBinom[k]-gamma+logEuler[j]-logEuler[i]) );
-        }
-    }
+    P.Resize( n, n );
+    auto riffleFill = 
+      [&]( Int i, Int j ) -> F
+      { const Int k = 2*i - j + 1;
+        if( k >= 0 && k <= n+1 )
+            return Exp(logBinom[k]-gamma+logEuler[j]-logEuler[i]);
+        else
+            return Base<F>(0); 
+      };
+    IndexDependentFill( P, function<F(Int,Int)>(riffleFill) );
 }
 
 template<typename F>
@@ -78,21 +73,16 @@ void Riffle( AbstractBlockDistMatrix<F>& P, Int n )
 
     const Real gamma = n*Log(Real(2));
 
-    Zeros( P, n, n );
-    const Int mLoc = P.LocalHeight();
-    const Int nLoc = P.LocalWidth();
-    for( Int jLoc=0; jLoc<nLoc; ++jLoc )
-    {
-        const Int j = P.GlobalCol(jLoc);
-        for( Int iLoc=0; iLoc<mLoc; ++iLoc )
-        {
-            const Int i = P.GlobalRow(iLoc);
-            const Int k = 2*i - j + 1;
-            if( k >= 0 && k <= n+1 )
-                P.SetLocal
-                ( iLoc, jLoc, Exp(logBinom[k]-gamma+logEuler[j]-logEuler[i]) );
-        }
-    }
+    P.Resize( n, n );
+    auto riffleFill = 
+      [&]( Int i, Int j ) -> F
+      { const Int k = 2*i - j + 1;
+        if( k >= 0 && k <= n+1 )
+            return Exp(logBinom[k]-gamma+logEuler[j]-logEuler[i]);
+        else
+            return Base<F>(0); 
+      };
+    IndexDependentFill( P, function<F(Int,Int)>(riffleFill) );
 }
 
 template<typename F>
@@ -101,7 +91,7 @@ void RiffleStationary( Matrix<F>& PInf, Int n )
     DEBUG_ONLY(CallStackEntry cse("RiffleStationary"))    
     typedef Base<F> Real;
     // NOTE: This currently requires quadratic time
-    std::vector<Real> sigma(n,0), sigmaTmp(n,0);
+    vector<Real> sigma(n,0), sigmaTmp(n,0);
     sigma[0] = sigmaTmp[0] = 1;
     for( Int j=1; j<n; ++j )
     {
@@ -114,9 +104,8 @@ void RiffleStationary( Matrix<F>& PInf, Int n )
     SwapClear( sigmaTmp );
     
     PInf.Resize( n, n );
-    for( Int j=0; j<n; ++j )
-        for( Int i=0; i<n; ++i )
-            PInf.Set( i, j, sigma[j] );
+    auto riffleStatFill = [&]( Int i, Int j ) { return sigma[j]; };
+    IndexDependentFill( PInf, function<F(Int,Int)>(riffleStatFill) );
 }
 
 template<typename F>
@@ -125,7 +114,7 @@ void RiffleStationary( AbstractDistMatrix<F>& PInf, Int n )
     DEBUG_ONLY(CallStackEntry cse("RiffleStationary"))    
     typedef Base<F> Real;
     // NOTE: This currently requires quadratic time
-    std::vector<Real> sigma(n,0), sigmaTmp(n,0);
+    vector<Real> sigma(n,0), sigmaTmp(n,0);
     sigma[0] = sigmaTmp[0] = 1;
     for( Int j=1; j<n; ++j )
     {
@@ -138,12 +127,8 @@ void RiffleStationary( AbstractDistMatrix<F>& PInf, Int n )
     SwapClear( sigmaTmp );
 
     PInf.Resize( n, n );
-    for( Int jLoc=0; jLoc<PInf.LocalWidth(); ++jLoc )
-    {
-        const Int j = PInf.GlobalCol(jLoc);
-        for( Int iLoc=0; iLoc<PInf.LocalHeight(); ++iLoc )
-            PInf.SetLocal( iLoc, jLoc, sigma[j] );
-    }
+    auto riffleStatFill = [&]( Int i, Int j ) { return sigma[j]; };
+    IndexDependentFill( PInf, function<F(Int,Int)>(riffleStatFill) );
 }
 
 template<typename F>
@@ -152,7 +137,7 @@ void RiffleStationary( AbstractBlockDistMatrix<F>& PInf, Int n )
     DEBUG_ONLY(CallStackEntry cse("RiffleStationary"))    
     typedef Base<F> Real;
     // NOTE: This currently requires quadratic time
-    std::vector<Real> sigma(n,0), sigmaTmp(n,0);
+    vector<Real> sigma(n,0), sigmaTmp(n,0);
     sigma[0] = sigmaTmp[0] = 1;
     for( Int j=1; j<n; ++j )
     {
@@ -165,12 +150,8 @@ void RiffleStationary( AbstractBlockDistMatrix<F>& PInf, Int n )
     SwapClear( sigmaTmp );
     
     PInf.Resize( n, n );
-    for( Int jLoc=0; jLoc<PInf.LocalWidth(); ++jLoc )
-    {
-        const Int j = PInf.GlobalCol(jLoc);
-        for( Int iLoc=0; iLoc<PInf.LocalHeight(); ++iLoc )
-            PInf.SetLocal( iLoc, jLoc, sigma[j] );
-    }
+    auto riffleStatFill = [&]( Int i, Int j ) { return sigma[j]; };
+    IndexDependentFill( PInf, function<F(Int,Int)>(riffleStatFill) );
 }
 
 template<typename F>
@@ -212,33 +193,19 @@ void RiffleDecay( Matrix<F>& A, Int n )
     Axpy( F(-1), PInf, A );
 }
 
-template<typename F,Dist U,Dist V>
-void RiffleDecay( DistMatrix<F,U,V>& A, Int n )
+template<typename F>
+void RiffleDecay( AbstractDistMatrix<F>& A, Int n )
 {
     DEBUG_ONLY(CallStackEntry cse("RiffleDecay"))
     Riffle( A, n );
-    DistMatrix<F,U,V> PInf( A.Grid() );
-    PInf.AlignWith( A.DistData() );
-    RiffleStationary( PInf, n );
-    Axpy( F(-1), PInf, A );
+    unique_ptr<AbstractDistMatrix<F>> 
+      PInf( A.Construct(A.Grid(),A.Root()) );
+    PInf->AlignWith( A.DistData() );
+    RiffleStationary( *PInf, n );
+    Axpy( F(-1), *PInf, A );
 }
 
-/*
-template<typename F,Dist U,Dist V>
-void RiffleDecay( BlockDistMatrix<F,U,V>& A, Int n )
-{
-    DEBUG_ONLY(CallStackEntry cse("RiffleDecay"))
-    Riffle( A, n );
-    BlockDistMatrix<F,U,V> PInf( A.Grid() );
-    PInf.AlignWith( A.DistData() );
-    RiffleStationary( PInf, n );
-    Axpy( F(-1), PInf, A );
-}
-*/
-
-#define PROTO_DIST(F,U,V) \
-  template void RiffleDecay( DistMatrix<F,U,V>& A, Int n ); 
-  //template void RiffleDecay( BlockDistMatrix<F,U,V>& A, Int n );
+// TODO: AbstractBlockDistMatrix version
 
 #define PROTO(F) \
   template void Riffle( Matrix<F>& P, Int n ); \
@@ -254,24 +221,9 @@ void RiffleDecay( BlockDistMatrix<F,U,V>& A, Int n )
   template void RiffleStationary( AbstractDistMatrix<F>& PInf, Int n ); \
   template void RiffleStationary( AbstractBlockDistMatrix<F>& PInf, Int n ); \
   template void RiffleDecay( Matrix<F>& A, Int n ); \
-  PROTO_DIST(F,CIRC,CIRC) \
-  PROTO_DIST(F,MC,  MR  ) \
-  PROTO_DIST(F,MC,  STAR) \
-  PROTO_DIST(F,MD,  STAR) \
-  PROTO_DIST(F,MR,  MC  ) \
-  PROTO_DIST(F,MR,  STAR) \
-  PROTO_DIST(F,STAR,MC  ) \
-  PROTO_DIST(F,STAR,MD  ) \
-  PROTO_DIST(F,STAR,MR  ) \
-  PROTO_DIST(F,STAR,STAR) \
-  PROTO_DIST(F,STAR,VC  ) \
-  PROTO_DIST(F,STAR,VR  ) \
-  PROTO_DIST(F,VC,  STAR) \
-  PROTO_DIST(F,VR,  STAR)
+  template void RiffleDecay( AbstractDistMatrix<F>& A, Int n );
 
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#define EL_NO_INT_PROTO
+#include "El/macros/Instantiate.h"
 
 } // namespace El

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -39,9 +39,9 @@ main( int argc, char* argv[] )
         }
         const double logDetDiv = LogDetDiv( LOWER, A, B );
         if( mpi::WorldRank() == 0 )
-            std::cout << "LogDetDiv(A,B) = " << logDetDiv << std::endl;
+            cout << "LogDetDiv(A,B) = " << logDetDiv << endl;
     }
-    catch( std::exception& e ) { ReportException(e); }
+    catch( exception& e ) { ReportException(e); }
 
     Finalize();
     return 0;

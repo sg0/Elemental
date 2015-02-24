@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -16,12 +16,12 @@ const double Pi = 3.141592653589793;
 
 // Compute log( choose(n,k) ) for k=0,...,n in quadratic time
 template<typename Real>
-std::vector<Real> LogBinomial( Int n );
+vector<Real> LogBinomial( Int n );
 
 // This is unfortunately quadratic time
 // Compute log( alpha_j ) for j=1,...,n
 template<typename Real>
-std::vector<Real> LogEulerian( Int n );
+vector<Real> LogEulerian( Int n );
 
 bool BooleanCoinFlip();
 Int CoinFlip();

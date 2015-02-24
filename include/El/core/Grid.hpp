@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
                       2013, Jed Brown 
    All rights reserved.
 
@@ -75,11 +75,11 @@ private:
     bool haveViewers_;
     int height_, size_, gcd_;
     GridOrder order_;
-    std::vector<int> diagPathsAndRanks_;
+    vector<int> diagPathsAndRanks_;
 
     mpi::Comm viewingComm_; // all processes that create the grid
     mpi::Group viewingGroup_;
-    std::vector<int> vectorColToViewingMap_;
+    vector<int> vectorColToViewingMap_;
 
     // Create a communicator for our owning team
     mpi::Comm owningComm_;
@@ -105,6 +105,22 @@ bool operator!= ( const Grid& A, const Grid& B );
 
 // Return a grid constructed using mpi::COMM_WORLD.
 const Grid& DefaultGrid();
+
+inline void AssertSameGrids( const Grid& g1 ) { }
+
+inline void AssertSameGrids( const Grid& g1, const Grid& g2 )
+{
+    if( g1 != g2 )
+        LogicError("Grids did not match");
+}
+
+template<typename... Args>
+inline void AssertSameGrids( const Grid& g1, const Grid& g2, Args&... args )
+{
+    if( g1 != g2 )
+        LogicError("Grids did not match");
+    AssertSameGrids( g2, args... );
+}
 
 } // namespace El
 

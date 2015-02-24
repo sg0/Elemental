@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -23,25 +23,26 @@ void Walsh( Matrix<T>& A, Int k, bool binary )
     // based upon successive sign flips
     const T onValue = 1;
     const T offValue = ( binary ? 0 : -1 );
-    IndexDependentFill
-    ( A, [=]( Int i, Int j ) 
-         { 
-            // Recurse on the quadtree, flipping the sign of the entry each
-            // time we are in the bottom-right quadrant
-            Unsigned r = (Unsigned)i;     
-            Unsigned s = (Unsigned)j;
-            Unsigned t = n;
-            bool on = true;
-            while( t != 1u )
-            {
-                t >>= 1;
-                if( r >= t && s >= t )
-                    on = !on;
-                r %= t;
-                s %= t;
-            }
-            return ( on ? onValue : offValue );
-        } );
+    auto walshFill = 
+      [&]( Int i, Int j ) -> T
+      {
+        // Recurse on the quadtree, flipping the sign of the entry each
+        // time we are in the bottom-right quadrant
+        Unsigned r = (Unsigned)i;     
+        Unsigned s = (Unsigned)j;
+        Unsigned t = n;
+        bool on = true;
+        while( t != 1u )
+        {
+            t >>= 1;
+            if( r >= t && s >= t )
+                on = !on;
+            r %= t;
+            s %= t;
+        }
+        return ( on ? onValue : offValue );
+      };
+    IndexDependentFill( A, function<T(Int,Int)>(walshFill) );
 }
 
 template<typename T>
@@ -57,35 +58,32 @@ void Walsh( AbstractDistMatrix<T>& A, Int k, bool binary )
     // based upon successive sign flips
     const T onValue = 1;
     const T offValue = ( binary ? 0 : -1 );
-    IndexDependentFill
-    ( A, [=]( Int i, Int j ) 
-         { 
-            // Recurse on the quadtree, flipping the sign of the entry each
-            // time we are in the bottom-right quadrant
-            Unsigned r = (Unsigned)i;     
-            Unsigned s = (Unsigned)j;
-            Unsigned t = n;
-            bool on = true;
-            while( t != 1u )
-            {
-                t >>= 1;
-                if( r >= t && s >= t )
-                    on = !on;
-                r %= t;
-                s %= t;
-            }
-            return ( on ? onValue : offValue );
-        } );
+    auto walshFill = 
+      [&]( Int i, Int j ) -> T
+      {
+        // Recurse on the quadtree, flipping the sign of the entry each
+        // time we are in the bottom-right quadrant
+        Unsigned r = (Unsigned)i;     
+        Unsigned s = (Unsigned)j;
+        Unsigned t = n;
+        bool on = true;
+        while( t != 1u )
+        {
+            t >>= 1;
+            if( r >= t && s >= t )
+                on = !on;
+            r %= t;
+            s %= t;
+        }
+        return ( on ? onValue : offValue );
+      };
+    IndexDependentFill( A, function<T(Int,Int)>(walshFill) );
 }
 
 #define PROTO(T) \
   template void Walsh( Matrix<T>& A, Int k, bool binary ); \
   template void Walsh( AbstractDistMatrix<T>& A, Int k, bool binary );
 
-PROTO(Int)
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#include "El/macros/Instantiate.h"
 
 } // namespace El

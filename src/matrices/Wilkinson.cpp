@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -16,8 +16,8 @@ void Wilkinson( Matrix<T>& A, Int k )
     DEBUG_ONLY(CallStackEntry cse("Wilkinson"))
     const Int n = 2*k+1;
     Zeros( A, n, n );
-    SetDiagonal( A, T(1), -1 );
-    SetDiagonal( A, T(1),  1 );
+    FillDiagonal( A, T(1), -1 );
+    FillDiagonal( A, T(1),  1 );
     
     for( Int j=0; j<=k; ++j )
         A.Set( j, j, T(k-j) );
@@ -31,8 +31,8 @@ void Wilkinson( AbstractDistMatrix<T>& A, Int k )
     DEBUG_ONLY(CallStackEntry cse("Wilkinson"))
     const Int n = 2*k+1;
     Zeros( A, n, n );
-    SetDiagonal( A, T(1), -1 );
-    SetDiagonal( A, T(1),  1 );
+    FillDiagonal( A, T(1), -1 );
+    FillDiagonal( A, T(1),  1 );
     
     for( Int j=0; j<=k; ++j )
         A.Set( j, j, T(k-j) );
@@ -44,10 +44,6 @@ void Wilkinson( AbstractDistMatrix<T>& A, Int k )
   template void Wilkinson( Matrix<T>& A, Int k ); \
   template void Wilkinson( AbstractDistMatrix<T>& A, Int k );
 
-PROTO(Int)
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#include "El/macros/Instantiate.h"
 
 } // namespace El

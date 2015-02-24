@@ -1,35 +1,24 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-#include "El-lite.hpp"
-#include "El/io.hpp"
+#include "El.hpp"
 
 namespace El {
 
-template<typename T>
-void Print( const std::vector<T>& x, std::string title, std::ostream& os )
-{
-    DEBUG_ONLY(CallStackEntry cse("Print"))
-    if( title != "" )
-        os << title << std::endl;
-    
-    const Int length = x.size();
-    for( Int i=0; i<length; ++i )
-        os << x[i] << " ";
-    os << std::endl;
-}
+// Dense
+// =====
 
 template<typename T>
-void Print( const Matrix<T>& A, std::string title, std::ostream& os )
+void Print( const Matrix<T>& A, string title, ostream& os )
 {
     DEBUG_ONLY(CallStackEntry cse("Print"))
     if( title != "" )
-        os << title << std::endl;
+        os << title << endl;
     
     const Int height = A.Height();
     const Int width = A.Width();
@@ -37,16 +26,17 @@ void Print( const Matrix<T>& A, std::string title, std::ostream& os )
     {
         for( Int j=0; j<width; ++j )
             os << A.Get(i,j) << " ";
-        os << std::endl;
+        os << endl;
     }
-    os << std::endl;
+    os << endl;
 }
 
-template<typename T,Dist U,Dist V>
-void Print( const DistMatrix<T,U,V>& A, std::string title, std::ostream& os )
+template<typename T>
+void Print
+( const AbstractDistMatrix<T>& A, string title, ostream& os )
 {
     DEBUG_ONLY(CallStackEntry cse("Print"))
-    if( U == A.UGath && V == A.VGath )
+    if( A.ColStride() == 1 && A.RowStride() == 1 )
     {
         if( A.CrossRank() == A.Root() && A.RedundantRank() == 0 )
             Print( A.LockedMatrix(), title, os );
@@ -59,12 +49,12 @@ void Print( const DistMatrix<T,U,V>& A, std::string title, std::ostream& os )
     }
 }
 
-template<typename T,Dist U,Dist V>
+template<typename T>
 void Print
-( const BlockDistMatrix<T,U,V>& A, std::string title, std::ostream& os )
+( const AbstractBlockDistMatrix<T>& A, string title, ostream& os )
 {
     DEBUG_ONLY(CallStackEntry cse("Print"))
-    if( U == A.UGath && V == A.VGath )
+    if( A.ColStride() == 1 && A.RowStride() == 1 )
     {
         if( A.CrossRank() == A.Root() && A.RedundantRank() == 0 )
             Print( A.LockedMatrix(), title, os );
@@ -78,72 +68,129 @@ void Print
 }
 
 template<typename T>
-void Print
-( const AbstractDistMatrix<T>& A, std::string title, std::ostream& os )
+void Print( const DistMultiVec<T>& X, string title, ostream& os )
 {
-    DEBUG_ONLY(CallStackEntry cse("Print"))
-    #define GUARD(CDIST,RDIST) \
-      A.DistData().colDist == CDIST && A.DistData().rowDist == RDIST
-    #define PAYLOAD(CDIST,RDIST) \
-      auto& ACast = dynamic_cast<const DistMatrix<T,CDIST,RDIST>&>(A); \
-      Print( ACast, title, os );
-    #include "El/core/GuardAndPayload.h"
+    DEBUG_ONLY(CallStackEntry cse("Print [DistMultiVec]"))
+    const Int commRank = mpi::Rank( X.Comm() );
+    if( commRank == 0 )
+    {
+        Matrix<T> XLoc;
+        CopyFromRoot( X, XLoc );
+        Print( XLoc, title, os ); 
+    }
+    else
+    {
+        CopyFromNonRoot( X, 0 );
+    }
+}
+
+void Print( const Graph& graph, string msg, ostream& os )
+{
+    DEBUG_ONLY(CallStackEntry cse("Print [Graph]"))
+    if( msg != "" )
+        os << msg << endl;
+    const Int numEdges = graph.NumEdges();
+    const Int* srcBuf = graph.LockedSourceBuffer();
+    const Int* tgtBuf = graph.LockedTargetBuffer();
+    for( Int e=0; e<numEdges; ++e )
+        os << srcBuf[e] << " " << tgtBuf[e] << "\n";
+    os << endl;
+}
+
+void Print( const DistGraph& graph, string msg, ostream& os )
+{
+    DEBUG_ONLY(CallStackEntry cse("Print [DistGraph]"))
+    const mpi::Comm comm = graph.Comm();
+    const int commRank = mpi::Rank( comm );
+    if( commRank == 0 )
+    {
+        Graph seqGraph;
+        CopyFromRoot( graph, seqGraph );
+        Print( seqGraph, msg, os );
+    }
+    else
+    {
+        CopyFromNonRoot( graph, 0 );
+    }
 }
 
 template<typename T>
-void Print
-( const AbstractBlockDistMatrix<T>& A, std::string title, std::ostream& os )
+void Print( const SparseMatrix<T>& A, string msg, ostream& os )
 {
-    DEBUG_ONLY(CallStackEntry cse("Print"))
-    #define GUARD(CDIST,RDIST) \
-      A.DistData().colDist == CDIST && A.DistData().rowDist == RDIST
-    #define PAYLOAD(CDIST,RDIST) \
-      auto& ACast = dynamic_cast<const BlockDistMatrix<T,CDIST,RDIST>&>(A); \
-      Print( ACast, title, os );
-    #include "El/core/GuardAndPayload.h"
+    DEBUG_ONLY(CallStackEntry cse("Print [SparseMatrix]"))
+    if( msg != "" )
+        os << msg << endl;
+    const Int numEntries = A.NumEntries();
+    const Int* srcBuf = A.LockedSourceBuffer();
+    const Int* tgtBuf = A.LockedTargetBuffer();
+    const T* valBuf = A.LockedValueBuffer();
+    for( Int s=0; s<numEntries; ++s )
+        os << srcBuf[s] << " " << tgtBuf[s] << " " << valBuf[s] << "\n";
+    os << endl;
 }
 
-#define DISTPROTO(T,U,V) \
-  template void Print \
-  ( const DistMatrix<T,U,V>& A, std::string title, std::ostream& os ); \
-  template void Print \
-  ( const BlockDistMatrix<T,U,V>& A, std::string title, std::ostream& os );
+template<typename T>
+void Print( const DistSparseMatrix<T>& A, string msg, ostream& os )
+{
+    DEBUG_ONLY(CallStackEntry cse("Print [DistSparseMatrix]"))
+    const mpi::Comm comm = A.Comm();
+    const int commRank = mpi::Rank( comm );
+
+    if( commRank == 0 )
+    {
+        SparseMatrix<T> ASeq;
+        CopyFromRoot( A, ASeq );
+        Print( ASeq, msg, os );
+    }
+    else
+    {
+        CopyFromNonRoot( A, 0 );
+    }
+}
+
+// Multifrontal
+// ============
+
+void PrintLocal
+( const DistSymmNodeInfo& info, string msg, ostream& os )
+{
+    DEBUG_ONLY(CallStackEntry cse("PrintLocal [DistSymmNodeInfo]"))
+    LogicError("This routine needs to be rewritten");
+}
+
+// Utilities
+// =========
+
+template<typename T>
+void Print( const vector<T>& x, string title, ostream& os )
+{
+    DEBUG_ONLY(CallStackEntry cse("Print"))
+    if( title != "" )
+        os << title << endl;
+    
+    const Int length = x.size();
+    for( Int i=0; i<length; ++i )
+        os << x[i] << " ";
+    os << endl;
+}
 
 #define PROTO(T) \
   template void Print \
-  ( const std::vector<T>& x, std::string title, std::ostream& os ); \
+  ( const vector<T>& x, string title, ostream& os ); \
   template void Print \
-  ( const Matrix<T>& A, std::string title, std::ostream& os ); \
-  DISTPROTO(T,CIRC,CIRC); \
-  DISTPROTO(T,MC,  MR  ); \
-  DISTPROTO(T,MC,  STAR); \
-  DISTPROTO(T,MD,  STAR); \
-  DISTPROTO(T,MR,  MC  ); \
-  DISTPROTO(T,MR,  STAR); \
-  DISTPROTO(T,STAR,MC  ); \
-  DISTPROTO(T,STAR,MD  ); \
-  DISTPROTO(T,STAR,MR  ); \
-  DISTPROTO(T,STAR,STAR); \
-  DISTPROTO(T,STAR,VC  ); \
-  DISTPROTO(T,STAR,VR  ); \
-  DISTPROTO(T,VC,  STAR); \
-  DISTPROTO(T,VR,  STAR); \
+  ( const Matrix<T>& A, string title, ostream& os ); \
   template void Print \
-  ( const AbstractDistMatrix<T>& A, std::string title, std::ostream& os ); \
+  ( const AbstractDistMatrix<T>& A, string title, ostream& os ); \
   template void Print \
-  ( const AbstractBlockDistMatrix<T>& A, std::string title, std::ostream& os ); 
+  ( const AbstractBlockDistMatrix<T>& A, \
+    string title, ostream& os ); \
+  template void Print \
+  ( const DistMultiVec<T>& X, string title, ostream& os ); \
+  template void Print \
+  ( const SparseMatrix<T>& A, string title, ostream& os ); \
+  template void Print \
+  ( const DistSparseMatrix<T>& A, string title, ostream& os );
 
-PROTO(Int);
-#ifndef EL_DISABLE_FLOAT
-PROTO(float);
-#ifndef EL_DISABLE_COMPLEX
-PROTO(Complex<float>);
-#endif // ifndef EL_DISABLE_COMPLEX
-#endif // ifndef EL_DISABLE_FLOAT
-
-PROTO(double);
-#ifndef EL_DISABLE_COMPLEX
-PROTO(Complex<double>);
-#endif // ifndef EL_DISABLE_COMPLEX
+#include "El/macros/Instantiate.h"
 
 } // namespace El

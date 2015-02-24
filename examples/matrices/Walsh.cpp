@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -34,9 +34,9 @@ main( int argc, char* argv[] )
         if( !binary )
         {
             LDL( W, true );
-            auto d = W.GetDiagonal();
-            MakeTriangular( LOWER, W );
-            SetDiagonal( W, 1. );
+            auto d = GetDiagonal(W);
+            MakeTrapezoidal( LOWER, W );
+            FillDiagonal( W, 1. );
 
             if( display )
             {
@@ -50,7 +50,7 @@ main( int argc, char* argv[] )
             }
         }
     }
-    catch( std::exception& e ) { ReportException(e); }
+    catch( exception& e ) { ReportException(e); }
 
     Finalize();
     return 0;

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -207,10 +207,10 @@ void Her
   double alpha, const double* x, int incx, double* A, int lda );
 void Her
 ( char uplo, int m,
-  scomplex alpha, const scomplex* x, int incx, scomplex* A, int lda );
+  float alpha, const scomplex* x, int incx, scomplex* A, int lda );
 void Her
 ( char uplo, int m,
-  dcomplex alpha, const dcomplex* x, int incx, dcomplex* A, int lda );
+  double alpha, const dcomplex* x, int incx, dcomplex* A, int lda );
 
 void Her2
 ( char uplo, int m,
@@ -354,11 +354,11 @@ void Her2k
 void Her2k
 ( char uplo, char trans, int n, int k,
   scomplex alpha, const scomplex* A, int lda, const scomplex* B, int ldb,
-  scomplex beta,        scomplex* C, int ldc );
+  float beta,           scomplex* C, int ldc );
 void Her2k
 ( char uplo, char trans, int n, int k,
   dcomplex alpha, const dcomplex* A, int lda, const dcomplex* B, int ldb,
-  dcomplex beta,        dcomplex* C, int ldc );
+  double beta,          dcomplex* C, int ldc );
 
 void Herk
 ( char uplo, char trans, int n, int k,
@@ -368,12 +368,12 @@ void Herk
   double alpha, const double* A, int lda, double beta, double* C, int ldc );
 void Herk
 ( char uplo, char trans, int n, int k,
-  scomplex alpha, const scomplex* A, int lda,
-  scomplex beta,        scomplex* C, int ldc );
+  float alpha, const scomplex* A, int lda,
+  float beta,        scomplex* C, int ldc );
 void Herk
 ( char uplo, char trans, int n, int k,
-  dcomplex alpha, const dcomplex* A, int lda,
-  dcomplex beta,        dcomplex* C, int ldc );
+  double alpha, const dcomplex* A, int lda,
+  double beta,        dcomplex* C, int ldc );
 
 void Symm
 ( char side, char uplo, int m, int n,

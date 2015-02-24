@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -26,6 +26,21 @@ typedef unsigned Unsigned;
  
 typedef Complex<float>  scomplex; 
 typedef Complex<double> dcomplex;
+
+template<typename T>
+struct Range
+{
+    T beg, end;
+    Range() : beg(0), end(0) { }
+    Range( T begArg, T endArg ) : beg(begArg), end(endArg) { }
+
+    Range<T> operator+( T shift ) const 
+    { return Range<T>(beg+shift,end+shift); }
+
+    Range<T> operator-( T shift ) const 
+    { return Range<T>(beg-shift,end-shift); }
+};
+typedef Range<Int> IR;
 
 template<typename Real>
 struct ValueInt
@@ -76,6 +91,9 @@ struct ValueIntPair<Complex<Real>>
     ( const ValueIntPair<Real>& a, const ValueIntPair<Real>& b )
     { return Abs(a.value) > Abs(b.value); }
 };
+
+template<typename F>
+using Entry = ValueIntPair<F>;
 
 // For the safe computation of products. The result is given by 
 //   product = rho * exp(kappa*n)
@@ -163,17 +181,21 @@ Dist StringToDist( std::string s );
 using namespace DistNS;
 typedef Dist Distribution;
 
-template<Dist U,Dist V>
-constexpr Dist DiagColDist() { return ( U==STAR ? V : U ); }
-template<Dist U,Dist V>
-constexpr Dist DiagRowDist() { return ( U==STAR ? U : V ); }
+// Return either the row or column piece of the implied diagonal distribution
+// ==========================================================================
 
-template<> constexpr Dist DiagColDist<MC,MR>() { return MD; }
-template<> constexpr Dist DiagRowDist<MC,MR>() { return STAR; }
-template<> constexpr Dist DiagColDist<MR,MC>() { return MD; }
-template<> constexpr Dist DiagRowDist<MR,MC>() { return STAR; }
+// Compile-time
+// ------------
+template<Dist U,Dist V> constexpr Dist DiagCol() { return ( U==STAR ? V : U ); }
+template<Dist U,Dist V> constexpr Dist DiagRow() { return ( U==STAR ? U : V ); }
+template<> constexpr Dist DiagCol<MC,MR>() { return MD; }
+template<> constexpr Dist DiagRow<MC,MR>() { return STAR; }
+template<> constexpr Dist DiagCol<MR,MC>() { return MD; }
+template<> constexpr Dist DiagRow<MR,MC>() { return STAR; }
 
-inline Dist DiagColDist( Dist U, Dist V )
+// Runtime
+// -------
+inline Dist DiagCol( Dist U, Dist V )
 { 
     if( U == MC && V == MR )
         return MD;
@@ -184,8 +206,7 @@ inline Dist DiagColDist( Dist U, Dist V )
     else
         return U;
 }
-
-inline Dist DiagRowDist( Dist U, Dist V )
+inline Dist DiagRow( Dist U, Dist V )
 {
     if( U == MC && V == MR )
         return STAR;
@@ -197,29 +218,111 @@ inline Dist DiagRowDist( Dist U, Dist V )
         return V;
 }
 
+// Return a piece of a distribution which induces the given diagonal dist
+// ======================================================================
+
+// Compile-time
+// ------------
 template<Dist U,Dist V>
-constexpr Dist DiagInvColDist() { return ( U==STAR ? V : U ); }
+constexpr Dist DiagInvCol() { return ( U==STAR ? V : U ); }
 template<Dist U,Dist V>
-constexpr Dist DiagInvRowDist() { return ( U==STAR ? U : V ); }
+constexpr Dist DiagInvRow() { return ( U==STAR ? U : V ); }
+template<> constexpr Dist DiagInvCol<MD,STAR>() { return MC; }
+template<> constexpr Dist DiagInvRow<MD,STAR>() { return MR; }
+template<> constexpr Dist DiagInvCol<STAR,MD>() { return MC; }
+template<> constexpr Dist DiagInvRow<STAR,MD>() { return MR; }
 
-template<> constexpr Dist DiagInvColDist<MD,STAR>() { return MC; }
-template<> constexpr Dist DiagInvRowDist<MD,STAR>() { return MR; }
-template<> constexpr Dist DiagInvColDist<STAR,MD>() { return MC; }
-template<> constexpr Dist DiagInvRowDist<STAR,MD>() { return MR; }
+// TODO: Runtime version?
 
-template<Dist U> 
-constexpr Dist GatheredDist() { return ( U==CIRC ? CIRC : STAR ); }
+// Union the distribution over its corresponding communicator
+// ==========================================================
+// Compile-time
+// ------------
+template<Dist U> constexpr Dist Collect()       { return STAR; }
+template<>       constexpr Dist Collect<CIRC>() { return CIRC; }
+// Run-time
+// --------
+inline Dist Collect( Dist U ) { return ( U==CIRC ? CIRC : STAR ); }
 
-template<Dist U> constexpr Dist PartialDist() { return U; }
-template<> constexpr Dist PartialDist<VC>() { return MC; }
-template<> constexpr Dist PartialDist<VR>() { return MR; }
+// Union the distribution over its corresponding partial communicator
+// ==================================================================
+// Compile-time
+// ------------
+template<Dist U> constexpr Dist Partial() { return U; }
+template<>       constexpr Dist Partial<VC>() { return MC; }
+template<>       constexpr Dist Partial<VR>() { return MR; }
+// Run-time
+// --------
+inline Dist Partial( Dist U ) 
+{ 
+    if( U == VC ) 
+        return MC;
+    else if( U == VR )
+        return MR;
+    else
+        return U;
+}
 
-template<Dist U,Dist V> constexpr Dist ScatteredRowDist() { return V; }
-template<> constexpr Dist ScatteredRowDist<VC,STAR>() { return MR; }
-template<> constexpr Dist ScatteredRowDist<VR,STAR>() { return MC; }
+// Return the partial distribution that would be used for a partial union
+// ======================================================================
+// Compile-time
+// ------------
+template<Dist U,Dist V> constexpr Dist PartialUnionRow()          { return V;  }
+template<>              constexpr Dist PartialUnionRow<VC,STAR>() { return MR; }
+template<>              constexpr Dist PartialUnionRow<VR,STAR>() { return MC; }template<Dist U,Dist V> constexpr Dist PartialUnionCol() 
+{ return PartialUnionRow<V,U>(); }
+// Run-time
+// --------
+inline Dist PartialUnionRow( Dist U, Dist V )
+{ 
+    if( U == VC )
+        return MR;
+    else if( U == VR )
+        return MC;
+    else
+        return V;
+}
+inline Dist PartialUnionCol( Dist U, Dist V )
+{ return PartialUnionRow( V, U ); }
 
-template<Dist U,Dist V> constexpr Dist ScatteredColDist() 
-{ return ScatteredRowDist<V,U>(); }
+// Return the product of two distributions
+// =======================================
+// Compile-time
+// ------------
+template<Dist U,Dist V> constexpr Dist ProductDist() { return CIRC; }
+template<>              constexpr Dist ProductDist<MC,  MR  >() { return VC;   }
+template<>              constexpr Dist ProductDist<MC,  STAR>() { return MC;   }
+template<>              constexpr Dist ProductDist<MD,  STAR>() { return MD;   }
+template<>              constexpr Dist ProductDist<MR,  MC  >() { return VR;   }
+template<>              constexpr Dist ProductDist<MR,  STAR>() { return MR;   }
+template<>              constexpr Dist ProductDist<STAR,MC  >() { return MC;   }
+template<>              constexpr Dist ProductDist<STAR,MD  >() { return MD;   }
+template<>              constexpr Dist ProductDist<STAR,MR  >() { return MR;   }
+template<>              constexpr Dist ProductDist<STAR,STAR>() { return STAR; }
+template<>              constexpr Dist ProductDist<STAR,VC  >() { return VC;   }
+template<>              constexpr Dist ProductDist<STAR,VR  >() { return VR;   }
+template<>              constexpr Dist ProductDist<VC,  STAR>() { return VC;   }
+template<>              constexpr Dist ProductDist<VR,  STAR>() { return VR;   }
+template<Dist U,Dist V> 
+constexpr Dist ProductDistPartner() { return STAR; }
+template<> 
+constexpr Dist ProductDistPartner<CIRC,CIRC>() { return CIRC; }
+// Runtime
+// -------
+inline Dist ProductDist( Dist U, Dist V )
+{
+    if(      U == STAR ) return V;
+    else if( V == STAR ) return U;
+    else if( U == MC   && V == MR   ) return VC;
+    else if( U == MR   && V == MC   ) return VR;
+    else if( U == CIRC && V == CIRC ) return CIRC;
+    else { return STAR; } // NOTE: This branch should not be possible
+}
+inline Dist ProductDistPartner( Dist U, Dist V )
+{
+    if( U == CIRC && V == CIRC ) return CIRC;
+    else                         return STAR;
+}
 
 namespace ViewTypeNS {
 enum ViewType
@@ -337,6 +440,28 @@ enum VerticalOrHorizontal
 };
 }
 using namespace VerticalOrHorizontalNS;
+
+// TODO: Distributed file formats?
+namespace FileFormatNS {
+enum FileFormat
+{
+    AUTO, // Automatically detect from file extension
+    ASCII,
+    ASCII_MATLAB,
+    BINARY,
+    BINARY_FLAT,
+    BMP,
+    JPG,
+    JPEG,
+    MATRIX_MARKET,
+    PNG,
+    PPM,
+    XBM,
+    XPM,
+    FileFormat_MAX // For detecting number of entries in enum
+};
+}
+using namespace FileFormatNS;
 
 } // namespace El
 

@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -15,8 +15,7 @@ namespace El {
 template<typename Real>
 void NormalFromEVD
 (       Matrix<Complex<Real>>& A,
-  const Matrix<Complex<Real>>& w,
-  const Matrix<Complex<Real>>& Z )
+  const Matrix<Complex<Real>>& w, const Matrix<Complex<Real>>& Z )
 {
     DEBUG_ONLY(CallStackEntry cse("NormalFromEVD"))
     typedef Complex<Real> C;
@@ -30,8 +29,8 @@ void NormalFromEVD
     for( Int k=0; k<n; k+=bsize )
     {
         const Int nb = Min(bsize,n-k);
-        auto Z1 = LockedView( Z, 0, k, m,  nb );
-        auto w1 = LockedView( w, k, 0, nb, 1  );
+        auto Z1 = Z( IR(0,m),    IR(k,k+nb) );
+        auto w1 = w( IR(k,k+nb), IR(0,1)    );
 
         Y1 = Z1Copy = Z1;
         DiagonalScale( RIGHT, ADJOINT, w1, Y1 );
@@ -41,12 +40,17 @@ void NormalFromEVD
 
 template<typename Real>
 void NormalFromEVD
-(       DistMatrix<Complex<Real>>& A,
-  const DistMatrix<Complex<Real>,VR,STAR>& w,
-  const DistMatrix<Complex<Real>>& Z )
+(       AbstractDistMatrix<Complex<Real>>& APre,
+  const AbstractDistMatrix<Complex<Real>>& wPre, 
+  const AbstractDistMatrix<Complex<Real>>& ZPre )
 {
     DEBUG_ONLY(CallStackEntry cse("NormalFromEVD"))
     typedef Complex<Real> C;
+
+    auto APtr = WriteProxy<C,MC,MR>( &APre );  auto& A = *APtr;
+    auto wPtr = ReadProxy<C,VR,STAR>( &wPre ); auto& w = *wPtr;
+    auto ZPtr = ReadProxy<C,MC,MR>( &ZPre );   auto& Z = *ZPtr;
+
     const Grid& g = A.Grid();
     DistMatrix<C,MC,  STAR> Z1_MC_STAR(g);
     DistMatrix<C,VR,  STAR> Z1_VR_STAR(g);
@@ -60,8 +64,8 @@ void NormalFromEVD
     for( Int k=0; k<n; k+=bsize )
     {
         const Int nb = Min(bsize,n-k);
-        auto Z1 = LockedView( Z, 0, k, m,  nb );
-        auto w1 = LockedView( w, k, 0, nb, 1  );
+        auto Z1 = Z( IR(0,m),    IR(k,k+nb) );
+        auto w1 = w( IR(k,k+nb), IR(0,1)    );
 
         Z1_MC_STAR.AlignWith( A );
         Z1_MC_STAR = Z1;
@@ -72,7 +76,7 @@ void NormalFromEVD
         DiagonalScale( RIGHT, ADJOINT, w1_STAR_STAR, Z1_VR_STAR );
 
         Z1Adj_STAR_MR.AlignWith( A );
-        Z1_VR_STAR.AdjointPartialColAllGather( Z1Adj_STAR_MR );
+        Adjoint( Z1_VR_STAR, Z1Adj_STAR_MR );
         LocalGemm( NORMAL, NORMAL, C(1), Z1_MC_STAR, Z1Adj_STAR_MR, C(1), A );
     }
 }
@@ -83,11 +87,12 @@ void NormalFromEVD
     const Matrix<Complex<Real>>& w, \
     const Matrix<Complex<Real>>& Z ); \
   template void NormalFromEVD \
-  (       DistMatrix<Complex<Real>>& A, \
-    const DistMatrix<Complex<Real>,VR,STAR>& w, \
-    const DistMatrix<Complex<Real>>& Z );
+  (       AbstractDistMatrix<Complex<Real>>& A, \
+    const AbstractDistMatrix<Complex<Real>>& w, \
+    const AbstractDistMatrix<Complex<Real>>& Z );
 
-PROTO(float)
-PROTO(double)
+#define EL_NO_INT_PROTO
+#define EL_NO_COMPLEX_PROTO
+#include "El/macros/Instantiate.h"
 
 } // namespace El

@@ -1,13 +1,12 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-#include "El-lite.hpp"
-#include "El/io.hpp"
+#include "El.hpp"
 
 #ifdef EL_HAVE_QT5
 # include "El/io/DisplayWindow-premoc.hpp"
@@ -25,8 +24,8 @@ void ProcessEvents( int numMsecs )
 #endif
 }
 
-template<typename T>
-void Display( const Matrix<T>& A, std::string title )
+template<typename Real>
+void Display( const Matrix<Real>& A, string title )
 {
     DEBUG_ONLY(CallStackEntry cse("Display"))
 #ifdef EL_HAVE_QT5
@@ -56,8 +55,8 @@ void Display( const Matrix<T>& A, std::string title )
 #endif
 }
 
-template<typename T>
-void Display( const Matrix<Complex<T>>& A, std::string title )
+template<typename Real>
+void Display( const Matrix<Complex<Real>>& A, string title )
 {
     DEBUG_ONLY(CallStackEntry cse("Display"))
 #ifdef EL_HAVE_QT5
@@ -75,7 +74,7 @@ void Display( const Matrix<Complex<T>>& A, std::string title )
     {
         for( Int i=0; i<m; ++i )
         {
-            const Complex<T> alpha = A.Get(i,j);
+            const Complex<Real> alpha = A.Get(i,j);
             const Complex<double> alphaDouble = 
                 Complex<double>(alpha.real(),alpha.imag()); 
             ADouble->Set( i, j, alphaDouble );
@@ -94,18 +93,11 @@ void Display( const Matrix<Complex<T>>& A, std::string title )
 #endif
 }
 
-template<typename T,Dist U,Dist V>
-void Display( const DistMatrix<T,U,V>& A, std::string title )
+template<typename T>
+void Display( const AbstractDistMatrix<T>& A, string title )
 {
     DEBUG_ONLY(CallStackEntry cse("Display"))
-#ifdef EL_HAVE_QT5
-    if( GuiDisabled() )
-    {
-        Print( A, title );
-        return;
-    }
-
-    if( U == A.UGath && V == A.VGath )
+    if( A.ColStride() == 1 && A.RowStride() == 1 )
     {
         if( A.CrossRank() == A.Root() && A.RedundantRank() == 0 )
             Display( A.LockedMatrix(), title );
@@ -116,23 +108,13 @@ void Display( const DistMatrix<T,U,V>& A, std::string title )
         if( A_CIRC_CIRC.CrossRank() == A_CIRC_CIRC.Root() )
             Display( A_CIRC_CIRC.Matrix(), title );
     }
-#else
-    Print( A, title );
-#endif
 }
 
-template<typename T,Dist U,Dist V>
-void Display( const BlockDistMatrix<T,U,V>& A, std::string title )
+template<typename T>
+void Display( const AbstractBlockDistMatrix<T>& A, string title )
 {
     DEBUG_ONLY(CallStackEntry cse("Display"))
-#ifdef EL_HAVE_QT5
-    if( GuiDisabled() )
-    {
-        Print( A, title );
-        return;
-    }
-
-    if( U == A.UGath && V == A.VGath )
+    if( A.ColStride() == 1 && A.RowStride() == 1 )
     {
         if( A.CrossRank() == A.Root() && A.RedundantRank() == 0 )
             Display( A.LockedMatrix(), title );
@@ -143,71 +125,230 @@ void Display( const BlockDistMatrix<T,U,V>& A, std::string title )
         if( A_CIRC_CIRC.CrossRank() == A_CIRC_CIRC.Root() )
             Display( A_CIRC_CIRC.Matrix(), title );
     }
+}
+
+template<typename T>
+void Display( const DistMultiVec<T>& X, string title )
+{
+    DEBUG_ONLY(CallStackEntry cse("Display [DistMultiVec]"))
+    const Int commRank = mpi::Rank( X.Comm() );
+    if( commRank == 0 )
+    {
+        Matrix<T> XLoc;
+        CopyFromRoot( X, XLoc );
+        Display( XLoc, title );
+    }
+    else
+    {
+        CopyFromNonRoot( X, 0 );
+    }
+}
+
+void Display( const Graph& graph, string title )
+{
+    DEBUG_ONLY(CallStackEntry cse("Display [Graph]"))
+#ifdef HAVE_QT5
+    auto graphMat = new Matrix<int>;
+    const int m = graph.NumTargets();
+    const int n = graph.NumSources();
+    Zeros( *graphMat, m, n );
+
+    const int numEdges = graph.NumEdges();
+    const int* srcBuf = graph.LockedSourceBuffer();
+    const int* tgtBuf = graph.LockedTargetBuffer();
+    for( int e=0; e<numEdges; ++e )
+        graphMat->Set( tgtBuf[e], srcBuf[e], 1 );
+
+    QString qTitle = QString::fromStdString( title );
+    auto spyWindow = new SpyWindow;
+    spyWindow->Spy( graphMat, qTitle );
+    spyWindow->show();
+
+    // Spend at most 200 milliseconds rendering
+    ProcessEvents( 200 );
+#else
+    Print( graph, title );
+#endif
+}
+
+void Display( const DistGraph& graph, string title )
+{
+    DEBUG_ONLY(CallStackEntry cse("Display [DistGraph]"))
+    const mpi::Comm comm = graph.Comm();
+    const int commRank = mpi::Rank( comm );
+
+    if( commRank == 0 )
+    {
+        Graph seqGraph;
+        CopyFromRoot( graph, seqGraph );
+        Display( seqGraph, title );
+    }
+    else
+    {
+        CopyFromNonRoot( graph, 0 );
+    }
+}
+
+template<typename Real>
+void Display( const SparseMatrix<Real>& A, string title )
+{
+    DEBUG_ONLY(CallStackEntry cse("Print [SparseMatrix]"))
+#ifdef HAVE_QT5
+    auto AFull = new Matrix<double>;
+    const int m = A.Height();
+    const int n = A.Width();
+    Zeros( *AFull, m, n );
+
+    const int numEntries = A.NumEntries();
+    const int* srcBuf = A.LockedSourceBuffer();
+    const int* tgtBuf = A.LockedTargetBuffer();
+    const Real* valBuf = A.LockedValueBuffer();
+    for( int s=0; s<numEntries; ++s )
+        AFull->Set( tgtBuf[s], srcBuf[s], double(valBuf[s]) );
+
+    QString qTitle = QString::fromStdString( title );
+    auto displayWindow = new DisplayWindow;
+    displayWindow->Display( AFull, qTitle );
+    displayWindow->show();
+
+    // Spend at most 200 milliseconds rendering
+    ProcessEvents( 200 );
+#else
+    Print( A, title );
+#endif
+}
+
+template<typename Real>
+void Display( const SparseMatrix<Complex<Real>>& A, string title )
+{
+    DEBUG_ONLY(CallStackEntry cse("Print [SparseMatrix]"))
+#ifdef HAVE_QT5
+    auto AFull = new Matrix<Complex<double>>;
+    const int m = A.Height();
+    const int n = A.Width();
+    Zeros( *AFull, m, n );
+
+    const int numEntries = A.NumEntries();
+    const int* srcBuf = A.LockedSourceBuffer();
+    const int* tgtBuf = A.LockedTargetBuffer();
+    const Complex<Real>* valBuf = A.LockedValueBuffer();
+    for( int s=0; s<numEntries; ++s )
+    {
+        const Complex<double> alpha =
+            Complex<double>(valBuf[s].real,valBuf[s].imag);
+        AFull->Set( tgtBuf[s], srcBuf[s], alpha );
+    }
+
+    QString qTitle = QString::fromStdString( title );
+    auto displayWindow = new ComplexDisplayWindow;
+    displayWindow->Display( AFull, qTitle );
+    displayWindow->show();
+
+    // Spend at most 200 milliseconds rendering
+    ProcessEvents( 200 );
 #else
     Print( A, title );
 #endif
 }
 
 template<typename T>
-void Display( const AbstractDistMatrix<T>& A, std::string title )
+void Display( const DistSparseMatrix<T>& A, string title )
 {
-    DEBUG_ONLY(CallStackEntry cse("Display"))
-    #define GUARD(CDIST,RDIST) \
-        A.DistData().colDist == CDIST && A.DistData().rowDist == RDIST
-    #define PAYLOAD(CDIST,RDIST) \
-      auto& ACast = dynamic_cast<const DistMatrix<T,CDIST,RDIST>&>(A); \
-      Display( ACast, title );
-    #include "El/core/GuardAndPayload.h"
+    DEBUG_ONLY(CallStackEntry cse("Print [SparseMatrix]"))
+    const mpi::Comm comm = A.Comm();
+    const int commRank = mpi::Rank( comm );
+    
+    if( commRank == 0 )
+    {
+        SparseMatrix<T> ASeq; 
+        CopyFromRoot( A, ASeq );
+        Display( ASeq, title );
+    }
+    else 
+    {
+        CopyFromNonRoot( A, 0 );
+    }
 }
 
-template<typename T>
-void Display( const AbstractBlockDistMatrix<T>& A, std::string title )
+void DisplayLocal
+( const DistSymmNodeInfo& info, bool beforeFact, string title )
 {
-    DEBUG_ONLY(CallStackEntry cse("Display"))
-    #define GUARD(CDIST,RDIST) \
-        A.DistData().colDist == CDIST && A.DistData().rowDist == RDIST
-    #define PAYLOAD(CDIST,RDIST) \
-      auto& ACast = dynamic_cast<const BlockDistMatrix<T,CDIST,RDIST>&>(A); \
-      Display( ACast, title );
-    #include "El/core/GuardAndPayload.h"
-}
+    DEBUG_ONLY(CallStackEntry cse("DisplayLocal [DistSymmNodeInfo]"))
+#ifdef HAVE_QT5
+    const int n = info.distNodes.back().size + info.distNodes.back().off;
+    auto graphMat = new Matrix<int>;
+    Zeros( *graphMat, n, n );
 
-#define DISTPROTO(T,U,V) \
-  template void Display( const DistMatrix<T,U,V>& A, std::string title ); \
-  template void Display( const BlockDistMatrix<T,U,V>& A, std::string title );
+    const int numLocal = info.localNodes.size();
+    for( int s=0; s<numLocal; ++s )
+    {
+        const SymmNodeInfo& node = info.localNodes[s];
+        for( int j=0; j<node.size; ++j )
+            for( int i=0; i<node.size; ++i )
+                graphMat->Set( i+node.off, j+node.off, 1 );
+        if( beforeFact )
+        {
+            const int origStructSize = node.origLowerStruct.size();
+            for( int i=0; i<origStructSize; ++i )
+                for( int j=0; j<node.size; ++j )
+                    graphMat->Set( node.origLowerStruct[i], j+node.off, 1 );
+        }
+        else
+        {
+            const int structSize = node.lowerStruct.size();
+            for( int i=0; i<structSize; ++i )
+                for( int j=0; j<node.size; ++j )
+                    graphMat->Set( node.lowerStruct[i], j+node.off, 1 );
+        }
+    }
+
+    const int numDist = info.distNodes.size();
+    for( int s=0; s<numDist; ++s )
+    {
+        const DistSymmNodeInfo& node = info.distNodes[s];
+        for( int j=0; j<node.size; ++j )
+            for( int i=0; i<node.size; ++i )
+                graphMat->Set( i+node.off, j+node.off, 1 );
+        if( beforeFact )
+        {
+            const int origStructSize = node.origLowerStruct.size();
+            for( int i=0; i<origStructSize; ++i )
+                for( int j=0; j<node.size; ++j )
+                    graphMat->Set( node.origLowerStruct[i], j+node.off, 1 );
+        }
+        else
+        {
+            const int structSize = node.lowerStruct.size();
+            for( int i=0; i<structSize; ++i )
+                for( int j=0; j<node.size; ++j )
+                    graphMat->Set( node.lowerStruct[i], j+node.off, 1 );
+        }
+    }
+
+    QString qTitle = QString::fromStdString( title );
+    auto spyWindow = new SpyWindow;
+    spyWindow->Spy( graphMat, qTitle );
+    spyWindow->show();
+
+    // Spend at most 200 milliseconds rendering
+    ProcessEvents( 200 );
+#else
+    PrintLocal( info );
+#endif
+}
 
 #define PROTO(T) \
-  template void Display( const Matrix<T>& A, std::string title ); \
-  DISTPROTO(T,CIRC,CIRC); \
-  DISTPROTO(T,MC,  MR  ); \
-  DISTPROTO(T,MC,  STAR); \
-  DISTPROTO(T,MD,  STAR); \
-  DISTPROTO(T,MR,  MC  ); \
-  DISTPROTO(T,MR,  STAR); \
-  DISTPROTO(T,STAR,MC  ); \
-  DISTPROTO(T,STAR,MD  ); \
-  DISTPROTO(T,STAR,MR  ); \
-  DISTPROTO(T,STAR,STAR); \
-  DISTPROTO(T,STAR,VC  ); \
-  DISTPROTO(T,STAR,VR  ); \
-  DISTPROTO(T,VC,  STAR); \
-  DISTPROTO(T,VR,  STAR); \
+  template void Display( const Matrix<T>& A, string title ); \
   template void Display \
-  ( const AbstractDistMatrix<T>& A, std::string title ); \
+  ( const AbstractDistMatrix<T>& A, string title ); \
   template void Display \
-  ( const AbstractBlockDistMatrix<T>& A, std::string title ); 
+  ( const AbstractBlockDistMatrix<T>& A, string title ); \
+  template void Display( const DistMultiVec<T>& X, string title ); \
+  template void Display \
+  ( const SparseMatrix<T>& A, string title ); \
+  template void Display \
+  ( const DistSparseMatrix<T>& A, string title );
 
-PROTO(Int);
-#ifndef EL_DISABLE_FLOAT
-PROTO(float);
-#ifndef EL_DISABLE_COMPLEX
-PROTO(Complex<float>);
-#endif // ifndef EL_DISABLE_COMPLEX
-#endif // ifndef EL_DISABLE_FLOAT
-
-PROTO(double);
-#ifndef EL_DISABLE_COMPLEX
-PROTO(Complex<double>);
-#endif // ifndef EL_DISABLE_COMPLEX
+#include "El/macros/Instantiate.h"
 
 } // namespace El

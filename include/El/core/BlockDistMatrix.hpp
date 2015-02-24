@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -16,27 +16,36 @@ struct BlockDistData
 {
     Dist colDist, rowDist;
     Int blockHeight, blockWidth;
-    Int colAlign, rowAlign; 
+    int colAlign, rowAlign; 
     Int colCut, rowCut;
-    Int root;  // relevant for [o ,o ]/[MD,* ]/[* ,MD]
+    int root;  // relevant for [o ,o ]/[MD,* ]/[* ,MD]
     const Grid* grid;
 
     BlockDistData() { }
 
-    template<typename T,Dist U,Dist V>
-    BlockDistData( const GeneralBlockDistMatrix<T,U,V>& A )
-    : colDist(U), rowDist(V), 
+    template<typename T>
+    BlockDistData( const AbstractBlockDistMatrix<T>& A )
+    : colDist(A.ColDist()), rowDist(A.RowDist()), 
       blockHeight(A.BlockHeight()), blockWidth(A.BlockWidth()),
       colAlign(A.ColAlign()), rowAlign(A.RowAlign()),
       colCut(A.ColCut()), rowCut(A.RowCut()),
       root(A.Root()), grid(&A.Grid())
     { }
 };
+inline bool operator==( const BlockDistData& A, const BlockDistData& B )
+{ return A.colDist     == B.colDist &&
+         A.rowDist     == B.rowDist &&
+         A.blockHeight == B.blockHeight &&
+         A.blockWidth  == B.blockWidth &&
+         A.colAlign    == B.colAlign &&
+         A.rowAlign    == B.rowAlign &&
+         A.root        == B.root &&
+         A.grid        == B.grid; }
+
 
 } // namespace El
 
 #include "./BlockDistMatrix/Abstract.hpp"
-#include "./BlockDistMatrix/General.hpp"
 #include "./BlockDistMatrix/CIRC_CIRC.hpp"
 #include "./BlockDistMatrix/MC_MR.hpp"
 #include "./BlockDistMatrix/MC_STAR.hpp"
@@ -67,6 +76,48 @@ FillDesc( const BlockDistMatrix<T>& A, int context )
     return desc;
 }
 #endif
+
+template<typename T>
+inline void AssertSameGrids( const AbstractBlockDistMatrix<T>& A ) { }
+
+template<typename T1,typename T2>
+inline void AssertSameGrids
+( const AbstractBlockDistMatrix<T1>& A1, const AbstractBlockDistMatrix<T2>& A2 )
+{
+    if( A1.Grid() != A2.Grid() )
+        LogicError("Grids did not match");
+}
+
+template<typename T1,typename T2,typename... Args>
+inline void AssertSameGrids
+( const AbstractBlockDistMatrix<T1>& A1, const AbstractBlockDistMatrix<T2>& A2,
+  Args&... args )
+{
+    if( A1.Grid() != A2.Grid() )
+        LogicError("Grids did not match");
+    AssertSameGrids( A2, args... );
+}
+
+template<typename T>
+inline void AssertSameDists( const AbstractBlockDistMatrix<T>& A ) { }
+
+template<typename T>
+inline void AssertSameDists
+( const AbstractBlockDistMatrix<T>& A1, const AbstractBlockDistMatrix<T>& A2 ) 
+{
+    if( A1.ColDist() != A2.ColDist() || A1.RowDist() != A2.RowDist() )
+        LogicError("Distributions did not match");
+}
+
+template<typename T,typename... Args>
+inline void AssertSameDists
+( const AbstractBlockDistMatrix<T>& A1, const AbstractBlockDistMatrix<T>& A2, 
+  Args&... args )
+{
+    if( A1.ColDist() != A2.ColDist() || A1.RowDist() != A2.RowDist() )
+        LogicError("Distributions did not match");
+    AssertSameDists( A2, args... );
+}
 
 } // namespace El
 

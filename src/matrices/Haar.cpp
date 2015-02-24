@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -17,7 +17,7 @@ void Haar( Matrix<F>& A, Int n )
     // TODO: Replace this with a quadratic scheme similar to Stewart's, which
     //       essentially generates random Householder reflectors
     Gaussian( A, n, n );
-    qr::Explicit( A );
+    qr::ExplicitUnitary( A );
 }
 
 template<typename F>
@@ -31,19 +31,19 @@ void ImplicitHaar( Matrix<F>& A, Matrix<F>& t, Matrix<Base<F>>& d, Int n )
 }
 
 template<typename F>
-void Haar( DistMatrix<F>& A, Int n )
+void Haar( AbstractDistMatrix<F>& A, Int n )
 {
     DEBUG_ONLY(CallStackEntry cse("Haar"))
     // TODO: Replace this with a quadratic scheme similar to Stewart's, which
     //       essentially generates random Householder reflectors
     Gaussian( A, n, n );
-    qr::Explicit( A );
+    qr::ExplicitUnitary( A );
 }
 
 template<typename F>
 void ImplicitHaar
-( DistMatrix<F>& A, DistMatrix<F,MD,STAR>& t, DistMatrix<Base<F>,MD,STAR>& d, 
-  Int n )
+( AbstractDistMatrix<F>& A, AbstractDistMatrix<F>& t, 
+  AbstractDistMatrix<Base<F>>& d, Int n )
 {
     DEBUG_ONLY(CallStackEntry cse("Haar"))
     // TODO: Replace this with a quadratic scheme similar to Stewart's, which
@@ -54,16 +54,14 @@ void ImplicitHaar
 
 #define PROTO(F) \
   template void Haar( Matrix<F>& A, Int n ); \
-  template void Haar( DistMatrix<F>& A, Int n ); \
+  template void Haar( AbstractDistMatrix<F>& A, Int n ); \
   template void ImplicitHaar \
   ( Matrix<F>& A, Matrix<F>& t, Matrix<Base<F>>& d, Int n ); \
   template void ImplicitHaar \
-  ( DistMatrix<F>& A, \
-    DistMatrix<F,MD,STAR>& t, DistMatrix<Base<F>,MD,STAR>& d, Int n );
+  ( AbstractDistMatrix<F>& A, \
+    AbstractDistMatrix<F>& t, AbstractDistMatrix<Base<F>>& d, Int n );
 
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#define EL_NO_INT_PROTO
+#include "El/macros/Instantiate.h"
 
 } // namespace El

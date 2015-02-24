@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -20,7 +20,7 @@ namespace El {
 template<typename T>
 void Write
 ( const Matrix<T>& A, 
-  std::string basename, FileFormat format, std::string title )
+  string basename, FileFormat format, string title )
 {
     DEBUG_ONLY(CallStackEntry cse("Write"))
     switch( format )
@@ -43,13 +43,13 @@ void Write
     }
 }
 
-template<typename T,Dist U,Dist V>
+template<typename T>
 void Write
-( const DistMatrix<T,U,V>& A, 
-  std::string basename, FileFormat format, std::string title )
+( const AbstractDistMatrix<T>& A, 
+  string basename, FileFormat format, string title )
 {
     DEBUG_ONLY(CallStackEntry cse("Write"))
-    if( U == A.UGath && V == A.VGath )
+    if( A.ColStride() == 1 && A.RowStride() == 1 )
     {
         if( A.CrossRank() == A.Root() && A.RedundantRank() == 0 )
             Write( A.LockedMatrix(), basename, format, title );
@@ -62,13 +62,13 @@ void Write
     }
 }
 
-template<typename T,Dist U,Dist V>
+template<typename T>
 void Write
-( const BlockDistMatrix<T,U,V>& A, 
-  std::string basename, FileFormat format, std::string title )
+( const AbstractBlockDistMatrix<T>& A, 
+  string basename, FileFormat format, string title )
 {
     DEBUG_ONLY(CallStackEntry cse("Write"))
-    if( U == A.UGath && V == A.VGath )
+    if( A.ColStride() == 1 && A.RowStride() == 1 )
     {
         if( A.CrossRank() == A.Root() && A.RedundantRank() == 0 )
             Write( A.LockedMatrix(), basename, format, title );
@@ -81,37 +81,17 @@ void Write
     }
 }
 
-#define PROTO_DIST(T,U,V) \
-  template void Write \
-  ( const DistMatrix<T,U,V>& A, \
-    std::string basename, FileFormat format, std::string title ); \
-  template void Write \
-  ( const BlockDistMatrix<T,U,V>& A, \
-    std::string basename, FileFormat format, std::string title );
-
 #define PROTO(T) \
   template void Write \
   ( const Matrix<T>& A, \
-    std::string basename, FileFormat format, std::string title ); \
-  PROTO_DIST(T,CIRC,CIRC) \
-  PROTO_DIST(T,MC,  MR  ) \
-  PROTO_DIST(T,MC,  STAR) \
-  PROTO_DIST(T,MD,  STAR) \
-  PROTO_DIST(T,MR,  MC  ) \
-  PROTO_DIST(T,MR,  STAR) \
-  PROTO_DIST(T,STAR,MC  ) \
-  PROTO_DIST(T,STAR,MD  ) \
-  PROTO_DIST(T,STAR,MR  ) \
-  PROTO_DIST(T,STAR,STAR) \
-  PROTO_DIST(T,STAR,VC  ) \
-  PROTO_DIST(T,STAR,VR  ) \
-  PROTO_DIST(T,VC,  STAR) \
-  PROTO_DIST(T,VR,  STAR)
+    string basename, FileFormat format, string title ); \
+  template void Write \
+  ( const AbstractDistMatrix<T>& A, \
+    string basename, FileFormat format, string title ); \
+  template void Write \
+  ( const AbstractBlockDistMatrix<T>& A, \
+    string basename, FileFormat format, string title );
 
-PROTO(Int)
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#include "El/macros/Instantiate.h"
 
 } // namespace El

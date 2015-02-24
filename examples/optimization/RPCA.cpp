@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -89,8 +89,8 @@ main( int argc, char* argv[] )
         const double frobLTrue = FrobeniusNorm( LTrue );
         const double maxLTrue = MaxNorm( LTrue );
         if( commRank == 0 )
-            std::cout << "|| L ||_F = " << frobLTrue << "\n"
-                      << "|| L ||_max = " << maxLTrue << std::endl;
+            cout << "|| L ||_F = " << frobLTrue << "\n"
+                 << "|| L ||_max = " << maxLTrue << endl;
         if( display )
             Display( LTrue, "True low-rank" );
         if( print )
@@ -102,9 +102,9 @@ main( int argc, char* argv[] )
         const double frobSTrue = FrobeniusNorm( STrue );
         const double maxSTrue = MaxNorm( STrue );
         if( commRank == 0 )
-            std::cout << "number of corrupted entries: " << numCorrupt << "\n"
-                      << "|| S ||_F = " << frobSTrue << "\n"
-                      << "|| S ||_max = " << maxSTrue << std::endl;
+            cout << "number of corrupted entries: " << numCorrupt << "\n"
+                 << "|| S ||_F = " << frobSTrue << "\n"
+                 << "|| S ||_max = " << maxSTrue << endl;
         if( display )
         {
             Display( STrue, "True sparse matrix" );
@@ -116,10 +116,9 @@ main( int argc, char* argv[] )
             Print( STrue, "True sparse" );
 
         if( commRank == 0 )
-            std::cout << "Using " << STrue.Grid().Height() << " x " 
-                      << STrue.Grid().Width() 
-                      << " process grid and blocksize of " << Blocksize() 
-                      << std::endl;
+            cout << "Using " << STrue.Grid().Height() << " x " 
+                 << STrue.Grid().Width() 
+                 << " process grid and blocksize of " << Blocksize() << endl;
 
         // M = LTrue + STrue
         DistMatrix<C> M( LTrue );
@@ -129,12 +128,8 @@ main( int argc, char* argv[] )
         if( print )
             Print( M, "Sum of low-rank and sparse" );
 
-        DistMatrix<C> L, S;
-        Zeros( L, m, n );
-        Zeros( S, m, n ); 
-
         // Create a custom set of parameters for RPCA
-        RpcaCtrl<double> ctrl;
+        RPCACtrl<double> ctrl;
         ctrl.useALM = useALM;
         ctrl.usePivQR = usePivQR;
         ctrl.progress = print;
@@ -145,6 +140,7 @@ main( int argc, char* argv[] )
         ctrl.rho = rho;
         ctrl.tol = tol;
 
+        DistMatrix<C> L, S;
         RPCA( M, L, S, ctrl );
 
         if( display )
@@ -166,13 +162,12 @@ main( int argc, char* argv[] )
         const double frobLDiff = FrobeniusNorm( L );
         const double frobSDiff = FrobeniusNorm( S );
         if( commRank == 0 )
-            std::cout << "\n"
-                      << "Error in computed decomposition:\n"
-                      << "  || L - LTrue ||_F / || LTrue ||_F = " 
-                      << frobLDiff/frobLTrue << "\n"
-                      << "  || S - STrue ||_F / || STrue ||_F = " 
-                      << frobSDiff/frobSTrue << "\n"
-                      << std::endl;
+            cout << "\n"
+                 << "Error in computed decomposition:\n"
+                 << "  || L - LTrue ||_F / || LTrue ||_F = " 
+                 << frobLDiff/frobLTrue << "\n"
+                 << "  || S - STrue ||_F / || STrue ||_F = " 
+                 << frobSDiff/frobSTrue << "\n" << endl;
 
         if( display )
         {
@@ -185,7 +180,7 @@ main( int argc, char* argv[] )
             Print( S, "Error in sparse estimate" );
         }
     }
-    catch( std::exception& e ) { ReportException(e); }
+    catch( exception& e ) { ReportException(e); }
 
     Finalize();
     return 0;

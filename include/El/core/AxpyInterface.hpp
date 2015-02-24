@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    Copyright (c) 2011, The University of Texas at Austin
    All rights reserved.
 
@@ -41,26 +41,29 @@ public:
     void Detach();
 
 private:
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
+    static const Int 
+        DATA_TAG        =1, 
+        DATA_REQUEST_TAG=2, 
+        DATA_REPLY_TAG  =3;
+#else
     static const Int 
         DATA_TAG        =1, 
         EOM_TAG         =2, 
         DATA_REQUEST_TAG=3, 
         DATA_REPLY_TAG  =4;
-  
-//request object for polling on Issends
+#endif
+
+    //request object for polling on Issends
     bool attachedForLocalToGlobal_, attachedForGlobalToLocal_;
 
     DistMatrix<T,MC,MR>* localToGlobalMat_;
     const DistMatrix<T,MC,MR>* globalToLocalMat_;
 
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
 #else
     std::vector<bool> sentEomTo_, haveEomFrom_;
     std::vector<mpi::Request> eomSendRequests_;
-    // Check if we are done with this attachment's work
-    bool Finished();
-    // Progress functions
-    void UpdateRequestStatuses();
 #endif    
     
     std::vector<std::deque<bool>> 
@@ -74,13 +77,18 @@ private:
     
     byte sendDummy_, recvDummy_;
 
-#if MPI_VERSION>=3 && defined(EL_USE_NONBLOCKING_CONSENSUS)
+    // Progress functions
+#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
     bool ReturnRequestStatuses();
 #else
+    // Check if we are done with this attachment's work
+    bool Finished();
     void HandleEoms();
     void StartSendingEoms();
     void FinishSendingEoms();
+    void UpdateRequestStatuses();
 #endif
+
     Int ReadyForSend
     ( Int sendSize,
       std::deque<std::vector<byte>>& sendVectors,

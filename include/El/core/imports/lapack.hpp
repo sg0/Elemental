@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -17,45 +17,58 @@ namespace lapack {
 // =================
 
 // Relative machine precision
-template<typename R> R MachineEpsilon();
+template<typename R=double> R MachineEpsilon();
 template<> float MachineEpsilon<float>();
 template<> double MachineEpsilon<double>();
 
 // Minimum number which can be inverted without overflow
-template<typename R> R MachineSafeMin();
+template<typename R=double> R MachineSafeMin();
 template<> float MachineSafeMin<float>();
 template<> double MachineSafeMin<double>();
 
 // Base of the machine, where the number is represented as 
 //   (mantissa) x (base)^(exponent)
-template<typename R> R MachineBase();
+template<typename R=double> R MachineBase();
 template<> float MachineBase<float>();
 template<> double MachineBase<double>();
 
 // Return the relative machine precision multiplied by the base
-template<typename R> R MachinePrecision();
+template<typename R=double> R MachinePrecision();
 template<> float MachinePrecision<float>();
 template<> double MachinePrecision<double>();
 
 // Return the minimum exponent before (gradual) underflow occurs
-template<typename R> R MachineUnderflowExponent();
+template<typename R=double> R MachineUnderflowExponent();
 template<> float MachineUnderflowExponent<float>();
 template<> double MachineUnderflowExponent<double>();
 
 // Return the underflow threshold: (base)^((underflow exponent)-1)
-template<typename R> R MachineUnderflowThreshold();
+template<typename R=double> R MachineUnderflowThreshold();
 template<> float MachineUnderflowThreshold<float>();
 template<> double MachineUnderflowThreshold<double>();
 
 // Return the largest exponent before overflow
-template<typename R> R MachineOverflowExponent();
+template<typename R=double> R MachineOverflowExponent();
 template<> float MachineOverflowExponent<float>();
 template<> double MachineOverflowExponent<double>();
 
 // Return the overflow threshold: (1-(rel. prec.)) * (base)^(overflow exponent)
-template<typename R> R MachineOverflowThreshold();
+template<typename R=double> R MachineOverflowThreshold();
 template<> float MachineOverflowThreshold<float>();
 template<> double MachineOverflowThreshold<double>();
+
+// For copying column-major matrices
+// =================================
+void Copy
+( char uplo, int m, int n, const float* A, int lda, float* B, int ldb );
+void Copy
+( char uplo, int m, int n, const double* A, int lda, double* B, int ldb );
+void Copy
+( char uplo, int m, int n, const scomplex* A, int lda, scomplex* B, int ldb );
+void Copy
+( char uplo, int m, int n, const dcomplex* A, int lda, dcomplex* B, int ldb );
+template<typename T>
+void Copy( char uplo, int m, int n, const T* A, int lda, T* B, int ldb );
 
 // For safely computing norms without overflow/underflow
 // =====================================================
@@ -65,10 +78,10 @@ double SafeNorm( double alpha, double beta );
 float SafeNorm( float alpha, float beta, float gamma );
 double SafeNorm( double alpha, double beta, double gamma );
 
-float SafeNorm( Complex<float> alpha, float beta );
-double SafeNorm( Complex<double> alpha, double beta );
-float SafeNorm( float alpha, Complex<float> beta );
-double SafeNorm( double alpha, Complex<double> beta );
+float SafeNorm( scomplex alpha, float beta );
+double SafeNorm( dcomplex alpha, double beta );
+float SafeNorm( float alpha, scomplex beta );
+double SafeNorm( double alpha, dcomplex beta );
 
 // Givens rotations
 // ================
@@ -377,6 +390,29 @@ void Eig( int n, double* A, int ldA, dcomplex* w, dcomplex* X, int ldX );
 void Eig( int n, double* A, int ldA, dcomplex* w, double* XPacked, int ldX );
 void Eig( int n, scomplex* A, int ldA, scomplex* w, scomplex* X, int ldX );
 void Eig( int n, dcomplex* A, int ldA, dcomplex* w, dcomplex* X, int ldX );
+
+// Templated wrappers
+// ==================
+template<typename T>
+inline void 
+Copy( char uplo, int m, int n, const T* A, int lda, T* B, int ldb )
+{
+    if( uplo == 'L' || uplo == 'l' )
+    {
+        // TODO: Handle trapezoids?
+        for( int j=0; j<n; ++j )
+            MemCopy( &B[j+j*ldb], &A[j+j*lda], m-j );
+    }
+    else if( uplo == 'U' || uplo == 'u' )
+    {
+        // TODO: Handle trapezoids?
+        for( int j=0; j<n; ++j )
+            MemCopy( &B[j*ldb], &A[j*lda], j+1 );
+    }
+    else
+        for( int j=0; j<n; ++j )
+            MemCopy( &B[j*ldb], &A[j*lda], m );
+}
 
 } // namespace lapack
 } // namespace El

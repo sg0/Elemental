@@ -1,14 +1,12 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
    which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
-#include "El-lite.hpp"
-
-
+#include "El.hpp"
 
 namespace El {
 
@@ -34,7 +32,7 @@ void Ricatti( Matrix<F>& W, Matrix<F>& X, SignCtrl<Base<F>> ctrl )
          WBL, WBR, n );
 
     // (ML, MR) = sgn(W) - I
-    UpdateDiagonal( W, F(-1) );
+    ShiftDiagonal( W, F(-1) );
 
     // Solve for X in ML X = -MR
     Matrix<F> ML, MR;
@@ -44,9 +42,15 @@ void Ricatti( Matrix<F>& W, Matrix<F>& X, SignCtrl<Base<F>> ctrl )
 }
 
 template<typename F>
-void Ricatti( DistMatrix<F>& W, DistMatrix<F>& X, SignCtrl<Base<F>> ctrl )
+void Ricatti
+( AbstractDistMatrix<F>& WPre, AbstractDistMatrix<F>& X, 
+  SignCtrl<Base<F>> ctrl )
 {
     DEBUG_ONLY(CallStackEntry cse("Ricatti"))
+
+    auto WPtr = ReadProxy<F,MC,MR>( &WPre );
+    auto& W = *WPtr;
+
     const Grid& g = W.Grid();
     Sign( W, ctrl );
     const Int n = W.Height()/2;
@@ -57,7 +61,7 @@ void Ricatti( DistMatrix<F>& W, DistMatrix<F>& X, SignCtrl<Base<F>> ctrl )
          WBL, WBR, n );
 
     // (ML, MR) = sgn(W) - I
-    UpdateDiagonal( W, F(-1) );
+    ShiftDiagonal( W, F(-1) );
 
     // Solve for X in ML X = -MR
     DistMatrix<F> ML(g), MR(g);
@@ -102,8 +106,9 @@ void Ricatti
 template<typename F>
 void Ricatti
 ( UpperOrLower uplo, 
-  const DistMatrix<F>& A, const DistMatrix<F>& K, const DistMatrix<F>& L, 
-  DistMatrix<F>& X, SignCtrl<Base<F>> ctrl )
+  const AbstractDistMatrix<F>& A, const AbstractDistMatrix<F>& K, 
+  const AbstractDistMatrix<F>& L,       AbstractDistMatrix<F>& X, 
+  SignCtrl<Base<F>> ctrl )
 {
     DEBUG_ONLY(
         CallStackEntry cse("Sylvester");
@@ -115,8 +120,7 @@ void Ricatti
             LogicError("L must be square");
         if( A.Height() != K.Height() || A.Height() != L.Height() )
             LogicError("A, K, and L must be the same size");
-        if( A.Grid() != K.Grid() || K.Grid() != L.Grid() )
-            LogicError("A, K, and L must have the same grid");
+        AssertSameGrids( A, K, L );
     )
     const Grid& g = A.Grid();
     const Int n = A.Height();
@@ -139,19 +143,19 @@ void Ricatti
   template void Ricatti \
   ( Matrix<F>& W, Matrix<F>& X, SignCtrl<Base<F>> ctrl ); \
   template void Ricatti \
-  ( DistMatrix<F>& W, DistMatrix<F>& X, SignCtrl<Base<F>> ctrl ); \
+  ( AbstractDistMatrix<F>& W, AbstractDistMatrix<F>& X, \
+    SignCtrl<Base<F>> ctrl ); \
   template void Ricatti \
   ( UpperOrLower uplo, \
     const Matrix<F>& A, const Matrix<F>& K, const Matrix<F>& L, \
           Matrix<F>& X, SignCtrl<Base<F>> ctrl ); \
   template void Ricatti \
   ( UpperOrLower uplo, \
-    const DistMatrix<F>& A, const DistMatrix<F>& K, const DistMatrix<F>& L, \
-          DistMatrix<F>& X, SignCtrl<Base<F>> ctrl );
+    const AbstractDistMatrix<F>& A, const AbstractDistMatrix<F>& K, \
+    const AbstractDistMatrix<F>& L,       AbstractDistMatrix<F>& X, \
+    SignCtrl<Base<F>> ctrl );
 
-PROTO(float)
-PROTO(double)
-PROTO(Complex<float>)
-PROTO(Complex<double>)
+#define EL_NO_INT_PROTO
+#include "El/macros/Instantiate.h"
 
 } // namespace El

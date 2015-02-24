@@ -1,5 +1,5 @@
 /*
-   Copyright (c) 2009-2014, Jack Poulson
+   Copyright (c) 2009-2015, Jack Poulson
    All rights reserved.
 
    This file is part of Elemental and is under the BSD 2-Clause License, 
@@ -12,10 +12,39 @@
 
 namespace El {
 
-void PrintVersion( std::ostream& os=std::cout );
-void PrintConfig( std::ostream& os=std::cout );
-void PrintCCompilerInfo( std::ostream& os=std::cout );
-void PrintCxxCompilerInfo( std::ostream& os=std::cout );
+using std::size_t;
+
+using std::array;
+using std::complex;
+using std::deque;
+using std::function;
+using std::pair;
+using std::set;
+using std::vector;
+
+using std::make_shared;
+using std::shared_ptr;
+using std::unique_ptr;
+
+using std::move;
+
+using std::string;
+using std::cout;
+using std::cerr;
+using std::endl;
+using std::ifstream;
+using std::ofstream;
+using std::ostream;
+using std::ostringstream;
+
+using std::exception;
+using std::uncaught_exception;
+
+void PrintVersion( ostream& os=cout );
+void PrintConfig( ostream& os=cout );
+void PrintCCompilerInfo( ostream& os=cout );
+void PrintCxxCompilerInfo( ostream& os=cout );
+bool Using64BitInt();
 
 // For initializing and finalizing Elemental
 void Initialize( int& argc, char**& argv );
@@ -28,21 +57,21 @@ class Args : public choice::MpiArgs
 public:
     Args
     ( int argc, char** argv,
-      mpi::Comm comm=mpi::COMM_WORLD, std::ostream& error=std::cerr )
+      mpi::Comm comm=mpi::COMM_WORLD, ostream& error=cerr )
     : choice::MpiArgs(argc,argv,comm,error)
     { }
     virtual ~Args() { }
 protected:
-    virtual void HandleVersion( std::ostream& os=std::cout ) const;
-    virtual void HandleBuild( std::ostream& os=std::cout ) const;
+    virtual void HandleVersion( ostream& os=cout ) const;
+    virtual void HandleBuild( ostream& os=cout ) const;
 };
 Args& GetArgs();
 
 // For processing command-line arguments
 template<typename T>
-T Input( std::string name, std::string desc );
+T Input( string name, string desc );
 template<typename T>
-T Input( std::string name, std::string desc, T defaultVal );
+T Input( string name, string desc, T defaultVal );
 void ProcessInput();
 void PrintInputReport();
 
@@ -78,30 +107,37 @@ inline Int Min( Int m, Int n )
 // Replacement for std::memcpy, which is known to often be suboptimal.
 // Notice the sizeof(T) is no longer required.
 template<typename T>
-void MemCopy( T* dest, const T* source, std::size_t numEntries );
+void MemCopy( T* dest, const T* source, size_t numEntries );
 
 template<typename T>
-void MemSwap( T* a, T* b, T* temp, std::size_t numEntries );
+void MemSwap( T* a, T* b, T* temp, size_t numEntries );
 
 // Generalization of std::memcpy so that unit strides are not required
 template<typename T>
 void StridedMemCopy
-(       T* dest,   std::size_t destStride,
-  const T* source, std::size_t sourceStride, std::size_t numEntries );
+(       T* dest,   Int destStride,
+  const T* source, Int sourceStride, Int numEntries );
+
+template<typename S,typename T>
+inline void CopySTL( const S& a, T& b )
+{
+    b.resize( a.size() ); 
+    std::copy( a.begin(), a.end(), b.begin() );
+}
 
 // Replacement for std::memset, which is likely suboptimal and hard to extend
 // to non-POD datatypes. Notice that sizeof(T) is no longer required.
 template<typename T>
-void MemZero( T* buffer, std::size_t numEntries );
+void MemZero( T* buffer, size_t numEntries );
 
 // Clear the contents of x by swapping with an empty object of the same type
 template<typename T>
 void SwapClear( T& x );
 
-inline void BuildStream( std::ostringstream& os ) { }
+inline void BuildStream( ostringstream& os ) { }
 
 template<typename T,typename... Args>
-inline void BuildStream( std::ostringstream& os, T item, Args... args )
+inline void BuildStream( ostringstream& os, T item, Args... args )
 {
     os << item;
     BuildStream( os, args... );
@@ -110,28 +146,28 @@ inline void BuildStream( std::ostringstream& os, T item, Args... args )
 template<typename... Args>
 inline void LogicError( Args... args )
 {
-    std::ostringstream os;
+    ostringstream os;
     BuildStream( os, args... );
-    os << std::endl;
+    os << endl;
     throw std::logic_error( os.str().c_str() );
 }
 
 template<typename... Args>
 inline void RuntimeError( Args... args )
 {
-    std::ostringstream os;
+    ostringstream os;
     BuildStream( os, args... );
-    os << std::endl;
+    os << endl;
     throw std::logic_error( os.str().c_str() );
 }
 
 // This is the only place that Elemental is currently using duck-typing.
 // I'm not sure if it's a good idea to use it more often.
 template<class MatType>
-inline std::string 
-DimsString( const MatType& A, std::string label="Matrix" )
+inline string 
+DimsString( const MatType& A, string label="Matrix" )
 { 
-    std::ostringstream os;
+    ostringstream os;
     os << label << " ~ " << A.Height() << " x " << A.Width();
     return os.str();
 }
@@ -170,33 +206,74 @@ public:
 };
 
 DEBUG_ONLY(
-    void PushCallStack( std::string s );
+    void PushCallStack( string s );
     void PopCallStack();
-    void DumpCallStack( std::ostream& os=std::cerr );
+    void DumpCallStack( ostream& os=cerr );
 
     class CallStackEntry 
     {
     public:
-        CallStackEntry( std::string s ) 
+        CallStackEntry( string s ) 
         { 
-            if( !std::uncaught_exception() )
+            if( !uncaught_exception() )
                 PushCallStack(s); 
         }
         ~CallStackEntry() 
         { 
-            if( !std::uncaught_exception() )
+            if( !uncaught_exception() )
                 PopCallStack(); 
         }
     };
 )
 
-void ReportException( const std::exception& e, std::ostream& os=std::cerr );
+void ReportException( const exception& e, ostream& os=cerr );
 class ArgException;
 
 void ComplainIfDebug();
 
 template<typename T>
-void EnsureConsistent( T alpha, mpi::Comm comm, std::string name="" );
+void EnsureConsistent( T alpha, mpi::Comm comm, string name="" );
+
+// This will be guaranteed by C++14 via std::make_unique
+template<typename T, typename ...Args>
+inline unique_ptr<T> MakeUnique( Args&& ...args )
+{ return unique_ptr<T>( new T( std::forward<Args>(args)... ) ); }
+
+template<typename T>
+T Scan( const vector<T>& counts, vector<T>& offsets );
+
+template<typename T>
+bool IsSorted( const vector<T>& x );
+// While is_strictly_sorted exists in Boost, it does not exist in the STL (yet)
+template<typename T>
+bool IsStrictlySorted( const vector<T>& x );
+
+void Union
+( vector<Int>& both,
+  const vector<Int>& first, const vector<Int>& second );
+vector<Int>
+Union( const vector<Int>& first, const vector<Int>& second );
+
+void RelativeIndices
+( vector<Int>& relInds, const vector<Int>& sub, const vector<Int>& full );
+vector<Int> RelativeIndices( const vector<Int>& sub, const vector<Int>& full );
+
+Int Find
+( const vector<Int>& sortedInds, Int index,
+  string msg="Could not find index" );
+
+// TODO: Move this somewhere else or obsolte it entirely
+inline Int
+RowToProcess( Int i, Int blocksize, Int commSize )
+{
+    if( blocksize > 0 )
+        return std::min( i/blocksize, commSize-1 );
+    else
+        return commSize-1;
+}
+
+template<typename F>
+void UpdateScaledSquare( F alpha, Base<F>& scale, Base<F>& scaledSquare );
 
 } // namespace El
 
