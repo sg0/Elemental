@@ -3,7 +3,7 @@ This file is part of Elemental and is under the BSD 2-Clause License,
 which can be found in the LICENSE file in the root directory, or at
 http://opensource.org/licenses/BSD-2-Clause
 */
-#include "El-lite.hpp"
+#include "El.hpp"
 #include <cassert>
 
 namespace El
@@ -2103,10 +2103,7 @@ void AxpyInterface2<T>::Detach()
     coords_.clear();
 }
 
-template class AxpyInterface2<Int>;
-template class AxpyInterface2<float>;
-template class AxpyInterface2<double>;
-template class AxpyInterface2<Complex<float>>;
-template class AxpyInterface2<Complex<double>>;
+#define PROTO(T) template class AxpyInterface2<T>;
+#include "El/macros/Instantiate.h"
 
 } // namespace El

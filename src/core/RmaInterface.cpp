@@ -12,12 +12,9 @@ This file is part of Elemental and is under the BSD 2-Clause License,
 which can be found in the LICENSE file in the root directory, or at
 http://opensource.org/licenses/BSD-2-Clause
 */
-#include "El-lite.hpp"
+#include "El.hpp"
 #include <cassert>
 
-// TODO Complete the const interfaces...
-// TODO RMA related checks pending (e.g bounds checking)...
-// TODO debug messages
 #if MPI_VERSION>=3
 namespace El
 {
@@ -1280,11 +1277,8 @@ void RmaInterface<T>::Detach()
     mpi::WindowFree (window);
 }
 
-template class RmaInterface<Int>;
-template class RmaInterface<float>;
-template class RmaInterface<double>;
-template class RmaInterface<Complex<float>>;
-template class RmaInterface<Complex<double>>;
+#define PROTO(T) template class RmaInterface<T>;
+#include "El/macros/Instantiate.h"
 
 } // namespace El
 #endif
