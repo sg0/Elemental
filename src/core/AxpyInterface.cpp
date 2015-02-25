@@ -20,12 +20,11 @@ namespace El
 template <typename T> bool AxpyInterface <T>::Finished()
 {
     DEBUG_ONLY( CallStackEntry cse( "AxpyInterface::Finished" );
-
                 if( !attachedForLocalToGlobal_ && !attachedForGlobalToLocal_ )
-                LogicError( "Not attached" ); )
-        const Grid& g = ( attachedForLocalToGlobal_ ?
-                          localToGlobalMat_->Grid() :
-                          globalToLocalMat_->Grid() );
+                    LogicError( "Not attached" ); )
+    const Grid& g = ( attachedForLocalToGlobal_ ?
+	              localToGlobalMat_->Grid() :
+                      globalToLocalMat_->Grid() );
 
     const Int p = g.Size();
     bool finished = true;
