@@ -20,27 +20,23 @@ namespace El
 {
 template<typename T>
 RmaInterface<T>::RmaInterface()
-    : GlobalArrayPut_(0), GlobalArrayGet_(0),
-    matrices_(0), window (MPI_WIN_NULL),
-    putVector_(0), getVector_(0),
-    toBeAttachedForPut_(false), toBeAttachedForGet_(false),
-    attached_(false), detached_(true)
+    : GlobalArrayPut_( 0 ), GlobalArrayGet_( 0 ),
+      matrices_( 0 ), window ( MPI_WIN_NULL ),
+      putVector_( 0 ), getVector_( 0 ),
+      toBeAttachedForPut_( false ), toBeAttachedForGet_( false ),
+      attached_( false ), detached_( true )
 { }
 
 template<typename T>
 RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::RmaInterface"))
-
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::RmaInterface" ) )
     attached_ 			= false;
     detached_ 			= true;
-
     toBeAttachedForGet_ 	= false;
     toBeAttachedForPut_ 	= false;
-    
     GlobalArrayPut_ 		= 0;
     GlobalArrayGet_ 		= 0;
-    
     window 	    		= MPI_WIN_NULL;
 }
 
@@ -50,96 +46,87 @@ RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
 template<typename T>
 RmaInterface<T>::RmaInterface( const DistMatrix<T>& X )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::RmaInterface"))
-
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::RmaInterface" ) )
     attached_ 			= false;
     detached_ 			= true;
-
     toBeAttachedForGet_ 	= false;
     toBeAttachedForPut_ 	= false;
-    
     GlobalArrayPut_ 		= 0;
     GlobalArrayGet_ 		= 0;
-    
     window 	    		= MPI_WIN_NULL;
 }
 
 template<typename T>
 RmaInterface<T>::~RmaInterface()
 {
-    {
         if( std::uncaught_exception() )
         {
             std::ostringstream os;
             os << "Uncaught exception detected during RmaInterface destructor "
-            "that required a call to Detach. Instead of allowing for the "
-            "possibility of Detach throwing another exception and "
-            "resulting in a 'terminate', we instead immediately dump the "
-            "call stack (if not in RELEASE mode) since the program will "
-            "likely hang:" << std::endl;
+               "that required a call to Detach. Instead of allowing for the "
+               "possibility of Detach throwing another exception and "
+               "resulting in a 'terminate', we instead immediately dump the "
+               "call stack (if not in RELEASE mode) since the program will "
+               "likely hang:" << std::endl;
             std::cerr << os.str();
-            DEBUG_ONLY(DumpCallStack())
+            DEBUG_ONLY( DumpCallStack() )
         }
         else
-        {
             Detach();
-        }
-    }
 }
 
 template<typename T>
 void RmaInterface<T>::Attach( DistMatrix<T>& Z )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Attach"))
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Attach" ) )
+
     // attached_ will be only set in Attach
     // and only unset in Detach
-    if (!attached_ && detached_)
+    if ( !attached_ && detached_ )
     {
         attached_ = true;
-	detached_ = false;
+        detached_ = false;
     }
     else
-        LogicError("Must detach before reattaching.");
+        LogicError( "Must detach before reattaching." );
 
     // if DistMatrix is non-const, all one-sided
     // transfers -- put, get and acc are possible
     if( !toBeAttachedForPut_ && !toBeAttachedForGet_ )
     {
-	GlobalArrayPut_ 		= &Z;
-	toBeAttachedForPut_ 		= true;
-	GlobalArrayGet_ 		= &Z;
-	toBeAttachedForGet_ 		= true;
+        GlobalArrayPut_ 		= &Z;
+        toBeAttachedForPut_ 		= true;
+        GlobalArrayGet_ 		= &Z;
+        toBeAttachedForGet_ 		= true;
+        const Grid& g = Z.Grid();
+        const Int p = g.Size ();
 
-	const Grid& g = Z.Grid();
-	const Int p = g.Size ();
+        if ( matrices_.empty() )
+        {
+            struct matrix_params_ mp;
+            mp.data_.resize( p );
+            mp.requests_.resize( p );
+            mp.statuses_.resize( p );
+            mp.base_ = NULL;
+            // push back new matrix_params created
+            // with default constructor
+            matrices_.push_back( mp );
+        }
 
-	if ( matrices_.empty() )
-	{
-	    struct matrix_params_ mp;
-	    mp.data_.resize(p);
-	    mp.requests_.resize(p);
-	    mp.statuses_.resize(p);   
-	    mp.base_ = NULL;
-	    // push back new matrix_params created
-	    // with default constructor
-	    matrices_.push_back( mp );
-	}
+        if ( putVector_.empty() )
+        {
+            getVector_.resize( p );
+            putVector_.resize( p );
+        }
 
-	if (putVector_.empty())
-	{
-	    getVector_.resize( p );
-	    putVector_.resize( p );
-	}
-
-	// TODO rma related checks
-	// creation of window
-	const Int numEntries = Z.LocalHeight () * Z.LocalWidth ();
-	const Int bufferSize = numEntries * sizeof(T);
-	void* baseptr = reinterpret_cast< void * >(Z.Buffer ());
-	assert(baseptr != NULL);
-
-	mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
-	mpi::WindowLock (window);
+        // TODO rma related checks
+        // creation of window
+        const Int numEntries = Z.LocalHeight () * Z.LocalWidth ();
+        const Int bufferSize = numEntries * sizeof( T );
+        void* baseptr = reinterpret_cast<void*>( Z.Buffer () );
+        assert( baseptr != NULL );
+        mpi::WindowCreate ( baseptr, bufferSize, g.VCComm (), window );
+        mpi::WindowLock ( window );
     }
 }
 
@@ -147,139 +134,134 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
 template<typename T>
 void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Attach"))
-    if (!attached_ && detached_)
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Attach" ) )
+
+    if ( !attached_ && detached_ )
     {
         attached_ = true;
-	detached_ = false;
+        detached_ = false;
     }
     else
-        LogicError("Must detach before reattaching.");
+        LogicError( "Must detach before reattaching." );
 
     if( !toBeAttachedForGet_ )
     {
-	GlobalArrayGet_ 	= &X;
-	toBeAttachedForGet_ 	= true;
-	GlobalArrayPut_ 	= 0;
-	toBeAttachedForPut_ 	= false;
+        GlobalArrayGet_ 	= &X;
+        toBeAttachedForGet_ 	= true;
+        GlobalArrayPut_ 	= 0;
+        toBeAttachedForPut_ 	= false;
+        const Grid& g = X.Grid();
+        const Int p = g.Size ();
 
-	const Grid& g = X.Grid();
-	const Int p = g.Size ();
+        if ( getVector_.size() != p )
+            getVector_.resize( p );
 
-	if (getVector_.size() != p)
-	{
-	    getVector_.resize( p );
-	}
-
-	//TODO rma related checks
-	const Int numEntries = X.LocalHeight () * X.LocalWidth ();
-	const Int bufferSize = numEntries * sizeof(T);
-	void* baseptr = static_cast<void*>(const_cast<T*>(X.LockedBuffer ()));
-	assert (baseptr != NULL);
-
-	mpi::WindowCreate (baseptr, bufferSize, g.VCComm (), window);
-	mpi::WindowLock (window);
+        //TODO rma related checks
+        const Int numEntries = X.LocalHeight () * X.LocalWidth ();
+        const Int bufferSize = numEntries * sizeof( T );
+        void* baseptr = static_cast<void*>( const_cast<T*>( X.LockedBuffer () ) );
+        assert ( baseptr != NULL );
+        mpi::WindowCreate ( baseptr, bufferSize, g.VCComm (), window );
+        mpi::WindowLock ( window );
     }
 }
 
 // for standard passive rma
 template<typename T>
 Int RmaInterface<T>::NextIndex
-( Int dataSize, 
-  std::deque <std::vector<T>> &dataVectors)
+( Int dataSize,
+  std::deque <std::vector<T>>& dataVectors )
 {
-    DEBUG_ONLY (CallStackEntry cse ("RmaInterface::NextIndex"))
-	
+    DEBUG_ONLY ( CallStackEntry cse ( "RmaInterface::NextIndex" ) )
     const Int numCreated = dataVectors.size ();
-        
-    dataVectors.resize (numCreated + 1);
-    dataVectors[numCreated].resize (dataSize);
-       
+    dataVectors.resize ( numCreated + 1 );
+    dataVectors[numCreated].resize ( dataSize );
     return numCreated;
 }
 
 // for request-based passive rma
 template<typename T>
 Int RmaInterface<T>::NextIndex (
-	Int target,
-	Int dataSize, 
-	const void* base_address,
-	Int *mindex)
+    Int target,
+    Int dataSize,
+    const void* base_address,
+    Int* mindex )
 {
-    DEBUG_ONLY (CallStackEntry cse ("RmaInterface::NextIndex"))
-    
+    DEBUG_ONLY ( CallStackEntry cse ( "RmaInterface::NextIndex" ) )
     assert ( base_address != NULL );
-
     Int matrixIndex = 0;
     const Grid& g = ( toBeAttachedForPut_ ?
-	    GlobalArrayPut_->Grid() :
-	    GlobalArrayGet_->Grid() );
+                      GlobalArrayPut_->Grid() :
+                      GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     const Int numMatrices = matrices_.size();
 
     // search for matrix base
-    for (Int m = 0; m < numMatrices; m++)
+    for ( Int m = 0; m < numMatrices; m++ )
     {
-	if ( matrices_[m].base_ == base_address )
-	{
-	    matrixIndex = m;
-	    break;
-	}
-	// uninitiated, first time
-	if ( matrices_[m].base_ == NULL )
-	{
-	    matrices_[m].base_ = base_address;
-	    matrixIndex = m;
-	    break;    
-	}
-	matrixIndex = m+1;
+        if ( matrices_[m].base_ == base_address )
+        {
+            matrixIndex = m;
+            break;
+        }
+
+        // uninitiated, first time
+        if ( matrices_[m].base_ == NULL )
+        {
+            matrices_[m].base_ = base_address;
+            matrixIndex = m;
+            break;
+        }
+
+        matrixIndex = m+1;
     }
-    
+
     // need to create new object
-    if ( matrixIndex == numMatrices)
+    if ( matrixIndex == numMatrices )
     {
-	struct matrix_params_ mp;
-	mp.data_.resize(p);
-	mp.requests_.resize(p);
-	mp.statuses_.resize(p);   
-	mp.base_ = NULL;
-	// push back new matrix_params created
-	// with default constructor
-	matrices_.push_back( mp );
-	matrices_[matrixIndex].base_ = base_address;
+        struct matrix_params_ mp;
+        mp.data_.resize( p );
+        mp.requests_.resize( p );
+        mp.statuses_.resize( p );
+        mp.base_ = NULL;
+        // push back new matrix_params created
+        // with default constructor
+        matrices_.push_back( mp );
+        matrices_[matrixIndex].base_ = base_address;
     }
-    // go through the request, data, 
+
+    // go through the request, data,
     // status objects
     const Int numCreated = matrices_[matrixIndex].data_[target].size ();
-    DEBUG_ONLY (if (numCreated != Int (matrices_[matrixIndex].requests_[target].size ()) ||
-		numCreated != Int (matrices_[matrixIndex].statuses_[target].size ()))
-	    LogicError ("size mismatch");)
 
-	for (Int i = 0; i < numCreated; ++i)
-	{
-	    // If this request is still running, 
-	    // test to see if it finished.
-	    if (matrices_[matrixIndex].statuses_[target][i])
-	    {
-		const bool finished = mpi::Test (matrices_[matrixIndex].requests_[target][i]);
-		matrices_[matrixIndex].statuses_[target][i] = !finished;
-	    }
+    DEBUG_ONLY ( if ( numCreated != Int ( matrices_[matrixIndex].requests_[target].size () ) ||
+                      numCreated != Int ( matrices_[matrixIndex].statuses_[target].size () ) )
+                 LogicError ( "size mismatch" ); )
 
-	    if (!matrices_[matrixIndex].statuses_[target][i])
-	    {
-		matrices_[matrixIndex].statuses_[target][i] = true;
-		matrices_[matrixIndex].data_[target][i].resize ( dataSize );
-		*mindex = matrixIndex;
-		return i;
-	    }
-	}
+    for ( Int i = 0; i < numCreated; ++i )
+    {
+        // If this request is still running,
+        // test to see if it finished.
+        if ( matrices_[matrixIndex].statuses_[target][i] )
+        {
+            const bool finished = mpi::Test ( matrices_[matrixIndex].requests_[target][i] );
+            matrices_[matrixIndex].statuses_[target][i] = !finished;
+        }
+
+        if ( !matrices_[matrixIndex].statuses_[target][i] )
+        {
+            matrices_[matrixIndex].statuses_[target][i] = true;
+            matrices_[matrixIndex].data_[target][i].resize ( dataSize );
+            *mindex = matrixIndex;
+            return i;
+        }
+    }
 
     matrices_[matrixIndex].data_[target].resize ( numCreated + 1 );
     matrices_[matrixIndex].data_[target][numCreated].resize ( dataSize );
     matrices_[matrixIndex].requests_[target].push_back ( mpi::REQUEST_NULL );
     matrices_[matrixIndex].statuses_[target].push_back ( true );
     *mindex = matrixIndex;
-
     return numCreated;
 }
 
@@ -287,17 +269,19 @@ Int RmaInterface<T>::NextIndex (
 template<typename T>
 void RmaInterface<T>::Rput( const Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Rput"))
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Rput" ) )
 
     if( i < 0 || j < 0 )
-        LogicError("Submatrix offsets must be non-negative");
+        LogicError( "Submatrix offsets must be non-negative" );
+
     if ( !toBeAttachedForPut_ )
-        LogicError("Global matrix cannot be updated");
+        LogicError( "Global matrix cannot be updated" );
 
     DistMatrix<T>& Y = *GlobalArrayPut_;
+
     //do rma related checks
     if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
-        LogicError("Submatrix out of bounds of global matrix");
+        LogicError( "Submatrix out of bounds of global matrix" );
 
     const Grid& g = Y.Grid();
     const Int r = g.Height();
@@ -305,24 +289,19 @@ void RmaInterface<T>::Rput( const Matrix<T>& Z, Int i, Int j )
     const Int p = g.Size();
     const Int myProcessRow = g.Row();
     const Int myProcessCol = g.Col();
-    const Int colAlign = (Y.ColAlign() + i) % r;
-    const Int rowAlign = (Y.RowAlign() + j) % c;
-
+    const Int colAlign = ( Y.ColAlign() + i ) % r;
+    const Int rowAlign = ( Y.RowAlign() + j ) % c;
     const Int XLDim = Z.LDim();
     // local matrix width and height
     const Int height = Z.Height();
     const Int width = Z.Width();
-
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
-
     const Int iLocalOffset = Length( i, Y.ColShift (), r );
     const Int jLocalOffset = Length( j, Y.RowShift (), c );
-
     const Int YLDim = Y.LDim ();
-        
     const T* XBuffer = Z.LockedBuffer();
-    const void* Buffer = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));	
+    const void* Buffer = static_cast<void*>( const_cast<T*>( Z.LockedBuffer() ) );
     Int matrix_index;
 
     for( Int step=0; step<p; ++step )
@@ -337,60 +316,62 @@ void RmaInterface<T>::Rput( const Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-	    const Int index = 
-		NextIndex (destination,
-			numEntries, 
-			Buffer,
-			&matrix_index);
-		    
-	    DEBUG_ONLY (if
-			(Int (matrices_[matrix_index].data_[destination][index].size ()) !=
-			 numEntries) LogicError ("Error in NextIndex");)
-	    
-	    T *sendBuffer = reinterpret_cast<T *>(matrices_[matrix_index].data_[destination][index].data ());
-	
+            const Int index =
+                NextIndex ( destination,
+                            numEntries,
+                            Buffer,
+                            &matrix_index );
+
+            DEBUG_ONLY ( if
+                         ( Int ( matrices_[matrix_index].data_[destination][index].size () ) !=
+                           numEntries ) LogicError ( "Error in NextIndex" ); )
+
+            T* sendBuffer = reinterpret_cast<T*>( matrices_[matrix_index].data_[destination][index].data () );
+
             for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendBuffer[t*localHeight];
-                const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
+                const T* thisXCol = &XBuffer[( rowShift+t*c )*XLDim];
+
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
-        
-		// put
-                mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * YLDim) * sizeof(T);
-		mpi::Rput (&sendBuffer[t*localHeight], localHeight,
-			destination, disp, localHeight, window,
-			matrices_[matrix_index].requests_[destination][index]);
+
+                // put
+                mpi::Aint disp =  ( iLocalOffset + ( jLocalOffset+t ) * YLDim ) * sizeof( T );
+                mpi::Rput ( &sendBuffer[t*localHeight], localHeight,
+                            destination, disp, localHeight, window,
+                            matrices_[matrix_index].requests_[destination][index] );
             }
         }
-        receivingRow = (receivingRow + 1) % r;
+
+        receivingRow = ( receivingRow + 1 ) % r;
+
         if( receivingRow == 0 )
-            receivingCol = (receivingCol + 1) % c;
+            receivingCol = ( receivingCol + 1 ) % c;
     }
 }
 
 template<typename T>
 void RmaInterface<T>::Rput( Matrix<T>& Z, Int i, Int j )
-{
-    Rput( const_cast<const Matrix<T>&>(Z), i, j );
-}
+{ Rput( const_cast<const Matrix<T>&>( Z ), i, j ); }
 
 // accumulate = Update Y(i:i+height-1,j:j+width-1) += X,
 // where X is height x width
 template<typename T>
 void RmaInterface<T>::Racc( const Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Racc"))
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Racc" ) )
 
     if ( !toBeAttachedForPut_ )
-        LogicError("Global matrix cannot be updated.");
+        LogicError( "Global matrix cannot be updated." );
+
     if( i < 0 || j < 0 )
-        LogicError("Submatrix offsets must be non-negative.");
+        LogicError( "Submatrix offsets must be non-negative." );
 
     DistMatrix<T>& Y = *GlobalArrayPut_;
 
     if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
-        LogicError("Submatrix out of bounds of global matrix.");
+        LogicError( "Submatrix out of bounds of global matrix." );
 
     //do rma related checks
     const Grid& g = Y.Grid();
@@ -399,23 +380,18 @@ void RmaInterface<T>::Racc( const Matrix<T>& Z, Int i, Int j )
     const Int p = g.Size();
     const Int myProcessRow = g.Row();
     const Int myProcessCol = g.Col();
-    const Int colAlign = (Y.ColAlign() + i) % r;
-    const Int rowAlign = (Y.RowAlign() + j) % c;
-
+    const Int colAlign = ( Y.ColAlign() + i ) % r;
+    const Int rowAlign = ( Y.RowAlign() + j ) % c;
     const Int XLDim = Z.LDim();
     const Int YLDim = Y.LDim ();
     // local matrix width and height
     const Int height = Z.Height();
     const Int width = Z.Width();
-    
-    const T* XBuffer = Z.LockedBuffer();    
-    const void* Buffer = static_cast < void * >(const_cast < T * >(Z.LockedBuffer()));	
-
-    Int matrix_index;   
-    
+    const T* XBuffer = Z.LockedBuffer();
+    const void* Buffer = static_cast <void*>( const_cast <T*>( Z.LockedBuffer() ) );
+    Int matrix_index;
     const Int iLocalOffset = Length( i, Y.ColShift (), r );
     const Int jLocalOffset = Length( j, Y.RowShift (), c );
-
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
 
@@ -431,59 +407,62 @@ void RmaInterface<T>::Racc( const Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-	    const Int index = 
-		NextIndex (destination,
-			numEntries, 
-			Buffer,
-			&matrix_index);
-		    
-	    DEBUG_ONLY (if
-			(Int (matrices_[matrix_index].data_[destination][index].size ()) !=
-			 numEntries) LogicError ("Error in NextIndex");)
-	    
-	    T *sendBuffer = reinterpret_cast<T *>(matrices_[matrix_index].data_[destination][index].data ());
-	
+            const Int index =
+                NextIndex ( destination,
+                            numEntries,
+                            Buffer,
+                            &matrix_index );
+
+            DEBUG_ONLY ( if
+                         ( Int ( matrices_[matrix_index].data_[destination][index].size () ) !=
+                           numEntries ) LogicError ( "Error in NextIndex" ); )
+
+            T* sendBuffer = reinterpret_cast<T*>( matrices_[matrix_index].data_[destination][index].data () );
+
             for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendBuffer[t*localHeight];
-                const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
+                const T* thisXCol = &XBuffer[( rowShift+t*c )*XLDim];
+
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
-	
-		// acc
-		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * YLDim) * sizeof(T);
-		mpi::Racc (&sendBuffer[t*localHeight], localHeight,
-			destination, disp, localHeight, window,
-			matrices_[matrix_index].requests_[destination][index]);
-	    }
+
+                // acc
+                mpi::Aint disp =  ( iLocalOffset + ( jLocalOffset+t ) * YLDim ) * sizeof( T );
+                mpi::Racc ( &sendBuffer[t*localHeight], localHeight,
+                            destination, disp, localHeight, window,
+                            matrices_[matrix_index].requests_[destination][index] );
+            }
         }
-        receivingRow = (receivingRow + 1) % r;
+
+        receivingRow = ( receivingRow + 1 ) % r;
+
         if( receivingRow == 0 )
-            receivingCol = (receivingCol + 1) % c;
+            receivingCol = ( receivingCol + 1 ) % c;
     }
 }
 
 template<typename T>
 void RmaInterface<T>::Racc( Matrix<T>& Z, Int i, Int j )
-{
-    Racc( const_cast<const Matrix<T>&>(Z), i, j );
-}
+{ Racc( const_cast<const Matrix<T>&>( Z ), i, j ); }
 
-// Locally Blocking 
+// Locally Blocking
 template<typename T>
 void RmaInterface<T>::Put( const Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Put"))
-    
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Put" ) )
+
     if( i < 0 || j < 0 )
-        LogicError("Submatrix offsets must be non-negative");
+        LogicError( "Submatrix offsets must be non-negative" );
+
     if ( !toBeAttachedForPut_ )
-        LogicError("Global matrix cannot be updated");
+        LogicError( "Global matrix cannot be updated" );
 
     DistMatrix<T>& Y = *GlobalArrayPut_;
+
     //do rma related checks
     if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
-        LogicError("Submatrix out of bounds of global matrix");
+        LogicError( "Submatrix out of bounds of global matrix" );
 
     const Grid& g = Y.Grid();
     const Int r = g.Height();
@@ -491,22 +470,17 @@ void RmaInterface<T>::Put( const Matrix<T>& Z, Int i, Int j )
     const Int p = g.Size();
     const Int myProcessRow = g.Row();
     const Int myProcessCol = g.Col();
-    const Int colAlign = (Y.ColAlign() + i) % r;
-    const Int rowAlign = (Y.RowAlign() + j) % c;
-
+    const Int colAlign = ( Y.ColAlign() + i ) % r;
+    const Int rowAlign = ( Y.RowAlign() + j ) % c;
     const Int XLDim = Z.LDim();
     // local matrix width and height
     const Int height = Z.Height();
     const Int width = Z.Width();
-
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
-
     const Int iLocalOffset = Length( i, Y.ColShift (), r );
     const Int jLocalOffset = Length( j, Y.RowShift (), c );
-
     const Int YLDim = Y.LDim ();
-            
     const T* XBuffer = Z.LockedBuffer();
 
     for( Int step=0; step<p; ++step )
@@ -521,79 +495,77 @@ void RmaInterface<T>::Put( const Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-	    const Int index = 
-		NextIndex ( numEntries, 
-		    putVector_[destination]);
-            
-	    T* sendBuffer = putVector_[destination][index].data();
+            const Int index =
+                NextIndex ( numEntries,
+                            putVector_[destination] );
+            T* sendBuffer = putVector_[destination][index].data();
 
             for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendBuffer[t*localHeight];
-                const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
+                const T* thisXCol = &XBuffer[( rowShift+t*c )*XLDim];
+
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
+
                 // put
-                mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * YLDim) * sizeof(T);
-                mpi::Iput (&sendBuffer[t*localHeight], localHeight,
-                           destination, disp, localHeight, window);
+                mpi::Aint disp =  ( iLocalOffset + ( jLocalOffset+t ) * YLDim ) * sizeof( T );
+                mpi::Iput ( &sendBuffer[t*localHeight], localHeight,
+                            destination, disp, localHeight, window );
             }
-            mpi::FlushLocal (destination, window);
+
+            mpi::FlushLocal ( destination, window );
         }
-        receivingRow = (receivingRow + 1) % r;
+
+        receivingRow = ( receivingRow + 1 ) % r;
+
         if( receivingRow == 0 )
-            receivingCol = (receivingCol + 1) % c;
+            receivingCol = ( receivingCol + 1 ) % c;
     }
 }
 
 template<typename T>
 void RmaInterface<T>::Put( Matrix<T>& Z, Int i, Int j )
-{
-    Put( const_cast<const Matrix<T>&>(Z), i, j );
-}
+{ Put( const_cast<const Matrix<T>&>( Z ), i, j ); }
 
 // accumulate = Update Y(i:i+height-1,j:j+width-1) += X,
 // where X is height x width
 template<typename T>
 void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Acc"))
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Acc" ) )
 
     if ( !toBeAttachedForPut_ )
-        LogicError("Global matrix cannot be updated.");
+        LogicError( "Global matrix cannot be updated." );
+
     if( i < 0 || j < 0 )
-        LogicError("Submatrix offsets must be non-negative.");
+        LogicError( "Submatrix offsets must be non-negative." );
 
     DistMatrix<T>& Y = *GlobalArrayPut_;
 
     if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
-        LogicError("Submatrix out of bounds of global matrix.");
+        LogicError( "Submatrix out of bounds of global matrix." );
 
     //do rma related checks
-
     const Grid& g = Y.Grid();
     const Int r = g.Height();
     const Int c = g.Width();
     const Int p = g.Size();
     const Int myProcessRow = g.Row();
     const Int myProcessCol = g.Col();
-    const Int colAlign = (Y.ColAlign() + i) % r;
-    const Int rowAlign = (Y.RowAlign() + j) % c;
-
+    const Int colAlign = ( Y.ColAlign() + i ) % r;
+    const Int rowAlign = ( Y.RowAlign() + j ) % c;
     const Int XLDim = Z.LDim();
     const Int YLDim = Y.LDim ();
     // local matrix width and height
     const Int height = Z.Height();
     const Int width = Z.Width();
-
     const Int iLocalOffset = Length( i, Y.ColShift (), r );
     const Int jLocalOffset = Length( j, Y.RowShift (), c );
-
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
-        
     const T* XBuffer = Z.LockedBuffer();
-    
+
     for( Int step=0; step<p; ++step )
     {
         const Int colShift = Shift( receivingRow, colAlign, r );
@@ -606,51 +578,52 @@ void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-	    const Int index = RmaInterface<T>::NextIndex ( numEntries, 
-		    putVector_[destination]);
-
+            const Int index = RmaInterface<T>::NextIndex ( numEntries,
+                              putVector_[destination] );
             T* sendBuffer = putVector_[destination][index].data();
 
             for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendBuffer[t*localHeight];
-                const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
+                const T* thisXCol = &XBuffer[( rowShift+t*c )*XLDim];
+
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
-		
-		// acc
-		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * YLDim) * sizeof(T);
-                mpi::Iacc (&sendBuffer[t*localHeight], localHeight,
-                           destination, disp, localHeight, window);
+
+                // acc
+                mpi::Aint disp =  ( iLocalOffset + ( jLocalOffset+t ) * YLDim ) * sizeof( T );
+                mpi::Iacc ( &sendBuffer[t*localHeight], localHeight,
+                            destination, disp, localHeight, window );
             }
-            mpi::FlushLocal (destination, window);
+
+            mpi::FlushLocal ( destination, window );
         }
-        receivingRow = (receivingRow + 1) % r;
+
+        receivingRow = ( receivingRow + 1 ) % r;
+
         if( receivingRow == 0 )
-            receivingCol = (receivingCol + 1) % c;
+            receivingCol = ( receivingCol + 1 ) % c;
     }
 }
 
 template<typename T>
 void RmaInterface<T>::Acc( Matrix<T>& Z, Int i, Int j )
-{
-    Acc( const_cast<const Matrix<T>&>(Z), i, j );
-}
+{ Acc( const_cast<const Matrix<T>&>( Z ), i, j ); }
 
 // TODO Iget and Rget
 template<typename T>
 void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Get"))
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Get" ) )
+
     // a call to Attach with a non-const DistMatrix must set
     // toBeAttachedForGet_ also, if not then it is assumed that
     // the DistMatrix isn't attached
     if ( !toBeAttachedForGet_ )
-        LogicError ("Cannot perform this operation as matrix is not attached.");
+        LogicError ( "Cannot perform this operation as matrix is not attached." );
 
-    const DistMatrix<T> &X = *GlobalArrayGet_;
-
-    const Grid & g = X.Grid ();
+    const DistMatrix<T>& X = *GlobalArrayGet_;
+    const Grid& g = X.Grid ();
     const Int r = g.Height ();
     const Int c = g.Width ();
     const Int p = g.Size ();
@@ -658,22 +631,18 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
     const Int myCol = g.Col ();
     const Int myProcessRow = g.Row();
     const Int myProcessCol = g.Col();
-
     // local width and height
     const Int height = Z.Height();
     const Int width = Z.Width();
 
-    if (i + height > X.Height () || j + width > X.Width ())
-        LogicError("Submatrix out of bounds of global matrix");
+    if ( i + height > X.Height () || j + width > X.Width () )
+        LogicError( "Submatrix out of bounds of global matrix" );
 
-    const Int colAlign = (X.ColAlign() + i) % r;
-    const Int rowAlign = (X.RowAlign() + j) % c;
-
-    const Int iLocalOffset = Length (i, X.ColShift (), r);
-    const Int jLocalOffset = Length (j, X.RowShift (), c);
-
+    const Int colAlign = ( X.ColAlign() + i ) % r;
+    const Int rowAlign = ( X.RowAlign() + j ) % c;
+    const Int iLocalOffset = Length ( i, X.ColShift (), r );
+    const Int jLocalOffset = Length ( j, X.RowShift (), c );
     const Int XLDim = X.LDim ();
-
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
 
@@ -688,33 +657,37 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-	    const Int index = RmaInterface<T>::NextIndex ( numEntries, 
-		    getVector_[destination]);
-            T *getBuffer = getVector_[destination][index].data ();
+            const Int index = RmaInterface<T>::NextIndex ( numEntries,
+                              getVector_[destination] );
+            T* getBuffer = getVector_[destination][index].data ();
 
             // get
             for( Int t=0; t<localWidth; ++t )
             {
-                mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * XLDim) * sizeof(T);
-                mpi::Iget (&getBuffer[t*localHeight], localHeight,
-                           destination, disp, localHeight, window);
+                mpi::Aint disp =  ( iLocalOffset + ( jLocalOffset+t ) * XLDim ) * sizeof( T );
+                mpi::Iget ( &getBuffer[t*localHeight], localHeight,
+                            destination, disp, localHeight, window );
             }
+
             // no difference between localflush
             // and flush for Get
-            mpi::FlushLocal (destination, window);
-            
-	    // update local matrix
+            mpi::FlushLocal ( destination, window );
+
+            // update local matrix
             for( Int t=0; t<localWidth; ++t )
             {
-                T *YCol = Z.Buffer (0,rowShift+t*c);
-                const T *XCol = &getBuffer[t * localHeight];
-                for (Int s = 0; s < localHeight; ++s)
+                T* YCol = Z.Buffer ( 0,rowShift+t*c );
+                const T* XCol = &getBuffer[t * localHeight];
+
+                for ( Int s = 0; s < localHeight; ++s )
                     YCol[colShift+s*r] = XCol[s];
             }
         }
-        receivingRow = (receivingRow + 1) % r;
+
+        receivingRow = ( receivingRow + 1 ) % r;
+
         if( receivingRow == 0 )
-            receivingCol = (receivingCol + 1) % c;
+            receivingCol = ( receivingCol + 1 ) % c;
     }
 }
 
@@ -722,17 +695,19 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 template<typename T>
 void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Iput"))
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Iput" ) )
 
     if( i < 0 || j < 0 )
-        LogicError("Submatrix offsets must be non-negative");
+        LogicError( "Submatrix offsets must be non-negative" );
+
     if ( !toBeAttachedForPut_ )
-        LogicError("Global matrix cannot be updated");
+        LogicError( "Global matrix cannot be updated" );
 
     DistMatrix<T>& Y = *GlobalArrayPut_;
+
     //do rma related checks
     if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
-        LogicError("Submatrix out of bounds of global matrix");
+        LogicError( "Submatrix out of bounds of global matrix" );
 
     const Grid& g = Y.Grid();
     const Int r = g.Height();
@@ -740,22 +715,17 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
     const Int p = g.Size();
     const Int myProcessRow = g.Row();
     const Int myProcessCol = g.Col();
-    const Int colAlign = (Y.ColAlign() + i) % r;
-    const Int rowAlign = (Y.RowAlign() + j) % c;
-
+    const Int colAlign = ( Y.ColAlign() + i ) % r;
+    const Int rowAlign = ( Y.RowAlign() + j ) % c;
     const Int XLDim = Z.LDim();
     // local matrix width and height
     const Int height = Z.Height();
     const Int width = Z.Width();
-
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
-
     const Int iLocalOffset = Length( i, Y.ColShift (), r );
     const Int jLocalOffset = Length( j, Y.RowShift (), c );
-
     const Int YLDim = Y.LDim ();
-            
     const T* XBuffer = Z.LockedBuffer();
 
     for( Int step=0; step<p; ++step )
@@ -770,29 +740,32 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-	    const Int index = 
-		NextIndex ( 
-			numEntries, 
-			putVector_[destination]
-			);
-
+            const Int index =
+                NextIndex (
+                    numEntries,
+                    putVector_[destination]
+                );
             T* sendBuffer = putVector_[destination][index].data();
 
             for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendBuffer[t*localHeight];
-                const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
+                const T* thisXCol = &XBuffer[( rowShift+t*c )*XLDim];
+
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
+
                 // put
-                mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * YLDim) * sizeof(T);
-                mpi::Iput (&sendBuffer[t*localHeight], localHeight,
-                           destination, disp, localHeight, window);
+                mpi::Aint disp =  ( iLocalOffset + ( jLocalOffset+t ) * YLDim ) * sizeof( T );
+                mpi::Iput ( &sendBuffer[t*localHeight], localHeight,
+                            destination, disp, localHeight, window );
             }
         }
-        receivingRow = (receivingRow + 1) % r;
+
+        receivingRow = ( receivingRow + 1 ) % r;
+
         if( receivingRow == 0 )
-            receivingCol = (receivingCol + 1) % c;
+            receivingCol = ( receivingCol + 1 ) % c;
     }
 }
 
@@ -801,17 +774,18 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 template<typename T>
 void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Iacc"))
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Iacc" ) )
 
     if ( !toBeAttachedForPut_ )
-        LogicError("Global matrix cannot be updated.");
+        LogicError( "Global matrix cannot be updated." );
+
     if( i < 0 || j < 0 )
-        LogicError("Submatrix offsets must be non-negative.");
+        LogicError( "Submatrix offsets must be non-negative." );
 
     DistMatrix<T>& Y = *GlobalArrayPut_;
 
     if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
-        LogicError("Submatrix out of bounds of global matrix.");
+        LogicError( "Submatrix out of bounds of global matrix." );
 
     //TODO rma related checks
     const Grid& g = Y.Grid();
@@ -820,20 +794,16 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
     const Int p = g.Size();
     const Int myProcessRow = g.Row();
     const Int myProcessCol = g.Col();
-    const Int colAlign = (Y.ColAlign() + i) % r;
-    const Int rowAlign = (Y.RowAlign() + j) % c;
-
+    const Int colAlign = ( Y.ColAlign() + i ) % r;
+    const Int rowAlign = ( Y.RowAlign() + j ) % c;
     const Int XLDim = Z.LDim();
     const Int YLDim = Y.LDim ();
     // local matrix width and height
     const Int height = Z.Height();
     const Int width = Z.Width();
-        
     const T* XBuffer = Z.LockedBuffer();
-    
     const Int iLocalOffset = Length( i, Y.ColShift (), r );
     const Int jLocalOffset = Length( j, Y.RowShift (), c );
-
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
 
@@ -849,73 +819,72 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-	    const Int index = 
-		NextIndex ( 
-			numEntries, 
-			putVector_[destination]);
-
+            const Int index =
+                NextIndex (
+                    numEntries,
+                    putVector_[destination] );
             T* sendBuffer = putVector_[destination][index].data();
 
             for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendBuffer[t*localHeight];
-                const T* thisXCol = &XBuffer[(rowShift+t*c)*XLDim];
+                const T* thisXCol = &XBuffer[( rowShift+t*c )*XLDim];
+
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
-		// acc
-		mpi::Aint disp =  (iLocalOffset + (jLocalOffset+t) * YLDim) * sizeof(T);
-                mpi::Iacc (&sendBuffer[t*localHeight], localHeight,
-                           destination, disp, localHeight, window);
+
+                // acc
+                mpi::Aint disp =  ( iLocalOffset + ( jLocalOffset+t ) * YLDim ) * sizeof( T );
+                mpi::Iacc ( &sendBuffer[t*localHeight], localHeight,
+                            destination, disp, localHeight, window );
             }
         }
-        receivingRow = (receivingRow + 1) % r;
+
+        receivingRow = ( receivingRow + 1 ) % r;
+
         if( receivingRow == 0 )
-            receivingCol = (receivingCol + 1) % c;
+            receivingCol = ( receivingCol + 1 ) % c;
     }
 }
 
 template<typename T>
 void RmaInterface<T>::Iput( Matrix<T>& Z, Int i, Int j )
-{
-    Iput( const_cast<const Matrix<T>&>(Z), i, j );
-}
+{ Iput( const_cast<const Matrix<T>&>( Z ), i, j ); }
 
 template<typename T>
 void RmaInterface<T>::Iacc( Matrix<T>& Z, Int i, Int j )
-{
-    Iacc( const_cast<const Matrix<T>&>(Z), i, j );
-}
+{ Iacc( const_cast<const Matrix<T>&>( Z ), i, j ); }
 
-// Local completion of all ops upon 
+// Local completion of all ops upon
 // return
 template<typename T>
 void RmaInterface<T>::LocalFlush()
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::LocalFlush"))
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::LocalFlush" ) )
+
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-        LogicError("Must initiate transfer before flushing.");
+        LogicError( "Must initiate transfer before flushing." );
 
     mpi::FlushLocal ( window );
 }
 
-// Local completion (specific to Z) upon 
+// Local completion (specific to Z) upon
 // return
 template<typename T>
 void RmaInterface<T>::LocalFlush( Matrix<T>& Z )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::LocalFlush"))
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::LocalFlush" ) )
+
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-        LogicError("Must initiate transfer before flushing.");
+        LogicError( "Must initiate transfer before flushing." );
 
     // if there are no request based RMA pending
     // for Z, then this functions acts like Flush
     // local all
     if ( !anyPendingXfers( Z ) )
-    {
-	LocalFlush();
-    }
+        LocalFlush();
     else
-	Wait ( Z );
+        Wait ( Z );
 }
 
 // there is no use as of now in
@@ -925,226 +894,225 @@ void RmaInterface<T>::LocalFlush( Matrix<T>& Z )
 template<typename T>
 void RmaInterface<T>::Flush( Matrix<T>& Z )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Flush"))
-    
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Flush" ) )
+
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-        LogicError("Must initiate transfer before flushing.");
-    
+        LogicError( "Must initiate transfer before flushing." );
+
     mpi::Flush ( window );
 }
 
 template<typename T>
 bool RmaInterface<T>::anyPendingXfers ( Matrix<T>& Z )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::anyPendingXfers"))
-
-    // by default, number of matrices 
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::anyPendingXfers" ) )
+    // by default, number of matrices
     // == number of processes
     Int matrixIndex;
     const Int numMatrices = matrices_.size();
-    const void *base_address = static_cast<void *>(const_cast<T*>(Z.LockedBuffer()));
+    const void* base_address = static_cast<void*>( const_cast<T*>( Z.LockedBuffer() ) );
 
     // search for matrix base
-    for (Int m = 0; m < numMatrices; m++)
+    for ( Int m = 0; m < numMatrices; m++ )
     {
-	if ( matrices_[m].base_ == base_address )
-	{
-	    matrixIndex = m;
-	    break;
-	}
-	matrixIndex = m+1;
+        if ( matrices_[m].base_ == base_address )
+        {
+            matrixIndex = m;
+            break;
+        }
+
+        matrixIndex = m+1;
     }
 
     // matrix not found
     if ( matrixIndex == numMatrices )
-	return false;
+        return false;
 
     return true;
 }
 
 // waitany implementation
 // cannot use mpi::Waitany
-// as of now because request 
+// as of now because request
 // objects are vector of deques
 template<typename T>
 void RmaInterface<T>::WaitAny( Matrix<T>& Z )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::WaitAny"))
-     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-	LogicError("Must initiate transfer at first.");
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::WaitAny" ) )
+
+    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
+        LogicError( "Must initiate transfer at first." );
 
     const Grid& g = ( toBeAttachedForPut_ ?
-	    GlobalArrayPut_->Grid() :
-	    GlobalArrayGet_->Grid() );
-
+                      GlobalArrayPut_->Grid() :
+                      GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     Int matrixIndex;
-    
     const Int numMatrices = matrices_.size();
-    
-    const void *base_address = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));
+    const void* base_address = static_cast<void*>( const_cast<T*>( Z.LockedBuffer() ) );
 
     // search for matrix base
-    for (Int m = 0; m < numMatrices; m++)
+    for ( Int m = 0; m < numMatrices; m++ )
     {
-	if ( matrices_[m].base_ == base_address )
-	{
-	    matrixIndex = m;
-	    break;
-	}
-	matrixIndex = m+1;
+        if ( matrices_[m].base_ == base_address )
+        {
+            matrixIndex = m;
+            break;
+        }
+
+        matrixIndex = m+1;
     }
 
     // matrix not found
     if ( matrixIndex == numMatrices )
-	return;
+        return;
 
     // data
-    for (int rank = 0; rank < p; ++rank)
+    for ( int rank = 0; rank < p; ++rank )
     {
-	if ( matrices_[matrixIndex].statuses_[rank].size() == 0 )
-	    continue;
-	
-	const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size ();
-	
-	for (int i = 0; i < numDataStatuses; i++)
-	{
-	    if (!matrices_[matrixIndex].statuses_[rank][i])
-	    {
-	    	mpi::Wait ( matrices_[matrixIndex].requests_[rank][i] );
-	    	matrices_[matrixIndex].statuses_[rank][i] = true;
-		return;
-	    }
-	}
+        if ( matrices_[matrixIndex].statuses_[rank].size() == 0 )
+            continue;
+
+        const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size ();
+
+        for ( int i = 0; i < numDataStatuses; i++ )
+        {
+            if ( !matrices_[matrixIndex].statuses_[rank][i] )
+            {
+                mpi::Wait ( matrices_[matrixIndex].requests_[rank][i] );
+                matrices_[matrixIndex].statuses_[rank][i] = true;
+                return;
+            }
+        }
     }
 }
 
 template<typename T>
 void RmaInterface<T>::Wait( Matrix<T>& Z )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Wait"))
-     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-	LogicError("Must initiate transfer at first.");
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Wait" ) )
+
+    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
+        LogicError( "Must initiate transfer at first." );
 
     const Grid& g = ( toBeAttachedForPut_ ?
-	    GlobalArrayPut_->Grid() :
-	    GlobalArrayGet_->Grid() );
+                      GlobalArrayPut_->Grid() :
+                      GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     Int matrixIndex;
-    
     const Int numMatrices = matrices_.size();
-    
-    const void *base_address = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));
+    const void* base_address = static_cast<void*>( const_cast<T*>( Z.LockedBuffer() ) );
 
     // search for matrix base
-    for (Int m = 0; m < numMatrices; m++)
+    for ( Int m = 0; m < numMatrices; m++ )
     {
-	if ( matrices_[m].base_ == base_address )
-	{
-	    matrixIndex = m;
-	    break;
-	}
-	matrixIndex = m+1;
+        if ( matrices_[m].base_ == base_address )
+        {
+            matrixIndex = m;
+            break;
+        }
+
+        matrixIndex = m+1;
     }
 
     // matrix not found
     if ( matrixIndex == numMatrices )
-	return;
+        return;
 
     // data
-    for (int rank = 0; rank < p; ++rank)
+    for ( int rank = 0; rank < p; ++rank )
     {
-	if ( matrices_[matrixIndex].statuses_[rank].size() == 0 )
-	    continue;
-	
-	const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size ();
-	
-	for (int i = 0; i < numDataStatuses; i++)
-	{
-	    mpi::Wait ( matrices_[matrixIndex].requests_[rank][i] );
-	    matrices_[matrixIndex].statuses_[rank][i] = true;
-	}
+        if ( matrices_[matrixIndex].statuses_[rank].size() == 0 )
+            continue;
+
+        const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size ();
+
+        for ( int i = 0; i < numDataStatuses; i++ )
+        {
+            mpi::Wait ( matrices_[matrixIndex].requests_[rank][i] );
+            matrices_[matrixIndex].statuses_[rank][i] = true;
+        }
     }
 }
 
 template<typename T>
 void RmaInterface<T>::Waitall ()
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Waitall"))
-     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-	LogicError("Must initiate transfer at first.");
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Waitall" ) )
+
+    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
+        LogicError( "Must initiate transfer at first." );
 
     const Grid& g = ( toBeAttachedForPut_ ?
-	    GlobalArrayPut_->Grid() :
-	    GlobalArrayGet_->Grid() );
+                      GlobalArrayPut_->Grid() :
+                      GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     Int matrixIndex;
-    
     const Int numMatrices = matrices_.size();
 
     // data
-    for (int matrixIndex = 0; matrixIndex < numMatrices; ++matrixIndex)
+    for ( int matrixIndex = 0; matrixIndex < numMatrices; ++matrixIndex )
     {
-	for (int rank = 0; rank < p; ++rank)
-	{
-	    const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size ();
+        for ( int rank = 0; rank < p; ++rank )
+        {
+            const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size ();
 
-	    for (int i = 0; i < numDataStatuses; i++)
-	    {
-		mpi::Wait ( matrices_[matrixIndex].requests_[rank][i] );
-		matrices_[matrixIndex].statuses_[rank][i] = true;
-	    }
-	}
+            for ( int i = 0; i < numDataStatuses; i++ )
+            {
+                mpi::Wait ( matrices_[matrixIndex].requests_[rank][i] );
+                matrices_[matrixIndex].statuses_[rank][i] = true;
+            }
+        }
     }
 }
 
 template<typename T>
 bool RmaInterface<T>::Test( Matrix<T>& Z )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Test"))
-     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-	LogicError("Must initiate transfer at first.");
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Test" ) )
+
+    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
+        LogicError( "Must initiate transfer at first." );
 
     const Grid& g = ( toBeAttachedForPut_ ?
-	    GlobalArrayPut_->Grid() :
-	    GlobalArrayGet_->Grid() );
-
+                      GlobalArrayPut_->Grid() :
+                      GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     Int matrixIndex;
-    
     const Int numMatrices = matrices_.size();
-    
-    const void *base_address = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));
+    const void* base_address = static_cast<void*>( const_cast<T*>( Z.LockedBuffer() ) );
 
     // search for matrix base
-    for (Int m = 0; m < numMatrices; m++)
+    for ( Int m = 0; m < numMatrices; m++ )
     {
-	if ( matrices_[m].base_ == base_address )
-	{
-	    matrixIndex = m;
-	    break;
-	}
-	matrixIndex = m+1;
+        if ( matrices_[m].base_ == base_address )
+        {
+            matrixIndex = m;
+            break;
+        }
+
+        matrixIndex = m+1;
     }
-   
+
     // matrix not found
     if ( matrixIndex == numMatrices )
-	return true;
+        return true;
 
-    for (int rank = 0; rank < p; ++rank)
+    for ( int rank = 0; rank < p; ++rank )
     {
-	if ( matrices_[matrixIndex].statuses_[rank].size() == 0 )
-	    continue;
-	
-	const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size ();
-	
-	for (int i = 0; i < numDataStatuses; i++)
-	{
-	    matrices_[matrixIndex].statuses_[rank][i] = 
-		!mpi::Test (matrices_[matrixIndex].requests_[rank][i]);
-	    if (matrices_[matrixIndex].statuses_[rank][i])
-		return false;
-	}
+        if ( matrices_[matrixIndex].statuses_[rank].size() == 0 )
+            continue;
+
+        const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size ();
+
+        for ( int i = 0; i < numDataStatuses; i++ )
+        {
+            matrices_[matrixIndex].statuses_[rank][i] =
+                !mpi::Test ( matrices_[matrixIndex].requests_[rank][i] );
+
+            if ( matrices_[matrixIndex].statuses_[rank][i] )
+                return false;
+        }
     }
 
     return true;
@@ -1157,52 +1125,52 @@ bool RmaInterface<T>::Test( Matrix<T>& Z )
 template<typename T>
 bool RmaInterface<T>::TestAny( Matrix<T>& Z )
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::TestAny"))
-     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-	LogicError("Must initiate transfer at first.");
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::TestAny" ) )
+
+    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
+        LogicError( "Must initiate transfer at first." );
 
     const Grid& g = ( toBeAttachedForPut_ ?
-	    GlobalArrayPut_->Grid() :
-	    GlobalArrayGet_->Grid() );
-
+                      GlobalArrayPut_->Grid() :
+                      GlobalArrayGet_->Grid() );
     const Int p = g.Size();
     Int matrixIndex;
-    
     const Int numMatrices = matrices_.size();
-    
-    const void *base_address = static_cast<void*>(const_cast<T*>(Z.LockedBuffer()));
+    const void* base_address = static_cast<void*>( const_cast<T*>( Z.LockedBuffer() ) );
 
     // search for matrix base
-    for (Int m = 0; m < numMatrices; m++)
+    for ( Int m = 0; m < numMatrices; m++ )
     {
-	if ( matrices_[m].base_ == base_address )
-	{
-	    matrixIndex = m;
-	    break;
-	}
-	matrixIndex = m+1;
+        if ( matrices_[m].base_ == base_address )
+        {
+            matrixIndex = m;
+            break;
+        }
+
+        matrixIndex = m+1;
     }
-       
+
     // matrix not found
     if ( matrixIndex == numMatrices )
-	return true;
+        return true;
 
-    for (int rank = 0; rank < p; ++rank)
+    for ( int rank = 0; rank < p; ++rank )
     {
-	if ( matrices_[matrixIndex].statuses_[rank].size() == 0 )
-	    continue;
-	
-	const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size ();
-	
-	for (int i = 0; i < numDataStatuses; i++)
-	{
-	    matrices_[matrixIndex].statuses_[rank][i] = 
-		!mpi::Test (matrices_[matrixIndex].requests_[rank][i]);
-	    if (matrices_[matrixIndex].statuses_[rank][i])
-		continue;
-	    else
-		return true;
-	}
+        if ( matrices_[matrixIndex].statuses_[rank].size() == 0 )
+            continue;
+
+        const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size ();
+
+        for ( int i = 0; i < numDataStatuses; i++ )
+        {
+            matrices_[matrixIndex].statuses_[rank][i] =
+                !mpi::Test ( matrices_[matrixIndex].requests_[rank][i] );
+
+            if ( matrices_[matrixIndex].statuses_[rank][i] )
+                continue;
+            else
+                return true;
+        }
     }
 
     return false;
@@ -1211,35 +1179,36 @@ bool RmaInterface<T>::TestAny( Matrix<T>& Z )
 template<typename T>
 bool RmaInterface<T>::Testall()
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Testall"))
-     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-	LogicError("Must initiate transfer at first.");
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Testall" ) )
+
+    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
+        LogicError( "Must initiate transfer at first." );
 
     const Grid& g = ( toBeAttachedForPut_ ?
-	    GlobalArrayPut_->Grid() :
-	    GlobalArrayGet_->Grid() );
+                      GlobalArrayPut_->Grid() :
+                      GlobalArrayGet_->Grid() );
     const Int p = g.Size();
-    
     const Int numMatrices = matrices_.size();
-     
+
     // data
-    for (int matrixIndex = 0; matrixIndex < numMatrices; ++matrixIndex)
-    {   
-	for (int rank = 0; rank < p; ++rank)
-	{
-	    if ( matrices_[matrixIndex].statuses_[rank].size() == 0 )
-		continue;
+    for ( int matrixIndex = 0; matrixIndex < numMatrices; ++matrixIndex )
+    {
+        for ( int rank = 0; rank < p; ++rank )
+        {
+            if ( matrices_[matrixIndex].statuses_[rank].size() == 0 )
+                continue;
 
-	    const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size ();
+            const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size ();
 
-	    for (int i = 0; i < numDataStatuses; i++)
-	    {
-		matrices_[matrixIndex].statuses_[rank][i] = 
-		    !mpi::Test (matrices_[matrixIndex].requests_[rank][i]);
-		if (matrices_[matrixIndex].statuses_[rank][i])
-		    return false;
-	    }
-	}
+            for ( int i = 0; i < numDataStatuses; i++ )
+            {
+                matrices_[matrixIndex].statuses_[rank][i] =
+                    !mpi::Test ( matrices_[matrixIndex].requests_[rank][i] );
+
+                if ( matrices_[matrixIndex].statuses_[rank][i] )
+                    return false;
+            }
+        }
     }
 
     return true;
@@ -1248,33 +1217,30 @@ bool RmaInterface<T>::Testall()
 template<typename T>
 void RmaInterface<T>::Detach()
 {
-    DEBUG_ONLY(CallStackEntry cse("RmaInterface::Detach"))
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Detach" ) )
+
     // destructor will call detach again...
-    if (detached_)
+    if ( detached_ )
         return;
+
     if( !attached_ )
-        LogicError("Must attach before detaching.");
+        LogicError( "Must attach before detaching." );
 
     const Grid& g = ( toBeAttachedForPut_ ?
                       GlobalArrayPut_->Grid() :
                       GlobalArrayGet_->Grid() );
-
     mpi::Barrier( g.VCComm() );
-
     attached_ 		= false;
     detached_ 		= true;
     toBeAttachedForPut_ = false;
     toBeAttachedForGet_ = false;
-
     GlobalArrayPut_ 	= 0;
     GlobalArrayGet_ 	= 0;
-
     putVector_.clear();
     getVector_.clear();
     matrices_.clear();
-
-    mpi::WindowUnlock (window);
-    mpi::WindowFree (window);
+    mpi::WindowUnlock ( window );
+    mpi::WindowFree ( window );
 }
 
 #define PROTO(T) template class RmaInterface<T>;
