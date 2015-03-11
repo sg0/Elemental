@@ -69,7 +69,12 @@ public:
 #endif
 
 private:
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    static mpi::Window window;
+#else
     mpi::Window window;
+#endif
     // struct for passing data
     // for request based rma
     struct matrix_params_

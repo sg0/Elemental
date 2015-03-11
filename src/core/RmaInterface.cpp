@@ -15,13 +15,25 @@ http://opensource.org/licenses/BSD-2-Clause
 #include "El.hpp"
 #include <cassert>
 
-#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)  
 namespace El
 {
+// initialize static window
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+template<typename T>
+    mpi::Window RmaInterface<T>::window = MPI_WIN_NULL;
+#endif    
+    
+// constructor
 template<typename T>
 RmaInterface<T>::RmaInterface()
     : GlobalArrayPut_( 0 ), GlobalArrayGet_( 0 ),
-      matrices_( 0 ), window( MPI_WIN_NULL ),
+      matrices_( 0 ), 
+#if defined(EL_USE_WIN_CREATE_FOR_RMA) && \
+	!defined(EL_USE_WIN_ALLOC_FOR_RMA)
+      window( MPI_WIN_NULL ),
+#endif      
       putVector_( 0 ), getVector_( 0 ),
       toBeAttachedForPut_( false ), toBeAttachedForGet_( false ),
       attached_( false ), detached_( true )
@@ -37,7 +49,10 @@ RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
     toBeAttachedForPut_ 	= false;
     GlobalArrayPut_ 		= 0;
     GlobalArrayGet_ 		= 0;
-    window 	    		= MPI_WIN_NULL;
+#if defined(EL_USE_WIN_CREATE_FOR_RMA) && \
+	!defined(EL_USE_WIN_ALLOC_FOR_RMA)
+    window 			= MPI_WIN_NULL;
+#endif
 }
 
 // until attach, I am not setting anything
@@ -53,7 +68,10 @@ RmaInterface<T>::RmaInterface( const DistMatrix<T>& X )
     toBeAttachedForPut_ 	= false;
     GlobalArrayPut_ 		= 0;
     GlobalArrayGet_ 		= 0;
+#if defined(EL_USE_WIN_CREATE_FOR_RMA) && \
+	!defined(EL_USE_WIN_ALLOC_FOR_RMA)
     window 	    		= MPI_WIN_NULL;
+#endif
 }
 
 template<typename T>

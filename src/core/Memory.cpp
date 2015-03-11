@@ -70,16 +70,15 @@ G* Memory<G>::Require( size_t size )
     // point window base ptr to local buffer 
     void* baseptr = NULL;
     // RmaInterface is a `friend of mine
-    RmaInterface<G> rmaint;
-    rmaint.window = MPI_WIN_NULL;
+    RmaInterface<G>* rmaint;
     // FIXME don't hardcode comm
     mpi::Comm comm = mpi::COMM_WORLD;
+    Grid grid (comm);
     // allocate memory to the base ptr of mpi window
-    mpi::WindowAllocate( &baseptr, size*sizeof(G), comm, rmaint.window );        
-    memset( baseptr, 0, size*sizeof(G) );
+    mpi::WindowAllocate( &baseptr, size*sizeof(G), grid.VCComm(), rmaint->window );        
     assert( baseptr != NULL );
     // start access epoch
-    mpi::WindowLock( rmaint.window );
+    mpi::WindowLock( rmaint->window );
 #endif
 
 #ifndef EL_RELEASE
