@@ -87,6 +87,8 @@ option(EL_BARRIER_IN_ALLTOALLV "Barrier before posting non-blocking recvs" OFF)
 # Enable MPI-3 routines
 option(EL_ENABLE_RMA_AXPY "Choose new Rma Axpy interface implemented using MPI-3 one sided routines" ON)
 option(EL_USE_IBARRIER_FOR_AXPY "Use MPI-3 IBarrier for synchronization in AxpyInterface" ON)
+option(EL_USE_WIN_ALLOC_FOR_RMA "Use MPI_Win_allocate for allocating window objects" ON)
+option(EL_USE_WIN_CREATE_FOR_RMA "Use MPI_Win_create for creating window objects" OFF)
 
 # If the version of METIS packaged with Elemental is to be built (the default),
 # then no METIS-specific variables need to be specified, but if the user prefers
