@@ -608,14 +608,25 @@ void WindowUnlock (Window & window)
 // RMA Utilities
 void WindowCreate (void *baseptr, int size, Comm comm, Window & window)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::WindowCreate"))
+    DEBUG_ONLY( CallStackEntry cse ("mpi::WindowCreate") )
 
-    // TODO use alloc_shm
-    SafeMpi (MPI_Win_create
-             (baseptr, (MPI_Aint) size, 1, MPI_INFO_NULL,
-              comm.comm, &window));
+    SafeMpi( MPI_Win_create
+             ( baseptr, (MPI_Aint) size, 1, MPI_INFO_NULL,
+              comm.comm, &window ) );
 #ifdef EL_NO_ACC_ORDERING
-    SetWindowProp (window, NO_ACC_ORDERING);
+    SetWindowProp( window, NO_ACC_ORDERING );
+#endif
+}
+
+void WindowAllocate (void *baseptr, int size, Comm comm, Window & window)
+{
+    DEBUG_ONLY( CallStackEntry cse ("mpi::WindowAllocate") )
+
+    SafeMpi( MPI_Win_allocate
+             ( (MPI_Aint) size, 1, MPI_INFO_NULL,
+              comm.comm, baseptr, &window) );
+#ifdef EL_NO_ACC_ORDERING
+    SetWindowProp( window, NO_ACC_ORDERING );
 #endif
 }
 
@@ -647,8 +658,9 @@ void CheckBounds (Window & window, Datatype win_type, Datatype type,
 }
 
 #ifdef EL_EXPLICIT_PROGRESS
-void RmaProgress ( Comm comm )
+void Progress ( Comm comm )
 {
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Progress"))
     int flag;
     SafeMpi (MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, 
 		comm.comm, &flag, MPI_STATUS_IGNORE));

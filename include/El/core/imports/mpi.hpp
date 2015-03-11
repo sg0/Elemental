@@ -67,6 +67,14 @@ namespace mpi {
 //#define EL_ENSURE_GET_ATOMICITY
 //#endif
 
+//#ifndef EL_USE_WIN_ALLOC_FOR_RMA
+//#define EL_USE_WIN_ALLOC_FOR_RMA
+//#endif
+
+//#ifndef EL_USE_WIN_CREATE_FOR_RMA
+//#define EL_USE_WIN_CREATE_FOR_RMA
+//#endif
+
 #ifndef EL_INT_SAFE_CAST
 #define EL_INT_SAFE_CAST(x) \
     (x < std::numeric_limits<int>::max () && \
@@ -266,7 +274,7 @@ void SetWindowProp ( Window& window, int prop );
 void CheckBounds ( Window & window, mpi::Datatype win_type, mpi::Datatype type, 
 size_t count, ptrdiff_t target_offset );
 #ifdef EL_EXPLICIT_PROGRESS
-void RmaProgress ( Comm comm );
+void Progress ( Comm comm );
 #endif
 long ReadInc (Window & win, Aint offset, 
 	long inc, int fop_root);
@@ -277,7 +285,8 @@ void WindowLock( Window& window );
 void WindowUnlock( int rank, Window& window );
 void WindowUnlock( Window& window );
 void WindowCreate( void* baseptr, int size, Comm comm, Window& window );
-void WindowFree (Window & window);
+void WindowAllocate( void* baseptr, int size, Comm comm, Window& window );
+void WindowFree (Window& window);
 // One-sided operations
 // --------------------
 // put

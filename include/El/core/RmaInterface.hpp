@@ -20,7 +20,8 @@ namespace El {
 template<typename T>
 class RmaInterface
 {
-public:
+public: 
+    
     RmaInterface();
     ~RmaInterface();
 
@@ -62,10 +63,13 @@ public:
 
     void Detach();
 
-private:
-    
-    mpi::Window window;
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    friend class Memory<T>; 
+#endif
 
+private:
+    mpi::Window window;
     // struct for passing data
     // for request based rma
     struct matrix_params_

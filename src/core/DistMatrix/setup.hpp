@@ -40,7 +40,7 @@ DM::DistMatrix( Int height, Int width, const El::Grid& grid, int root )
     if( COLDIST == CIRC && ROWDIST == CIRC )
         this->matrix_.viewType_ = OWNER;
     this->SetShifts(); 
-    this->Resize(height,width); 
+    this->Resize(height,width);
 }
 
 template<typename T>
