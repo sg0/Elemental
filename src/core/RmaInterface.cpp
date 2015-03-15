@@ -18,13 +18,6 @@ http://opensource.org/licenses/BSD-2-Clause
 #if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)  
 namespace El
 {
-// initialize static window
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-template<typename T>
-    mpi::Window RmaInterface<T>::window = MPI_WIN_NULL;
-#endif    
-    
 // constructor
 template<typename T>
 RmaInterface<T>::RmaInterface()
@@ -37,7 +30,12 @@ RmaInterface<T>::RmaInterface()
       putVector_( 0 ), getVector_( 0 ),
       toBeAttachedForPut_( false ), toBeAttachedForGet_( false ),
       attached_( false ), detached_( true )
-{ }
+{
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    mpi::Window window = MPI_WIN_NULL;
+#endif
+}
 
 template<typename T>
 RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
@@ -51,7 +49,11 @@ RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
     GlobalArrayGet_ 		= 0;
 #if defined(EL_USE_WIN_CREATE_FOR_RMA) && \
 	!defined(EL_USE_WIN_ALLOC_FOR_RMA)
-    window 			= MPI_WIN_NULL;
+    window 		= MPI_WIN_NULL;
+#endif
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    mpi::Window window = MPI_WIN_NULL;
 #endif
 }
 
@@ -71,6 +73,10 @@ RmaInterface<T>::RmaInterface( const DistMatrix<T>& X )
 #if defined(EL_USE_WIN_CREATE_FOR_RMA) && \
 	!defined(EL_USE_WIN_ALLOC_FOR_RMA)
     window 	    		= MPI_WIN_NULL;
+#endif
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    mpi::Window window = MPI_WIN_NULL;
 #endif
 }
 
@@ -149,6 +155,10 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
         mpi::WindowCreate( baseptr, bufferSize, g.VCComm(), window );
         mpi::WindowLock( window );
 #endif
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    mpi::Window window = MPI_WIN_NULL;
+#endif
     }
 }
 
@@ -178,7 +188,8 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
         if( getVector_.size() != p )
             getVector_.resize( p );
 
-#if defined(EL_USE_WIN_CREATE_FOR_RMA) && !defined(EL_USE_WIN_ALLOC_FOR_RMA)
+#if defined(EL_USE_WIN_CREATE_FOR_RMA) &&\
+	!defined(EL_USE_WIN_ALLOC_FOR_RMA)
         //TODO rma related checks
         const Int numEntries = X.LocalHeight() * X.LocalWidth();
         const Int bufferSize = numEntries * sizeof( T );
@@ -186,6 +197,10 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
         assert( baseptr != NULL );
         mpi::WindowCreate( baseptr, bufferSize, g.VCComm(), window );
         mpi::WindowLock( window );
+#endif
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    mpi::Window window = MPI_WIN_NULL;
 #endif
     }
 }
@@ -605,8 +620,10 @@ void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-            const Int index = RmaInterface<T>::NextIndex( numEntries,
-                              putVector_[destination] );
+            const Int index = 
+		NextIndex( numEntries,
+			putVector_[destination] );
+
             T* sendBuffer = putVector_[destination][index].data();
 
             for( Int t=0; t<localWidth; ++t )

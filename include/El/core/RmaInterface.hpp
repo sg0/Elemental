@@ -65,13 +65,12 @@ public:
 
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    friend class Memory<T>; 
+    static mpi::Window window;
 #endif
 
 private:
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    static mpi::Window window;
 #else
     mpi::Window window;
 #endif
@@ -128,6 +127,12 @@ private:
     void WaitAny(       Matrix<T>& Z );
     void WaitAny( const Matrix<T>& Z );   
 };
+// define static window
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+template<typename T>
+    mpi::Window RmaInterface<T>::window;
+#endif    
 #endif // EL_ENABLE_RMA_AXPY
 } // namespace El
 #endif // ifndef EL_RMAINTERFACE_HPP

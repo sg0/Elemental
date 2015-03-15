@@ -804,7 +804,6 @@ template <typename T> void AxpyInterface <T>::Detach()
             HandleGlobalToLocalRequest();
 
 #if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
-
         if( nb_bar_active )
             DONE = mpi::Test( nb_bar_request );
         else
@@ -816,13 +815,13 @@ template <typename T> void AxpyInterface <T>::Detach()
                 nb_bar_active = true;
             }
         }
-
 #else
         HandleEoms();
 #endif
     }
 
     mpi::Barrier( g.VCComm() );
+    
     attachedForLocalToGlobal_ = false;
     attachedForGlobalToLocal_ = false;
     recvVector_.clear();

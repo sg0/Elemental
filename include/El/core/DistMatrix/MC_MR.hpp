@@ -34,7 +34,8 @@ public:
     DistMatrix( const El::Grid& g=DefaultGrid(), int root=0 );
     // Create a height x width distributed matrix
     DistMatrix
-    ( Int height, Int width, const El::Grid& g=DefaultGrid(), int root=0 );
+    ( Int height, Int width, const El::Grid& g=DefaultGrid(), int root=0 ); 
+    
     // Create a copy of distributed matrix A (redistributing if necessary)
     DistMatrix( const type& A );
     DistMatrix( const absType& A );
