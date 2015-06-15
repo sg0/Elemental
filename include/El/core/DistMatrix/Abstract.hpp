@@ -48,7 +48,11 @@ public:
     void Resize( Int height, Int width, Int ldim );
     void MakeConsistent( bool includingViewers=false );
     void MakeSizeConsistent( bool includingViewers=false );
-
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    void SetDim( Int height, Int width );
+    void SetWindowBase( T * ptr );
+#endif
     // Realignment
     // -----------
     void Align( int colAlign, int rowAlign, bool constrain=true );

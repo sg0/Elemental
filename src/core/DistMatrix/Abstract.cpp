@@ -121,6 +121,36 @@ AbstractDistMatrix<T>::SetGrid( const El::Grid& grid )
     }
 }
 
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+template<typename T>
+void
+AbstractDistMatrix<T>::SetDim( Int height, Int width )
+{
+    DEBUG_ONLY(
+        CallStackEntry cse("ADM::SetDim");
+        AssertNotLocked();
+        if( Viewing() && (height > height_ || width > width_) )
+            LogicError("Tried to increase the size of a view");
+    )
+    height_ = height; 
+    width_ = width;    
+    
+    matrix_.SetDim_ ( Length(height,ColShift(),ColStride()),
+    	              Length(width,RowShift(),RowStride()) );
+    //std::cout << "ADM:: height = " << Length(height,ColShift(),ColStride()) 
+    //	<< " width = " << Length(width,RowShift(),RowStride()) << "\n";
+}
+
+template<typename T>
+void
+AbstractDistMatrix<T>::SetWindowBase( T* baseptr )
+{
+    DEBUG_ONLY( CallStackEntry cse("ADM::SetWindowBase"); )
+    matrix_.SetWindowBase_( baseptr );
+}
+#endif
+
 template<typename T>
 void
 AbstractDistMatrix<T>::Resize( Int height, Int width )

@@ -14,7 +14,6 @@
 #include "./setup.hpp"
 
 namespace El {
-
 // Public section
 // ##############
 

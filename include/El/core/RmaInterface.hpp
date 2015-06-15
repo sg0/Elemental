@@ -24,7 +24,7 @@ public:
     
     RmaInterface();
     ~RmaInterface();
-
+    
     RmaInterface(       DistMatrix<T,MC,MR>& Z );
     RmaInterface( const DistMatrix<T,MC,MR>& Z );
 
@@ -63,17 +63,9 @@ public:
 
     void Detach();
 
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    static mpi::Window window;
-#endif
-
 private:
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-#else
     mpi::Window window;
-#endif
+    
     // struct for passing data
     // for request based rma
     struct matrix_params_
@@ -127,12 +119,6 @@ private:
     void WaitAny(       Matrix<T>& Z );
     void WaitAny( const Matrix<T>& Z );   
 };
-// define static window
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-template<typename T>
-    mpi::Window RmaInterface<T>::window;
-#endif    
 #endif // EL_ENABLE_RMA_AXPY
 } // namespace El
 #endif // ifndef EL_RMAINTERFACE_HPP

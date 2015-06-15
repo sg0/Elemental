@@ -23,7 +23,6 @@ namespace El {
 
 // Return a view
 // -------------
-
 template<typename T>
 DM DM::operator()( Range<Int> indVert, Range<Int> indHorz )
 {

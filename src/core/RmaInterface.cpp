@@ -23,19 +23,11 @@ template<typename T>
 RmaInterface<T>::RmaInterface()
     : GlobalArrayPut_( 0 ), GlobalArrayGet_( 0 ),
       matrices_( 0 ), 
-#if defined(EL_USE_WIN_CREATE_FOR_RMA) && \
-	!defined(EL_USE_WIN_ALLOC_FOR_RMA)
       window( MPI_WIN_NULL ),
-#endif      
       putVector_( 0 ), getVector_( 0 ),
       toBeAttachedForPut_( false ), toBeAttachedForGet_( false ),
       attached_( false ), detached_( true )
-{
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    mpi::Window window = MPI_WIN_NULL;
-#endif
-}
+{}
 
 template<typename T>
 RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
@@ -47,14 +39,7 @@ RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
     toBeAttachedForPut_ 	= false;
     GlobalArrayPut_ 		= 0;
     GlobalArrayGet_ 		= 0;
-#if defined(EL_USE_WIN_CREATE_FOR_RMA) && \
-	!defined(EL_USE_WIN_ALLOC_FOR_RMA)
     window 		= MPI_WIN_NULL;
-#endif
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    mpi::Window window = MPI_WIN_NULL;
-#endif
 }
 
 // until attach, I am not setting anything
@@ -70,14 +55,7 @@ RmaInterface<T>::RmaInterface( const DistMatrix<T>& X )
     toBeAttachedForPut_ 	= false;
     GlobalArrayPut_ 		= 0;
     GlobalArrayGet_ 		= 0;
-#if defined(EL_USE_WIN_CREATE_FOR_RMA) && \
-	!defined(EL_USE_WIN_ALLOC_FOR_RMA)
     window 	    		= MPI_WIN_NULL;
-#endif
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    mpi::Window window = MPI_WIN_NULL;
-#endif
 }
 
 template<typename T>
@@ -157,8 +135,19 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
 #endif
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    mpi::Window window = MPI_WIN_NULL;
+	const Int height = Z.LocalHeight();
+	const Int width = Z.LocalWidth();
+	// allocate memory to the base ptr of mpi window
+	const int sizeEntries = ( width * height * sizeof( T ) );
+	
+	mpi::WindowAllocate( sizeEntries, g.VCComm(), window );
+        T *baseptr = NULL;
+	baseptr = reinterpret_cast<T *>( mpi::GetWindowBase( window ) );
+	Z.SetWindowBase( baseptr );
+
+	mpi::WindowLock( window );
 #endif
+    mpi::Barrier( g.VCComm() );
     }
 }
 
@@ -199,9 +188,10 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
         mpi::WindowLock( window );
 #endif
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    mpi::Window window = MPI_WIN_NULL;
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)        
+	LogicError("Cannot modify const DistMatrix");
 #endif
+	mpi::Barrier( g.VCComm() );
     }
 }
 
@@ -881,9 +871,9 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 
                 // acc
                 mpi::Aint disp = ( iLocalOffset + ( jLocalOffset+t ) * YLDim ) * sizeof( T );
-                mpi::Iacc( &sendBuffer[t*localHeight], localHeight,
+		mpi::Iacc( &sendBuffer[t*localHeight], localHeight,
                            destination, disp, localHeight, window );
-            }
+	    }
         }
 
         receivingRow = ( receivingRow + 1 ) % r;
@@ -1280,15 +1270,21 @@ void RmaInterface<T>::Detach()
                       GlobalArrayPut_->Grid() :
                       GlobalArrayGet_->Grid() );
     mpi::Barrier( g.VCComm() );
+    
     attached_ 		= false;
     detached_ 		= true;
+    
     toBeAttachedForPut_ = false;
     toBeAttachedForGet_ = false;
+    
     GlobalArrayPut_ 	= 0;
     GlobalArrayGet_ 	= 0;
+    
     putVector_.clear();
     getVector_.clear();
+    
     matrices_.clear();
+    
     mpi::WindowUnlock( window );
     mpi::WindowFree( window );
 }

@@ -93,6 +93,7 @@ EL_EXPORT ElError ElDistMatrixSetGrid_d( ElDistMatrix_d A, ElConstGrid grid );
 EL_EXPORT ElError ElDistMatrixSetGrid_c( ElDistMatrix_c A, ElConstGrid grid );
 EL_EXPORT ElError ElDistMatrixSetGrid_z( ElDistMatrix_z A, ElConstGrid grid );
 
+
 /* void AbstractDistMatrix<T>::Resize( Int height, Int width )
    ----------------------------------------------------------- */
 EL_EXPORT ElError ElDistMatrixResize_i
@@ -105,6 +106,7 @@ EL_EXPORT ElError ElDistMatrixResize_c
 ( ElDistMatrix_c A, ElInt height, ElInt width );
 EL_EXPORT ElError ElDistMatrixResize_z
 ( ElDistMatrix_z A, ElInt height, ElInt width );
+
 
 /* void AbstractDistMatrix<T>::Resize( Int height, Int width, Int ldim )
    --------------------------------------------------------------------- */

@@ -55,6 +55,7 @@ public:
     void Empty();
     void Resize( Int height, Int width );
     void Resize( Int height, Int width, Int ldim );
+
     // Reconfigure around the given buffer, but do not assume ownership
     void Attach( Int height, Int width, T* buffer, Int ldim );
     void LockedAttach( Int height, Int width, const T* buffer, Int ldim );
@@ -110,6 +111,12 @@ private:
     void Control_( Int height, Int width, T* buffer, Int ldim );
     void Attach_( Int height, Int width, T* buffer, Int ldim );
     void LockedAttach_( Int height, Int width, const T* buffer, Int ldim );
+
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    void SetDim_( Int height, Int width );
+    void SetWindowBase_( T* ptr );
+#endif
 
     // Return a reference to a single entry without error-checking
     // ===========================================================

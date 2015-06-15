@@ -13,13 +13,6 @@
 
 #include "El/blas_like/level1/copy_internal.hpp"
 
-#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
-    defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-    !defined(EL_USE_WIN_CREATE_FOR_RMA)
-#include "El/core/RmaInterface.hpp"
-#endif
-
-
 namespace El {
 
 #define DM DistMatrix<T,COLDIST,ROWDIST>
@@ -27,7 +20,6 @@ namespace El {
 
 // Public section
 // ##############
-
 // Constructors and destructors
 // ============================
 
@@ -46,27 +38,17 @@ DM::DistMatrix( Int height, Int width, const El::Grid& grid, int root )
 { 
     if( COLDIST == CIRC && ROWDIST == CIRC )
         this->matrix_.viewType_ = OWNER;
-    // FIXME for temporary testing only
-    // allocate MPI window
-#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
-	defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    // TODO rma related checks
-    // point window base ptr to local buffer 
-    void* baseptr = NULL;
-    // RmaInterface is a `friend' of mine
-    //RmaInterface<T> rmaint;
-    // FIXME dont hardcode comm
-    //mpi::Comm comm = mpi::COMM_WORLD;
-    //Grid grid( comm );
-    // allocate memory to the base ptr of mpi window
-    const int buffersize = ( width * height * sizeof(T) );
-    mpi::WindowAllocate( &baseptr, buffersize, grid.VCComm(), RmaInterface<T>::window );        
-    // start access epoch
-    mpi::WindowLock( RmaInterface<T>::window );
-#endif
+    
+    // allocate MPI window in RmaInterface,
+    // do not allocate memory now, just the
+    // dimensions
     this->SetShifts(); 
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    this->SetDim(height, width);
+#else
     this->Resize(height,width);
+#endif    
 }
 
 template<typename T>
@@ -134,6 +116,7 @@ DM::DistMatrix( const BlockDistMatrix<T,U,V>& A )
 template<typename T>
 DM::DistMatrix( DM&& A ) EL_NOEXCEPT : ADM(std::move(A)) { }
 
+// FIXME move windowfree elsewhere
 template<typename T> DM::~DistMatrix() { }
 
 template<typename T> 

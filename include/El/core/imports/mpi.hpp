@@ -11,6 +11,7 @@
 #ifndef EL_IMPORTS_MPI_HPP
 #define EL_IMPORTS_MPI_HPP
 #include <limits>
+
 namespace El {
 
 namespace mpi {
@@ -280,12 +281,19 @@ long ReadInc (Window & win, Aint offset,
 	long inc, int fop_root);
 // Window creation/update/delete
 // -----------------------------
-void WindowLock( int rank, Window& window );
-void WindowLock( Window& window );
-void WindowUnlock( int rank, Window& window );
-void WindowUnlock( Window& window );
-void WindowCreate( void* baseptr, int size, Comm comm, Window& window );
-void WindowAllocate( void* baseptr, int size, Comm comm, Window& window );
+void WindowLock( int rank, Window & window );
+void WindowLock( Window & window );
+void WindowUnlock( int rank, Window & window );
+void WindowUnlock( Window & window );
+void WindowCreate( void * baseptr, int size, Comm comm, Window & window );
+void WindowAllocate( int count, Comm comm, Window & window );    
+void * GetWindowBase( Window & window );
+/*
+template<typename R> void WindowAllocate ( R *baseptr, int count, Comm comm, Window & window );    
+template<typename R> void WindowAllocate( Complex<R>* baseptr, int count, Comm comm, Window& window );
+template<typename R> R * GetWindowBase( R *baseptr, Window & window );
+template<typename R> Complex<R> * GetWindowBase( Complex<R> *baseptr, Window & window );
+*/
 void WindowFree (Window& window);
 // One-sided operations
 // --------------------

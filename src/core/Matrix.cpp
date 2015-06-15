@@ -555,6 +555,30 @@ void Matrix<T>::Resize_( Int height, Int width )
     }
 }
 
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+template<typename T>
+void Matrix<T>::SetDim_( Int height, Int width )
+{
+    bool reallocate = height > ldim_ || width > width_;
+    height_ = height;
+    width_ = width;
+    
+    if( reallocate )
+	ldim_ = Max( height, 1 );        
+    //std::cout << "Matrix:: height = " << height_ << " width = " << width_ << "\n";
+}
+    
+template<typename T>
+void Matrix<T>::SetWindowBase_( T* ptr )
+{
+    if( ptr == NULL )
+    	LogicError("Cannot assign matrix base with NULL pointer" );
+    
+    data_ = ptr;
+}
+#endif
+
 template<typename T>
 void Matrix<T>::Resize_( Int height, Int width, Int ldim )
 {
