@@ -128,23 +128,20 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
         // creation of window
         const Int numEntries = Z.LocalHeight() * Z.LocalWidth();
         const Int bufferSize = numEntries * sizeof( T );
-        void* baseptr = reinterpret_cast<void*>( Z.Buffer() );
-        assert( baseptr != NULL );
+        void * baseptr = reinterpret_cast<void *>( Z.Buffer() );
         mpi::WindowCreate( baseptr, bufferSize, g.VCComm(), window );
         mpi::WindowLock( window );
 #endif
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-	const Int height = Z.LocalHeight();
-	const Int width = Z.LocalWidth();
-	// allocate memory to the base ptr of mpi window
-	const int sizeEntries = ( width * height * sizeof( T ) );
+        const Int numEntries = Z.LocalHeight() * Z.LocalWidth();
+        const Int bufferSize = numEntries * sizeof( T );
 	
-	mpi::WindowAllocate( sizeEntries, g.VCComm(), window );
-        T *baseptr = NULL;
-	baseptr = reinterpret_cast<T *>( mpi::GetWindowBase( window ) );
-	Z.SetWindowBase( baseptr );
+	mpi::WindowAllocate( bufferSize, g.VCComm(), window );
+        void * baseptr = NULL;
+	mpi::GetWindowBase( &baseptr, window );
 
+	Z.SetWindowBase( reinterpret_cast<T *>( baseptr ) );
 	mpi::WindowLock( window );
 #endif
     mpi::Barrier( g.VCComm() );
@@ -182,14 +179,13 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
         //TODO rma related checks
         const Int numEntries = X.LocalHeight() * X.LocalWidth();
         const Int bufferSize = numEntries * sizeof( T );
-        void* baseptr = static_cast<void*>( const_cast<T*>( X.LockedBuffer() ) );
-        assert( baseptr != NULL );
+        void * baseptr = static_cast<void *>( const_cast<T *>( X.LockedBuffer() ) );
         mpi::WindowCreate( baseptr, bufferSize, g.VCComm(), window );
         mpi::WindowLock( window );
 #endif
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)        
-	LogicError("Cannot modify const DistMatrix");
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)       
+	LogicError ("Const DistMatrix cannot be modified, select EL_USE_WIN_CREATE_FOR_RMA");
 #endif
 	mpi::Barrier( g.VCComm() );
     }

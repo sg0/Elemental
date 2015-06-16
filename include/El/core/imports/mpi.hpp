@@ -287,13 +287,7 @@ void WindowUnlock( int rank, Window & window );
 void WindowUnlock( Window & window );
 void WindowCreate( void * baseptr, int size, Comm comm, Window & window );
 void WindowAllocate( int count, Comm comm, Window & window );    
-void * GetWindowBase( Window & window );
-/*
-template<typename R> void WindowAllocate ( R *baseptr, int count, Comm comm, Window & window );    
-template<typename R> void WindowAllocate( Complex<R>* baseptr, int count, Comm comm, Window& window );
-template<typename R> R * GetWindowBase( R *baseptr, Window & window );
-template<typename R> Complex<R> * GetWindowBase( Complex<R> *baseptr, Window & window );
-*/
+void GetWindowBase( void * base, Window & window );
 void WindowFree (Window& window);
 // One-sided operations
 // --------------------

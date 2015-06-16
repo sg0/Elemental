@@ -662,17 +662,14 @@ void WindowFree (Window & window)
     SafeMpi (MPI_Win_free (&window));
 }
 
-void * GetWindowBase (Window & window)
+void GetWindowBase (void * base, Window & window)
 {
     DEBUG_ONLY( CallStackEntry cse ("mpi::GetWindowBase") )
 
-    void * base = NULL;
     int flag = 0;
-    SafeMpi( MPI_Win_get_attr
-             ( window, MPI_WIN_BASE, &base, &flag) );
-
     // TODO check flag
-    return base;
+    SafeMpi( MPI_Win_get_attr
+             ( window, MPI_WIN_BASE, base, &flag) );
 }
 
 void WindowAllocate (int size, Comm comm, Window & window)
@@ -689,95 +686,6 @@ void WindowAllocate (int size, Comm comm, Window & window)
     SetWindowProp( window, NO_ACC_ORDERING );
 #endif
 }
-
-/*
-template<typename R>
-R * GetWindowBase (R *baseptr, Window & window)
-{
-    DEBUG_ONLY( CallStackEntry cse ("mpi::GetWindowBase") )
-
-    R * base = NULL;
-    int flag = 0;
-    SafeMpi( MPI_Win_get_attr
-             ( window, MPI_WIN_BASE, &base, &flag) );
-
-    // TODO check flag
-    return base;
-}
-
-template<typename R>
-Complex<R> * GetWindowBase (Complex<R> *baseptr, Window & window)
-{
-    DEBUG_ONLY( CallStackEntry cse ("mpi::GetWindowBase") )
-
-    Complex<R> * base = NULL;
-    int flag = 0;
-    SafeMpi( MPI_Win_get_attr
-             ( window, MPI_WIN_BASE, &base, &flag) );
-
-    // TODO check flag
-    return base;
-}
-
-template int * GetWindowBase (int *baseptr, Window & window);
-template unsigned * GetWindowBase (unsigned *baseptr, Window & window);
-template long int * GetWindowBase (long int *baseptr, Window & window);
-template unsigned long * GetWindowBase (unsigned long *baseptr, Window & window);
-#ifdef EL_HAVE_MPI_LONG_LONG
-template long long int * GetWindowBase (long long int *baseptr, Window & window);
-template unsigned long long * GetWindowBase (unsigned long long *baseptr, Window & window);
-#endif
-template float * GetWindowBase (float *baseptr, Window & window);
-template double * GetWindowBase (double *baseptr, Window & window);
-template Complex<float> * GetWindowBase (Complex<float> *baseptr, Window & window);
-template Complex<double> * GetWindowBase (Complex<double> *baseptr, Window & window);
-
-template<typename R>
-void WindowAllocate (R *baseptr, int count, Comm comm, Window & window)
-{
-    DEBUG_ONLY( CallStackEntry cse ("mpi::WindowAllocate") )
-    
-    R * base = NULL;
-    SafeMpi( MPI_Win_allocate
-             ( (MPI_Aint) (count * sizeof(R)), sizeof(R), MPI_INFO_NULL,
-              comm.comm, &base, &window) );
-    memset (base, 0, (count * sizeof(R)));
-
-#ifdef EL_NO_ACC_ORDERING
-    SetWindowProp( window, NO_ACC_ORDERING );
-#endif
-}
-
-template<typename R>
-void WindowAllocate (Complex<R> *baseptr, int count, Comm comm, Window & window)
-{
-    DEBUG_ONLY( CallStackEntry cse ("mpi::WindowAllocate") )
-    
-    Complex<R> * base = NULL;
-    SafeMpi( MPI_Win_allocate
-             ( (MPI_Aint) (2 * count * sizeof(R)), sizeof(R), MPI_INFO_NULL,
-              comm.comm, &base, &window) );
-    memset (base, 0, (2 * count * sizeof(R)));
-
-#ifdef EL_NO_ACC_ORDERING
-    SetWindowProp( window, NO_ACC_ORDERING );
-#endif
-}
-
-template void WindowAllocate (int *baseptr, int count, Comm comm, Window & window);
-template void WindowAllocate (unsigned *baseptr, int count, Comm comm, Window & window);
-template void WindowAllocate (long int *baseptr, int count, Comm comm, Window & window);
-template void WindowAllocate (unsigned long *baseptr, int count, Comm comm, Window & window);
-#ifdef EL_HAVE_MPI_LONG_LONG
-template void WindowAllocate (long long int *baseptr, int count, Comm comm, Window & window);
-template void WindowAllocate (unsigned long long *baseptr, int count, Comm comm, Window & window);
-#endif
-template void WindowAllocate (float *baseptr, int count, Comm comm, Window & window);
-template void WindowAllocate (double *baseptr, int count, Comm comm, Window & window);
-template void WindowAllocate (Complex<float> *baseptr, int count, Comm comm, Window & window);
-template void WindowAllocate (Complex<double> *baseptr, int count, Comm comm, Window & window);
-
-*/
 
 // put
 template<typename R>
