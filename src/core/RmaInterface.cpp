@@ -138,10 +138,10 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
         const Int bufferSize = numEntries * sizeof( T );
 	
 	mpi::WindowAllocate( bufferSize, g.VCComm(), window );
-        void * baseptr = NULL;
+        T * baseptr = NULL;
 	mpi::GetWindowBase( &baseptr, window );
 
-	Z.SetWindowBase( reinterpret_cast<T *>( baseptr ) );
+	Z.SetWindowBase( baseptr );
 	mpi::WindowLock( window );
 #endif
     mpi::Barrier( g.VCComm() );
@@ -1265,6 +1265,7 @@ void RmaInterface<T>::Detach()
     const Grid& g = ( toBeAttachedForPut_ ?
                       GlobalArrayPut_->Grid() :
                       GlobalArrayGet_->Grid() );
+
     mpi::Barrier( g.VCComm() );
     
     attached_ 		= false;

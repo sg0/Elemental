@@ -38,7 +38,14 @@ void Memory<G>::ShallowSwap( Memory<G>& mem )
 }
 
 template<typename G>
-Memory<G>::~Memory() { delete[] buffer_; }
+Memory<G>::~Memory() 
+{
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+#else
+    delete[] buffer_; 
+#endif
+}
 
 template<typename G>
 G* Memory<G>::Buffer() const { return buffer_; }
@@ -79,6 +86,29 @@ G* Memory<G>::Require( size_t size )
     return buffer_;
 }
 
+
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+template<typename G>
+void Memory<G>::Preallocated( size_t size, G * baseptr )
+{
+    if( size > size_ )
+    {
+	delete[] buffer_;
+	
+	buffer_ = baseptr;
+        size_ = size;
+
+#ifdef EL_ZERO_INIT
+        MemZero( buffer_, size_ );
+#elif defined(EL_HAVE_VALGRIND)
+        if( EL_RUNNING_ON_VALGRIND )
+            MemZero( buffer_, size_ );
+#endif
+    }
+}
+#endif // end of EL_USE_WIN_ALLOC_FOR_RMA
+
 template<typename G>
 void Memory<G>::Release()
 {  this->Empty(); }
@@ -86,7 +116,11 @@ void Memory<G>::Release()
 template<typename G>
 void Memory<G>::Empty()
 {
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+#else
     delete[] buffer_;
+#endif
     size_ = 0;
     buffer_ = nullptr;
 }

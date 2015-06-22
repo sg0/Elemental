@@ -565,17 +565,22 @@ void Matrix<T>::SetDim_( Int height, Int width )
     width_ = width;
     
     if( reallocate )
-	ldim_ = Max( height, 1 );        
-    //std::cout << "Matrix:: height = " << height_ << " width = " << width_ << "\n";
+    {
+	ldim_ = Max( height, 1 );     
+	data_ = nullptr;
+    }
 }
-    
+
+// SetDim_ must be called before this
+// function gets called
 template<typename T>
 void Matrix<T>::SetWindowBase_( T* ptr )
 {
     if( ptr == NULL )
     	LogicError("Cannot assign matrix base with NULL pointer" );
-    
-    data_ = ptr;
+    memory_.Preallocated((height_*width_), ptr );
+    data_ = memory_.Buffer();
+    //data_ = ptr;
 }
 #endif
 

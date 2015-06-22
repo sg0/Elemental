@@ -680,7 +680,6 @@ void WindowAllocate (int size, Comm comm, Window & window)
     SafeMpi( MPI_Win_allocate
              ( (MPI_Aint) size, 1, MPI_INFO_NULL,
               comm.comm, &base, &window) );
-    memset (base, 0, size);
 
 #ifdef EL_NO_ACC_ORDERING
     SetWindowProp( window, NO_ACC_ORDERING );
@@ -1131,11 +1130,12 @@ void Iacc (const R* source, int origin_count, int target_rank,
            Aint disp, int target_count, Op op, Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
-        SafeMpi (MPI_Accumulate
-                 (source, origin_count,
-                  TypeMap<R>(), target_rank, disp,
-                  target_count, TypeMap<R>(), op.op,
-                  window));
+	
+    SafeMpi (MPI_Accumulate
+             (source, origin_count,
+              TypeMap<R>(), target_rank, disp,
+              target_count, TypeMap<R>(), op.op,
+              window));
 }
 
 template<typename R>

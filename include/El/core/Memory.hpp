@@ -30,7 +30,10 @@ public:
 
     G* Buffer() const;
     size_t Size()   const;
-
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    void Preallocated( size_t size, G * baseptr);
+#endif
     G* Require( size_t size );
     void Release();
     void Empty();
