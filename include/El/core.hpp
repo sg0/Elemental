@@ -153,6 +153,7 @@ template<typename T=double,Dist U=MC,Dist V=MR> class BlockDistMatrix;
 #include "El/core/AxpyInterface.hpp"
 #include "El/core/RmaInterface.hpp"
 #include "El/core/AxpyInterface2.0.hpp"
+#include "El/core/GlobalArrays.hpp"
 
 #include "El/core/Graph.hpp"
 // TODO: Sequential map

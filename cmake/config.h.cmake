@@ -84,6 +84,7 @@
 #cmakedefine EL_USE_IBARRIER_FOR_AXPY
 #cmakedefine EL_USE_WIN_CREATE_FOR_RMA
 #cmakedefine EL_USE_WIN_ALLOC_FOR_RMA
+#cmakedefine EL_USE_GA
 
 #cmakedefine EL_DECLSPEC
 #ifdef EL_DECLSPEC

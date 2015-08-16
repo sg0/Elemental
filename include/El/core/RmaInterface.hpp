@@ -35,7 +35,8 @@ public:
     void Put( Matrix<T>& Z, Int i, Int j );
     void Put( const Matrix<T>& Z, Int i, Int j );
 
-    void Get(       Matrix<T>& Z, Int i, Int j );
+    void Get(            Matrix<T>& Z, Int i, Int j );
+    void Getx( T scalar, Matrix<T>& Z, Int i, Int j );
 
     void Acc(       Matrix<T>& Z, Int i, Int j );
     void Acc( const Matrix<T>& Z, Int i, Int j );
@@ -54,12 +55,27 @@ public:
     void Racc(       Matrix<T>& Z, Int i, Int j );
     void Racc( const Matrix<T>& Z, Int i, Int j );
 
+    // atomic routines
+    long CompareAndSwap (Int i, Int j, long incr);
+
     // Synchronization routines
     void Flush(            Matrix<T>& Z );
     void Flush(      const Matrix<T>& Z );
     void LocalFlush( const Matrix<T>& Z );
     void LocalFlush(       Matrix<T>& Z );
     void LocalFlush();
+   
+    bool Testall();
+    bool Test(          Matrix<T>& Z );
+    bool Test(    const Matrix<T>& Z );  
+    bool TestAny(       Matrix<T>& Z );
+    bool TestAny( const Matrix<T>& Z ); 
+
+    void Waitall();
+    void Wait(          Matrix<T>& Z );
+    void Wait(    const Matrix<T>& Z );    
+    void WaitAny(       Matrix<T>& Z );
+    void WaitAny( const Matrix<T>& Z ); 
 
     void Detach();
 
@@ -105,19 +121,7 @@ private:
     // only relevant for request-based
     // passive RMA
     bool anyPendingXfers (       Matrix<T>& Z );
-    bool anyPendingXfers ( const Matrix<T>& Z );
-   
-    bool Testall();
-    bool Test(          Matrix<T>& Z );
-    bool Test(    const Matrix<T>& Z );  
-    bool TestAny(       Matrix<T>& Z );
-    bool TestAny( const Matrix<T>& Z ); 
-
-    void Waitall();
-    void Wait(          Matrix<T>& Z );
-    void Wait(    const Matrix<T>& Z );    
-    void WaitAny(       Matrix<T>& Z );
-    void WaitAny( const Matrix<T>& Z );   
+    bool anyPendingXfers ( const Matrix<T>& Z ); 
 };
 #endif // EL_ENABLE_RMA_AXPY
 } // namespace El

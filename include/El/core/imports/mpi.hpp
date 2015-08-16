@@ -31,51 +31,6 @@ namespace mpi {
 #endif
 #endif
 
-// Use MPI-3 IBarrier in developing a Non-blocking 
-// consensus instead of El strict EOM matching
-// see - Scalable communication protocols for 
-// dynamic sparse data exchange by Hoefler, et al
-//#ifndef EL_USE_IBARRIER_FOR_AXPY
-//#define EL_USE_IBARRIER_FOR_AXPY
-//#endif
-
-//#ifndef EL_ENABLE_RMA_AXPY
-//#define EL_ENABLE_RMA_AXPY
-//#endif
-
-// Use derived datatypes for strided
-// vector communication patterns
-//#ifndef EL_USE_DERIVED_DATATYPE
-//#define EL_USE_DERIVED_DATATYPE
-//#endif
-
-// explicit progress for RMA
-//#ifndef EL_EXPLICIT_PROGRESS
-//#define EL_EXPLICIT_PROGRESS 
-//#endif
-
-// no acc ordering
-//#ifndef EL_NO_ACC_ORDERING
-//#define EL_NO_ACC_ORDERING
-//#endif
-
-// put/get atomicity
-//#ifndef EL_ENSURE_PUT_ATOMICITY
-//#define EL_ENSURE_PUT_ATOMICITY
-//#endif
-
-//#ifndef EL_ENSURE_GET_ATOMICITY
-//#define EL_ENSURE_GET_ATOMICITY
-//#endif
-
-//#ifndef EL_USE_WIN_ALLOC_FOR_RMA
-//#define EL_USE_WIN_ALLOC_FOR_RMA
-//#endif
-
-//#ifndef EL_USE_WIN_CREATE_FOR_RMA
-//#define EL_USE_WIN_CREATE_FOR_RMA
-//#endif
-
 #ifndef EL_INT_SAFE_CAST
 #define EL_INT_SAFE_CAST(x) \
     (x < std::numeric_limits<int>::max () && \
@@ -278,7 +233,7 @@ size_t count, ptrdiff_t target_offset );
 void Progress ( Comm comm );
 #endif
 long ReadInc (Window & win, Aint offset, 
-	long inc, int fop_root);
+	long inc, int fop_root = 0);
 // Window creation/update/delete
 // -----------------------------
 void WindowLock( int rank, Window & window );

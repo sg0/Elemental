@@ -90,6 +90,9 @@ option(EL_USE_IBARRIER_FOR_AXPY "Use MPI-3 IBarrier for synchronization in AxpyI
 option(EL_USE_WIN_ALLOC_FOR_RMA "Use MPI_Win_allocate for allocating window objects" ON)
 option(EL_USE_WIN_CREATE_FOR_RMA "Use MPI_Win_create for creating window objects" OFF)
 
+# Enable Global Arrays Layer
+option(EL_ENABLE_RMA_GLOBAL_ARRAYS "Enable basic Global Arrays API" ON)
+
 # If the version of METIS packaged with Elemental is to be built (the default),
 # then no METIS-specific variables need to be specified, but if the user prefers
 # to use their own version, then the root path of the installation should be
@@ -405,6 +408,8 @@ elseif(BUILD_METIS)
 elseif(MANUAL_METIS)
   set(LINK_LIBS ${LINK_LIBS} ${METIS_LIBS})
 endif()
+
+set_target_properties(metis PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 add_library(El ${EL_C_CPP_FILES})
 target_link_libraries(El pmrrr ${LINK_LIBS})
