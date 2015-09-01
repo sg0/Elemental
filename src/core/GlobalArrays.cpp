@@ -607,6 +607,7 @@ template<typename T>
 void GlobalArrays< T >::NGA_NbGet(int g_a, int lo[], int hi[], void* buf, int ld[], ga_nbhdl_t* nbhandle)
 {
     NGA_Get (g_a, lo, hi, buf, ld);
+    *nbhandle = -1;
 }
 
 template<typename T>
@@ -660,7 +661,7 @@ void GlobalArrays< T >::NGA_NbWait(ga_nbhdl_t* nbhandle)
     if (*nbhandle != -1)
     {
 	ga_handles[*nbhandle].rmaint.Waitall ();
-	ga_handles[*nbhandle].pending_transfer = true; 
+	ga_handles[*nbhandle].pending_transfer = false; 
 	// release handle
 	*nbhandle = -1;
     }

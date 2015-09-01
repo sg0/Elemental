@@ -38,11 +38,7 @@ namespace El {
 		void NGA_Access(int g_a, int lo[], int hi[], void *ptr, int ld[]);
 		void NGA_Acc(int g_a, int lo[], int hi[],void* buf,int ld[],void* alpha);
 		int  NGA_Allocate(int g_a);
-		void NGA_Destroy(int g_a);
-		int  NGA_Duplicate(int g_a, char* array_name);
-		void NGA_Fill(int g_a, void *value);
 		void NGA_Get(int g_a, int lo[], int hi[], void* buf, int ld[]); 
-		void NGA_Initialize(void);
 		void NGA_NbAcc(int g_a,int lo[], int hi[],void* buf,int ld[],void* alpha, ga_nbhdl_t* nbhandle);
 		void NGA_NbGet(int g_a, int lo[], int hi[], void* buf, int ld[], ga_nbhdl_t* nbhandle);
 		void NGA_NbPut(int g_a, int lo[], int hi[], void* buf, int ld[], ga_nbhdl_t* nbhandle);
@@ -50,8 +46,6 @@ namespace El {
 		void NGA_NbWait(ga_nbhdl_t* nbhandle);
 		void NGA_Put(int g_a, int lo[], int hi[], void* buf, int ld[]); 
 		long NGA_Read_inc(int g_a, int subscript[], long inc);
-		void NGA_Sync(void);
-		void NGA_Terminate(void);
 
 	    private:
 		bool ga_initialized;

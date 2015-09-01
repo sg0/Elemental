@@ -30,6 +30,7 @@
 #include "El/core/flame_part/Partition.h"
 #include "El/core/flame_part/Repartition.h"
 #include "El/core/flame_part/SlidePartition.h"
+#include "El/core/GlobalArrays.h"
 
 #include "El/io.h"
 
@@ -59,6 +60,7 @@
 #include "El/optimization/models.h"
 #include "El/optimization/prox.h"
 #include "El/optimization/util.h"
+
 
 #ifdef __cplusplus
 #include "El/CReflect.hpp"
