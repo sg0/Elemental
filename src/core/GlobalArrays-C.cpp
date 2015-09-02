@@ -34,6 +34,9 @@ extern "C" {
   /* void GlobalArrays<T>::GA_Copy(int g_a, int g_b) */ \
   ElError ElGlobalArraysCopy_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt g_b ) \
   { EL_TRY( CReflect(A)->GA_Copy (g_a, g_b) ) } \
+  /* void GlobalArrays<T>::GA_Symmetrize(int g_a) */ \
+  ElError ElGlobalArraysSymmetrize_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a ) \
+  { EL_TRY( CReflect(A)->GA_Symmetrize (g_a) ) } \
   /* void GlobalArrays<T>::GA_Destroy(int g_a) */ \
   ElError ElGlobalArraysDestroy_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a ) \
   { EL_TRY( CReflect(A)->GA_Destroy (g_a) ) } \
@@ -65,6 +68,9 @@ extern "C" {
   /* void GlobalArrays<T>::NGA_Access(int g_a, int lo[], int hi[], void *ptr, int ld[]) */ \
   ElError ElGlobalArraysAccess_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], ElInt hi[], ElInt* ptr, ElInt ld[] ) \
   { EL_TRY( CReflect(A)->NGA_Access(g_a, lo, hi, ptr, ld) ) } \
+  /* void GlobalArrays<T>::NGA_Distribute(int g_a, int iproc, int lo[], int hi[]) */ \
+  ElError ElGlobalArraysDistribute_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt iproc, ElInt lo[], ElInt hi[] ) \
+  { EL_TRY( CReflect(A)->NGA_Distribute(g_a, iproc, lo, hi) ) } \
   /* void GlobalArrays<T>::NGA_Acc(int g_a, int lo[], int hi[],void* buf,int ld[],void* alpha) */ \
   ElError ElGlobalArraysAccumulate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], \
 	ElInt hi[], ElInt* ptr, ElInt ld[], ElInt* alpha ) \

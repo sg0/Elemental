@@ -47,6 +47,12 @@ EL_EXPORT ElError ElGlobalArraysCopy_i( ElGlobalArrays_i A, ElInt g_a, ElInt g_b
 EL_EXPORT ElError ElGlobalArraysCopy_s( ElGlobalArrays_s A, ElInt g_a, ElInt g_b );
 EL_EXPORT ElError ElGlobalArraysCopy_d( ElGlobalArrays_d A, ElInt g_a, ElInt g_b );
 
+/* void GlobalArrays<T>::GA_Symmetrize(int g_a); 
+ -----------------------------------------------------*/
+EL_EXPORT ElError ElGlobalArraysSymmetrize_i( ElGlobalArrays_i A, ElInt g_a );
+EL_EXPORT ElError ElGlobalArraysSymmetrize_s( ElGlobalArrays_s A, ElInt g_a );
+EL_EXPORT ElError ElGlobalArraysSymmetrize_d( ElGlobalArrays_d A, ElInt g_a );
+
 /* void GlobalArrays<T>::GA_Destroy(int g_a);
    ------------------------------------------------*/
 EL_EXPORT ElError ElGlobalArraysDestroy_i( ElGlobalArrays_i A, ElInt g_a );
@@ -109,6 +115,12 @@ EL_EXPORT ElError ElGlobalArraysTranspose_d( ElGlobalArrays_d A, ElInt g_a, ElIn
 EL_EXPORT ElError ElGlobalArraysAccess_i( ElGlobalArrays_i A, ElInt g_a, ElInt lo[], ElInt hi[], ElInt* ptr, ElInt ld[] );
 EL_EXPORT ElError ElGlobalArraysAccess_s( ElGlobalArrays_s A, ElInt g_a, ElInt lo[], ElInt hi[], float* ptr, ElInt ld[] );
 EL_EXPORT ElError ElGlobalArraysAccess_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[], ElInt hi[], double* ptr, ElInt ld[] );
+
+/* void GlobalArrays<T>::NGA_Distribution(int g_a, int iproc, int lo[], int hi[]);
+ ---------------------------------------------------------------------------------- */
+EL_EXPORT ElError ElGlobalArraysDistribution_i( ElGlobalArrays_i A, ElInt g_a, ElInt iproc, ElInt lo[], ElInt hi[] );
+EL_EXPORT ElError ElGlobalArraysDistribution_s( ElGlobalArrays_s A, ElInt g_a, ElInt iproc, ElInt lo[], ElInt hi[] );
+EL_EXPORT ElError ElGlobalArraysDistribution_d( ElGlobalArrays_d A, ElInt g_a, ElInt iproc, ElInt lo[], ElInt hi[] );
 
 /* void GlobalArrays<T>::NGA_Acc(int g_a, int lo[], int hi[],void* buf,int ld[],void* alpha);
  ---------------------------------------------------------------------------------- */

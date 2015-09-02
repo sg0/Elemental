@@ -18,7 +18,10 @@ deliberately not implemented. Only 1/2-dimensional arrays are supported.
 This file is part of Elemental and is under the BSD 2-Clause License,
 which can be found in the LICENSE file in the root directory, or at
 http://opensource.org/licenses/BSD-2-Clause
-This is a subset of Global Arrays toolkit
+
+This is a subset of Global Arrays toolkit, the intention is to use
+as many core Elemental functions as possible in building this. Only for
+remote put/gets El::RmaInterface should be used.
 */
 #include "El.hpp"
 
@@ -281,7 +284,8 @@ void GlobalArrays< T >::GA_Copy(int g_a, int g_b)
 	LogicError ("Global Arrays of different types cannot be copied. ");
 
     // copy
-    GA_COPY (g_a, g_b);
+    // GA_COPY (g_a, g_b)
+    Copy (ga_handles[g_a].DM, ga_handles[g_b].DM);
 }
 
 // deallocates ga and frees associated resources
@@ -294,6 +298,31 @@ void GlobalArrays< T >::GA_Destroy(int g_a)
     ga_handles[g_a].rmaint.Detach();
     // erase
     ga_handles.erase( ga_handles.begin() + g_a );
+}
+
+// A := 0.5 * ( A + A' )
+template<typename T>
+void GlobalArrays< T >::GA_Symmetrize (int g_a)
+{
+    // create an empty GA for transpose
+    int g_at = GA_Duplicate( g_a, "transpose array" ); 
+    int g_c = GA_Duplicate( g_a, "final array" ); 
+
+    // transpose
+    GA_Transpose( g_a, g_at );
+
+    // add: g_a + g_at
+    // g_c = alpha * g_a  +  beta * g_b;
+    double *scale;
+    *scale = 0.5;
+    GA_Add((void *)scale, g_a, (void *)scale, g_at, g_c);
+
+    // copy, g_a = g_c
+    GA_Copy (g_a, g_c);
+    
+    // destroy the intermediate GAs
+    GA_Destroy (g_at);
+    GA_Destroy (g_c);
 }
 
 // C := alpha*op( A )*op( B ) + beta*C
@@ -445,7 +474,31 @@ void GlobalArrays< T >::GA_Transpose(int g_a, int g_b)
     Transpose( ga_handles[g_a].DM, ga_handles[g_b].DM );
 }
 
-// accesses data locally allocated for a global array
+// Inquires for the data range on a specified processor
+template<typename T>
+void GlobalArrays< T >::NGA_Distribution(int g_a, int iproc, int lo[], int hi[])
+{
+    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Distribution" ) )
+
+    int dim[2] = {-1, -1}    
+    const int my_rank = g.VCRank();
+
+    // find the width and height of the submatrix held by process iproc
+    if (iproc == my_rank)
+    {
+	dim[0] = ga_handles[g_a].DM.LocalWidth();
+	dim[1] = ga_handles[g_a].DM.LocalHeight();
+    }
+
+    // broadcast iproc's dim to everyone
+    mpi::Broadcast(dim, 2, iproc, ga_handles[g_a].comm);
+
+    // calculate lo and hi
+    lo[0] = 0; lo[1] = 0;
+    hi[0] = dim[0]; hi[1] = dim[1];
+}
+
+// accesses data locally allocated for a global array    
 template<typename T>
 void GlobalArrays< T >::NGA_Access(int g_a, int lo[], int hi[], void *ptr, int ld[])
 {

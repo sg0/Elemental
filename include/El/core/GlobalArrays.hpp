@@ -46,6 +46,8 @@ namespace El {
 		void NGA_NbWait(ga_nbhdl_t* nbhandle);
 		void NGA_Put(int g_a, int lo[], int hi[], void* buf, int ld[]); 
 		long NGA_Read_inc(int g_a, int subscript[], long inc);
+		void NGA_Distribution(int g_a, int iproc, int lo[], int hi[]);
+		void GA_Symmetrize(int g_a);
 
 	    private:
 		bool ga_initialized;
