@@ -451,9 +451,18 @@ void GlobalArrays< T >::NGA_Access(int g_a, int lo[], int hi[], void *ptr, int l
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Access" ) )
 
-    // calculate height and width from lo and hi
-    int width = hi[0] - lo[0];
-    int height = hi[1] - lo[1];
+    int width, height;
+    // calculate height and width from lo and hi if possible
+    if (lo[0] != -1 && hi[0] != -2)
+    {
+	width = hi[0] - lo[0];
+	height = hi[1] - lo[1];
+    }
+    else // full local dimensions
+    {
+	width = ga_handles[g_a].DM.LocalWidth();
+	height = ga_handles[g_a].DM.LocalHeight();
+    } 
 
     T * buffer = (T *)ptr;
     T * Abuf = (T *)ga_handles[g_a].DM.Buffer();
