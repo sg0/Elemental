@@ -2,6 +2,7 @@
 #ifndef EL_GLOBALARRAYS_C_H
 #define EL_GLOBALARRAYS_C_H
 
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && defined(EL_ENABLE_RMA_GLOBAL_ARRAYS)
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -198,4 +199,5 @@ EL_EXPORT ElError ElGlobalArraysReadIncrement_d( ElGlobalArrays_d A, ElInt g_a, 
 } // extern "C"
 #endif
 
+#endif /* MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && defined(EL_ENABLE_RMA_GLOBAL_ARRAYS) */
 #endif /* ifndef EL_GLOBALARRAYS_C_H */

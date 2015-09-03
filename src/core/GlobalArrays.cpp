@@ -119,7 +119,6 @@ int GlobalArrays< T >::GA_Duplicate(int g_a, char* array_name)
 
     int g_b = GA_Create_handle ();
 
-    ga_handles[g_b].dtype = ga_handles[g_a].dtype;
     ga_handles[g_b].dims[0] = ga_handles[g_a].dims[0];
     ga_handles[g_b].dims[1] = ga_handles[g_a].dims[1];
     ga_handles[g_b].status = ga_handles[g_a].status;
@@ -311,9 +310,6 @@ void GlobalArrays< T >::GA_Copy(int g_a, int g_b)
 	if (ga_handles[g_a].dims[i] != ga_handles[g_b].dims[i])
 	    LogicError ("Global Arrays of different shapes cannot be copied. ");
     }
-    // arrays must have the same type
-    if (ga_handles[g_a].dtype != ga_handles[g_b].dtype)
-	LogicError ("Global Arrays of different types cannot be copied. ");
 
     // copy
     // GA_COPY (g_a, g_b)

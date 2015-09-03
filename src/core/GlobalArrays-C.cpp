@@ -12,6 +12,7 @@
 #include "El.h"
 using namespace El;
 
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && defined(EL_ENABLE_RMA_GLOBAL_ARRAYS)
 extern "C" {
 #define GA_BASE(SIG,SIGBASE,T) \
   /* GlobalArrays<T>::GlobalArrays() */ \
@@ -123,4 +124,6 @@ extern "C" {
 #ifndef C_PROTO_DOUBLE
 # define C_PROTO_DOUBLE C_PROTO_REAL(d,double)
 #endif
+
+#endif // end of MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && defined(EL_ENABLE_RMA_GLOBAL_ARRAYS)     
 }
