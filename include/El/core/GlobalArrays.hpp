@@ -55,7 +55,6 @@ namespace El {
 		struct GA
 		{
 		    int handle; // integer handle
-		    mpi::Datatype dtype; // data type of ga
 		    int ndims; // number of dimensions
 		    int dims[2]; // x and y dims of distmatrix
 		    bool pending_transfer; // whether there is a pending xfer to/from this ga
@@ -64,7 +63,7 @@ namespace El {
 		    DistMatrix < T > DM; // distmatrix      
 		    RmaInterface < T > rmaint; // rma object
 		};
-		// handle vector of GAs
+		// vector of GA handles
 		std::vector < struct GA > ga_handles;
 	};
 #endif // EL_ENABLE_RMA_GLOBAL_ARRAYS
