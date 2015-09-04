@@ -100,7 +100,7 @@ int GlobalArrays< T >::GA_Allocate(int g_a)
     DistMatrix< T > D (grid); 
     D.Resize( ga_handles[g_a].dims[0], ga_handles[g_a].dims[1] ); 
     Zeros( D, ga_handles[g_a].dims[0], ga_handles[g_a].dims[1] );
-    &ga_handles[g_a].DM = D;
+    ga_handles[g_a].DM = D;
     
     ga_handles[g_a].rmaint.Attach( ga_handles[g_a].DM );
     
@@ -113,7 +113,7 @@ int GlobalArrays< T >::GA_Allocate(int g_a)
 // creates a new array with the same properties as 
 // the given array. new array handle returned
 template<typename T>
-int GlobalArrays< T >::GA_Duplicate(int g_a, char* array_name)
+int GlobalArrays< T >::GA_Duplicate(int g_a, char array_name[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Duplicate" ) )
 
@@ -131,7 +131,7 @@ int GlobalArrays< T >::GA_Duplicate(int g_a, char* array_name)
 	DistMatrix< T > D (grid); 
 	D.Resize( ga_handles[g_a].dims[0], ga_handles[g_a].dims[1] ); 
 	Zeros( D, ga_handles[g_a].dims[0], ga_handles[g_a].dims[1] );
-	&ga_handles[g_b].DM = D;
+	ga_handles[g_b].DM = D;
     }
  
     if (ga_handles[g_a].status == ALLOCATED)
@@ -431,7 +431,7 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, int m, int n, int k, double a
 template<typename T>
 void GlobalArrays< T >::GA_Fill(int g_a, void *value)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Duplicate" ) )
+    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Fill" ) )
     
     T * v = (T *)(value);
     if (*v != 0)
@@ -491,8 +491,9 @@ void GlobalArrays< T >::NGA_Distribution(int g_a, int iproc, int lo[], int hi[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Distribution" ) )
 
-    int dim[2] = {-1, -1}    
-    const int my_rank = g.VCRank();
+    int dim[2] = {-1, -1};
+    Grid grid (ga_handles[g_a].comm);
+    const int my_rank = grid.VCRank();
 
     // find the width and height of the submatrix held by process iproc
     if (iproc == my_rank)
@@ -616,19 +617,6 @@ void  GlobalArrays< T >::NGA_Acc(int g_a, int lo[], int hi[], void* buf, int ld[
 }
 
 template<typename T>
-int GlobalArrays< T >::NGA_Allocate(int g_a) { return GA_Allocate (g_a); }
-
-template<typename T>
-void GlobalArrays< T >::NGA_Destroy(int g_a) { GA_Destroy (g_a); }
-
-// create a duplicate of g_a and return new handle
-template<typename T>
-int GlobalArrays< T >::NGA_Duplicate(int g_a, char* array_name) { return GA_Duplicate (g_a, array_name); }
-
-template<typename T>
-void GlobalArrays< T >::NGA_Fill(int g_a, void *value) { GA_Fill (g_a, value); }
-
-template<typename T>
 void GlobalArrays< T >::NGA_Get(int g_a, int lo[], int hi[], void* buf, int ld[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Get" ) )
@@ -651,9 +639,6 @@ void GlobalArrays< T >::NGA_Get(int g_a, int lo[], int hi[], void* buf, int ld[]
 	inbuf[i+j*ldim] = buffer[i+j*ldim];
 }
  
-template<typename T>
-void GlobalArrays< T >::NGA_Initialize() { GA_Initialize (); }
-
 template<typename T>
 void GlobalArrays< T >::NGA_NbAcc(int g_a,int lo[], int hi[],void* buf,int ld[],void* alpha, ga_nbhdl_t* nbhandle)
 {
@@ -795,13 +780,6 @@ long GlobalArrays< T >::NGA_Read_inc(int g_a, int subscript[], long inc)
 
     return prev;   
 }
-
-template<typename T>
-void GlobalArrays< T >::NGA_Sync() { GA_Sync(); }
-
-template<typename T>
-void GlobalArrays< T >::NGA_Terminate() { GA_Terminate(); }
-
 
 // FIXME 
 template class GlobalArrays<int>;
