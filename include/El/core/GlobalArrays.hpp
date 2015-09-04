@@ -29,7 +29,7 @@ namespace El {
 		void GA_Destroy(int g_a);
 		void GA_Add(void *alpha, int g_a, void* beta, int g_b, int g_c); 
 		void GA_Dgemm(char ta, char tb, int m, int n, int k, double alpha, int g_a, int g_b, double beta, int g_c );
-		int  GA_Duplicate(int g_a, char array_name[]);
+		int  GA_Duplicate(int g_a, const char *array_name);
 		void GA_Fill(int g_a, void *value);
 		void GA_Initialize();
 		void GA_Sync();

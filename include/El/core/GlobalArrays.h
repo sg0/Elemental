@@ -75,11 +75,11 @@ EL_EXPORT ElError ElGlobalArraysDgemm_s( ElGlobalArrays_s A, char ta, ElInt m, E
 EL_EXPORT ElError ElGlobalArraysDgemm_d( ElGlobalArrays_d A, char ta, ElInt m, ElInt n, ElInt k, 
 	double alpha, ElInt g_a, ElInt g_b, double beta, ElInt g_c );
 
-/* int GlobalArrays<T>::GA_Duplicate(int g_a, char array_name[]);
+/* int GlobalArrays<T>::GA_Duplicate(int g_a, const char *array_name);
  ------------------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysDuplicate_i( ElGlobalArrays_i A, ElInt g_a, char array_name[], ElInt* g_dup );
-EL_EXPORT ElError ElGlobalArraysDuplicate_s( ElGlobalArrays_s A, ElInt g_a, char array_name[], ElInt* g_dup );
-EL_EXPORT ElError ElGlobalArraysDuplicate_d( ElGlobalArrays_d A, ElInt g_a, char array_name[], ElInt* g_dup );
+EL_EXPORT ElError ElGlobalArraysDuplicate_i( ElGlobalArrays_i A, ElInt g_a, const char* array_name, ElInt* g_dup );
+EL_EXPORT ElError ElGlobalArraysDuplicate_s( ElGlobalArrays_s A, ElInt g_a, const char* array_name, ElInt* g_dup );
+EL_EXPORT ElError ElGlobalArraysDuplicate_d( ElGlobalArrays_d A, ElInt g_a, const char* array_name, ElInt* g_dup );
 
 /* void GlobalArrays<T>::GA_Fill(int g_a, void *value);
  -------------------------------------- */

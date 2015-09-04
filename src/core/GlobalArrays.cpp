@@ -113,7 +113,7 @@ int GlobalArrays< T >::GA_Allocate(int g_a)
 // creates a new array with the same properties as 
 // the given array. new array handle returned
 template<typename T>
-int GlobalArrays< T >::GA_Duplicate(int g_a, char array_name[])
+int GlobalArrays< T >::GA_Duplicate(int g_a, const char *array_name)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Duplicate" ) )
 
@@ -496,30 +496,22 @@ void GlobalArrays< T >::NGA_Distribution(int g_a, int iproc, int lo[], int hi[])
     const int my_rank = grid.VCRank();
 
     // find the width and height of the submatrix held by process iproc
-    if (iproc == my_rank)
-    {
-	dim[0] = ga_handles[g_a].DM.LocalWidth();
-	dim[1] = ga_handles[g_a].DM.LocalHeight();
-	if (dim[0] == 0 && dim[1] == 0) // in case iproc does not own a submatrix
-	{
-	    dim[0] = -1;
-	    dim[0] = -2;
-	}
-    }
+    dim[0] = ga_handles[g_a].DM.LocalWidth();
+    dim[1] = ga_handles[g_a].DM.LocalHeight();
 
     // broadcast iproc's dim to everyone
-    mpi::Broadcast(dim, 2, iproc, ga_handles[g_a].comm);
+    if (iproc != my_rank)
+	mpi::Broadcast(dim, 2, iproc, ga_handles[g_a].comm);
 
-    // calculate lo and hi
-    if (dim[0] != -1 && dim[1] != -2)
-    {
-	lo[0] = 0; lo[1] = 0;
-	hi[0] = dim[0]; hi[1] = dim[1];
-    }
-    else
+    if (dim[0] == 0 && dim[1] == 0) // in case iproc does not own a submatrix
     {
 	lo[0] = -1; lo[1] = -1;
 	hi[0] = -2; hi[1] = -2;
+    }
+    else
+    {
+	lo[0] = 0; lo[1] = 0;
+	hi[0] = dim[0]; hi[1] = dim[1];
     }
 }
 

@@ -48,8 +48,8 @@ extern "C" {
   ElError ElGlobalArraysDgemm_ ## SIG ( ElGlobalArrays_ ## SIG A, char ta, ElInt m, ElInt n, ElInt k, \
 	double alpha, ElInt g_a, ElInt g_b, double beta, ElInt g_c ) \
   { EL_TRY( CReflect(A)->GA_Dgemm(ta, tb, m, n, k, alpha, g_a, g_b, beta, g_c ) ) } \
-  /* int GlobalArrays<T>::GA_Duplicate(int g_a, char array_name[]) */ \
-  ElError ElGlobalArraysDuplicate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, char array_name[], ElInt* g_dup ) \
+  /* int GlobalArrays<T>::GA_Duplicate(int g_a, const char* array_name) */ \
+  ElError ElGlobalArraysDuplicate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, const char *array_name, ElInt* g_dup ) \
   { EL_TRY( *g_dup = CReflect(A)->GA_Duplicate(g_a, array_name) ) } \
   /* void GlobalArrays<T>::GA_Fill(int g_a, void *value) */ \
   ElError ElGlobalArraysFill_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt* value ) \
