@@ -45,7 +45,7 @@ extern "C" {
   ElError ElGlobalArraysAdd_ ## SIG ( ElGlobalArrays_ ## SIG A, void* alpha, ElInt g_a, void* beta, ElInt g_b, ElInt g_c ) \
   { EL_TRY( CReflect(A)->GA_Add(alpha, g_a, beta, g_b, g_c) ) } \
   /* void GlobalArrays<T>::GA_Dgemm(char ta, char tb, int m, int n, int k, double alpha, int g_a, int g_b, double beta, int g_c ) */ \
-  ElError ElGlobalArraysDgemm_ ## SIG ( ElGlobalArrays_ ## SIG A, char ta, ElInt m, ElInt n, ElInt k, \
+  ElError ElGlobalArraysDgemm_ ## SIG ( ElGlobalArrays_ ## SIG A, char ta, char tb, ElInt m, ElInt n, ElInt k, \
 	double alpha, ElInt g_a, ElInt g_b, double beta, ElInt g_c ) \
   { EL_TRY( CReflect(A)->GA_Dgemm(ta, tb, m, n, k, alpha, g_a, g_b, beta, g_c ) ) } \
   /* int GlobalArrays<T>::GA_Duplicate(int g_a, const char* array_name) */ \
