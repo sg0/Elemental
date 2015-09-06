@@ -25,7 +25,7 @@ remote put/gets El::RmaInterface should be used.
 */
 #include "El.hpp"
 
-#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && defined(EL_ENABLE_RMA_GLOBAL_ARRAYS)
+//#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && defined(EL_ENABLE_RMA_GLOBAL_ARRAYS)
 namespace El
 {
 // constructor    
@@ -774,10 +774,9 @@ long GlobalArrays< T >::NGA_Read_inc(int g_a, int subscript[], long inc)
 }
 
 // FIXME 
-template class GlobalArrays<int>;
-template class GlobalArrays<long>;
+template class GlobalArrays<Int>;
 template class GlobalArrays<float>;
 template class GlobalArrays<double>;
 
 } // namespace El
-#endif // EL_ENABLE_RMA_GLOBAL_ARRAYS
+//#endif // EL_ENABLE_RMA_GLOBAL_ARRAYS

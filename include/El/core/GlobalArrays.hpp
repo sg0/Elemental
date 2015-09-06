@@ -3,11 +3,12 @@
 #define EL_GLOBALARRAYS_HPP
 
 namespace El {
+
 #if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && defined(EL_ENABLE_RMA_GLOBAL_ARRAYS)
-    template<typename T>
-	class GlobalArrays 
-	{
-	    public:
+template<typename T>
+class GlobalArrays 
+{
+	public:
 		GlobalArrays();
 		~GlobalArrays();
 
@@ -16,9 +17,9 @@ namespace El {
 		// ga creation status
 		typedef enum ga_status_
 		{
-		    CREATED, // handle created
-		    SET, // called ga_set_data
-		    ALLOCATED // memory allocated
+			CREATED, // handle created
+			SET, // called ga_set_data
+			ALLOCATED // memory allocated
 		} ga_status_t;
 
 		// Subset of GA C API
@@ -48,23 +49,23 @@ namespace El {
 		void NGA_Distribution(int g_a, int iproc, int lo[], int hi[]);
 		void GA_Symmetrize(int g_a);
 
-	    private:
+	private:
 		bool ga_initialized;
 
 		struct GA
 		{
-		    int handle; // integer handle
-		    int ndims; // number of dimensions
-		    int dims[2]; // x and y dims of distmatrix
-		    bool pending_transfer; // whether there is a pending xfer to/from this ga
-		    ga_status_t status; // whether GA is set, allocated or just handle created
-		    mpi::Comm comm; // comm for window allocation and everything
-		    DistMatrix < T > DM; // distmatrix      
-		    RmaInterface < T > rmaint; // rma object
+			int handle; // integer handle
+			int ndims; // number of dimensions
+			int dims[2]; // x and y dims of distmatrix
+			bool pending_transfer; // whether there is a pending xfer to/from this ga
+			ga_status_t status; // whether GA is set, allocated or just handle created
+			mpi::Comm comm; // comm for window allocation and everything
+			DistMatrix < T > DM; // distmatrix      
+			RmaInterface < T > rmaint; // rma object
 		};
 		// vector of GA handles
 		std::vector < struct GA > ga_handles;
-	};
+};
 #endif // EL_ENABLE_RMA_GLOBAL_ARRAYS
 } // namespace El
 #endif // ifndef EL_GLOBALARRAYS_HPP
