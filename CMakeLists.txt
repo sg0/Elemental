@@ -46,9 +46,9 @@ set(EL_VERSION_MINOR 86-dev)
 
 # TODO: Add discussion of "MATH_LIBS" and "REFERENCE_ROOT"
 
-set(BUILD_SHARED_LIBS "Build shared libraries?" ON)
-
+option(BUILD_SHARED_LIBS "Build shared libraries?" ON)
 option(EL_C_INTERFACE "Build C interface" ON)
+
 if(BUILD_SHARED_LIBS AND EL_C_INTERFACE)
   # Define PYTHON_SITE_PACKAGES if you want to install the python package
   # somewhere other than the default system-wide location (e.g., within your
@@ -89,7 +89,6 @@ option(EL_ENABLE_RMA_AXPY "Choose new Rma Axpy interface implemented using MPI-3
 option(EL_USE_IBARRIER_FOR_AXPY "Use MPI-3 IBarrier for synchronization in AxpyInterface" ON)
 option(EL_USE_WIN_ALLOC_FOR_RMA "Use MPI_Win_allocate for allocating window objects" ON)
 option(EL_USE_WIN_CREATE_FOR_RMA "Use MPI_Win_create for creating window objects" OFF)
-
 # Enable Global Arrays Layer
 option(EL_ENABLE_RMA_GLOBAL_ARRAYS "Enable basic Global Arrays API" ON)
 
@@ -433,27 +432,32 @@ endforeach()
 add_custom_target(prepare_El_headers DEPENDS ${PREPARED_HEADERS})
 add_dependencies(El prepare_El_headers)
 
+# Decide if/how to install the Python interface
+# ---------------------------------------------
 if(BUILD_SHARED_LIBS)
   if(INSTALL_PYTHON_PACKAGE)
     if(NOT PYTHON_SITE_PACKAGES)
-      execute_process( 
-        COMMAND python -c 
-        "from distutils.sysconfig import get_python_lib; print get_python_lib()" 
-        OUTPUT_VARIABLE PYTHON_SITE_PACKAGES OUTPUT_STRIP_TRAILING_WHITESPACE
-      )
+      if(INSTALL_PYTHON_INTO_USER_SITE)
+        execute_process(COMMAND python -c
+          "import site; print site.USER_SITE"
+          OUTPUT_VARIABLE PYTHON_SITE_PACKAGES 
+          OUTPUT_STRIP_TRAILING_WHITESPACE)
+      else()
+        execute_process(COMMAND python -c
+          "from distutils.sysconfig import get_python_lib; print get_python_lib()"
+          OUTPUT_VARIABLE PYTHON_SITE_PACKAGES 
+          OUTPUT_STRIP_TRAILING_WHITESPACE)
+      endif()  
+      set(PYTHON_SITE_PACKAGES ${PYTHON_SITE_PACKAGES} 
+        CACHE PATH "Destination for Python site package directory")
     endif()
-    message(STATUS "PYTHON_SITE_PACKAGES=${PYTHON_SITE_PACKAGES}")
-    install(
-      DIRECTORY ${PROJECT_SOURCE_DIR}/include/
+    install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/
       DESTINATION ${PYTHON_SITE_PACKAGES}
-      FILES_MATCHING PATTERN "*.py"
-    )
+      FILES_MATCHING PATTERN "*.py")
   else()
-    install(
-      DIRECTORY ${PROJECT_SOURCE_DIR}/include/
+    install(DIRECTORY ${PROJECT_SOURCE_DIR}/include/
       DESTINATION ${CMAKE_INSTALL_PREFIX}/include/
-      FILES_MATCHING PATTERN "*.py"
-    )
+      FILES_MATCHING PATTERN "*.py")
   endif()
 endif()
 
