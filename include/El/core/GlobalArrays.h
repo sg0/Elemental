@@ -62,9 +62,9 @@ EL_EXPORT ElError ElGlobalArraysDestroy_d( ElGlobalArrays_d A, ElInt g_a );
 
 /* void GlobalArrays<T>::GA_Add(void *alpha, int g_a, void* beta, int g_b, int g_c); 
    ---------------------------------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysAdd_i( ElGlobalArrays_i A, ElInt* alpha, ElInt g_a, ElInt* beta, ElInt g_b, ElInt g_c );
-EL_EXPORT ElError ElGlobalArraysAdd_s( ElGlobalArrays_s A, float* alpha, ElInt g_a, float* beta, ElInt g_b, ElInt g_c );
-EL_EXPORT ElError ElGlobalArraysAdd_d( ElGlobalArrays_d A, double* alpha, ElInt g_a, double* beta, ElInt g_b, ElInt g_c );
+EL_EXPORT ElError ElGlobalArraysAdd_i( ElGlobalArrays_i A, void* alpha, ElInt g_a, void* beta, ElInt g_b, ElInt g_c );
+EL_EXPORT ElError ElGlobalArraysAdd_s( ElGlobalArrays_s A, void* alpha, ElInt g_a, void* beta, ElInt g_b, ElInt g_c );
+EL_EXPORT ElError ElGlobalArraysAdd_d( ElGlobalArrays_d A, void* alpha, ElInt g_a, void* beta, ElInt g_b, ElInt g_c );
 
 /* void GlobalArrays<T>::GA_Dgemm(char ta, char tb, int m, int n, int k, double alpha, int g_a, int g_b, double beta, int g_c );
    ----------------------------------------------------------------------------------------------------------- */
@@ -83,9 +83,9 @@ EL_EXPORT ElError ElGlobalArraysDuplicate_d( ElGlobalArrays_d A, ElInt g_a, cons
 
 /* void GlobalArrays<T>::GA_Fill(int g_a, void *value);
  -------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysFill_i( ElGlobalArrays_i A, ElInt g_a, ElInt* value );
-EL_EXPORT ElError ElGlobalArraysFill_s( ElGlobalArrays_s A, ElInt g_a, float* value );
-EL_EXPORT ElError ElGlobalArraysFill_d( ElGlobalArrays_d A, ElInt g_a, double* value );
+EL_EXPORT ElError ElGlobalArraysFill_i( ElGlobalArrays_i A, ElInt g_a, void* value );
+EL_EXPORT ElError ElGlobalArraysFill_s( ElGlobalArrays_s A, ElInt g_a, void* value );
+EL_EXPORT ElError ElGlobalArraysFill_d( ElGlobalArrays_d A, ElInt g_a, void* value );
 
 /* void GlobalArrays<T>::GA_Initialize();
  ------------------------------------- */
@@ -126,40 +126,40 @@ EL_EXPORT ElError ElGlobalArraysDistribution_d( ElGlobalArrays_d A, ElInt g_a, E
 /* void GlobalArrays<T>::NGA_Acc(int g_a, int lo[], int hi[],void* buf,int ld[],void* alpha);
  ---------------------------------------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysAccumulate_i( ElGlobalArrays_i A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], ElInt* ptr, ElInt ld[], ElInt* alpha );
+	ElInt hi[], ElInt* ptr, ElInt ld[], void* alpha );
 EL_EXPORT ElError ElGlobalArraysAccumulate_s( ElGlobalArrays_s A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], float* ptr, ElInt ld[], float* alpha );
+	ElInt hi[], float* ptr, ElInt ld[], void* alpha );
 EL_EXPORT ElError ElGlobalArraysAccumulate_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], double* ptr, ElInt ld[], double* alpha );
+	ElInt hi[], double* ptr, ElInt ld[], void* alpha );
 
 /* void GlobalArrays<T>::NGA_Get(int g_a, int lo[], int hi[], void* buf, int ld[]); 
  ------------------------------------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysGet_i( ElGlobalArrays_i A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], ElInt* ptr, ElInt ld[] );
+	ElInt hi[], ElInt* buf, ElInt ld[] );
 EL_EXPORT ElError ElGlobalArraysGet_s( ElGlobalArrays_s A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], float* ptr, ElInt ld[] );
+	ElInt hi[], float* buf, ElInt ld[] );
 EL_EXPORT ElError ElGlobalArraysGet_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], double* ptr, ElInt ld[] );
+	ElInt hi[], double* buf, ElInt ld[] );
 
 /* void GlobalArrays<T>::NGA_NbAcc(int g_a,int lo[], int hi[],void* buf,int ld[],void* alpha, ga_nbhdl_t* nbhandle);
  ----------------------------------------------------------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysNBAccumulate_i( ElGlobalArrays_i A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], ElInt* ptr, ElInt ld[], ElInt* alpha, ElInt* nbhandle );
+	ElInt hi[], ElInt* ptr, ElInt ld[], void* alpha, ElInt* nbhandle );
 EL_EXPORT ElError ElGlobalArraysNBAccumulate_s( ElGlobalArrays_s A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], float* ptr, ElInt ld[], float* alpha, ElInt* nbhandle );
+	ElInt hi[], float* ptr, ElInt ld[], void* alpha, ElInt* nbhandle );
 EL_EXPORT ElError ElGlobalArraysNBAccumulate_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], double* ptr, ElInt ld[], double* alpha, ElInt* nbhandle );
+	ElInt hi[], double* ptr, ElInt ld[], void* alpha, ElInt* nbhandle );
 
 /* void GlobalArrays<T>::NGA_NbGet(int g_a, int lo[], int hi[], void* buf, int ld[], ga_nbhdl_t* nbhandle);
  --------------------------------------------------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysNBGet_i( ElGlobalArrays_i A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], ElInt* ptr, ElInt ld[], ElInt* nbhandle );
+	ElInt hi[], ElInt* buf, ElInt ld[], ElInt* nbhandle );
 EL_EXPORT ElError ElGlobalArraysNBGet_s( ElGlobalArrays_s A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], float* ptr, ElInt ld[], ElInt* nbhandle );
+	ElInt hi[], float* buf, ElInt ld[], ElInt* nbhandle );
 EL_EXPORT ElError ElGlobalArraysNBGet_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], double* ptr, ElInt ld[], ElInt* nbhandle );
+	ElInt hi[], double* buf, ElInt ld[], ElInt* nbhandle );
 
-/* void GlobalArrays<T>::NGA_NbPut(int g_a, int lo[], int hi[], void* buf, int ld[], ga_nbhdl_t* nbhandle);
+/* void GlobalArrays<T>::NGA_NbPut(int g_a, int lo[], int hi[], void* ptr, int ld[], ga_nbhdl_t* nbhandle);
   --------------------------------------------------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysNBPut_i( ElGlobalArrays_i A, ElInt g_a, ElInt lo[], 
 	ElInt hi[], ElInt* ptr, ElInt ld[], ElInt* nbhandle );
@@ -180,7 +180,7 @@ EL_EXPORT ElError ElGlobalArraysNBWait_i( ElGlobalArrays_i A, ElInt* nbhandle );
 EL_EXPORT ElError ElGlobalArraysNBWait_s( ElGlobalArrays_s A, ElInt* nbhandle );
 EL_EXPORT ElError ElGlobalArraysNBWait_d( ElGlobalArrays_d A, ElInt* nbhandle );
 
-/* void GlobalArrays<T>::NGA_Put(int g_a, int lo[], int hi[], void* buf, int ld[]); 
+/* void GlobalArrays<T>::NGA_Put(int g_a, int lo[], int hi[], void* ptr, int ld[]); 
   ---------------------------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysPut_i( ElGlobalArrays_i A, ElInt g_a, ElInt lo[], 
 	ElInt hi[], ElInt* ptr, ElInt ld[] );

@@ -65,6 +65,18 @@ class GlobalArrays
 		};
 		// vector of GA handles
 		std::vector < struct GA > ga_handles;
+		
+                // Friend declarations
+		// ===================
+		template <typename F>               friend class GlobalArrays;
+		template <typename F>               friend class Matrix;
+		template <typename F>               friend class AbstractDistMatrix;
+		template <typename F>               friend class AbstractBlockDistMatrix;
+		template <typename F>               friend class RmaInterface;
+		template <typename F,Dist U,Dist V> friend class GeneralDistMatrix;
+		template <typename F,Dist U,Dist V> friend class GeneralBlockDistMatrix;
+		template <typename F,Dist U,Dist V> friend class DistMatrix;
+		template <typename F,Dist U,Dist V> friend class BlockDistMatrix;
 };
 #endif // EL_ENABLE_RMA_GLOBAL_ARRAYS
 } // namespace El
