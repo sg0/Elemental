@@ -39,7 +39,7 @@ RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
     toBeAttachedForPut_ 	= false;
     GlobalArrayPut_ 		= 0;
     GlobalArrayGet_ 		= 0;
-    window 		= MPI_WIN_NULL;
+    window 		        = MPI_WIN_NULL;
 }
 
 // until attach, I am not setting anything

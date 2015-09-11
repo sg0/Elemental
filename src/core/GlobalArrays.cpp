@@ -42,8 +42,8 @@ GlobalArrays< T >::~GlobalArrays()
     {
 	std::ostringstream os;
 	os << "Uncaught exception detected during GlobalArrays destructor "
-	    "that required a call to Detach. Instead of allowing for the "
-	    "possibility of Detach throwing another exception and "
+	    "that required a call to GA_Terminate. Instead of allowing for the "
+	    "possibility of GA_Terminate throwing another exception and "
 	    "resulting in a 'terminate', we instead immediately dump the "
 	    "call stack (if not in RELEASE mode) since the program will "
 	    "likely hang:" << std::endl;
@@ -59,13 +59,17 @@ template<typename T>
 int GlobalArrays< T >::GA_Create_handle()
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Create_handle" ) )
-
+    
+    // resize GA handle vector	
     const Int numCreated = ga_handles.size();
+    // at this step, we just need to extend the handle vector
+    // by 1, struct fields will be populated in other functions
+    ga_handles[numCreated - 1].handle = (numCreated - 1);
+    ga_handles[numCreated - 1].status = CREATED;
+       
     ga_handles.resize( numCreated + 1 );
-    ga_handles[numCreated].handle = numCreated;
-    ga_handles[numCreated].status = CREATED;
 
-    return numCreated;
+    return (numCreated - 1);
 }
 
 // set dims for the handle
@@ -95,19 +99,46 @@ template<typename T>
 int GlobalArrays< T >::GA_Allocate(int g_a)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Allocate" ) )
+    
+    if ( ga_handles[g_a].dims[0] > 0 
+	    && ga_handles[g_a].dims[1] > 0
+	    && ga_handles[g_a].comm != mpi::COMM_NULL )
+    {
+	// distmatrix
+	// TODO check if this is required?
+	// Grid grid (ga_handles[g_a].comm);
+	//ga_handles[g_a].DM.SetGrid (grid);
+	// zeros is resize followed by memset to 0
+	Zeros( ga_handles[g_a].DM, ga_handles[g_a].dims[0], ga_handles[g_a].dims[1] );
+	ga_handles[g_a].status = ALLOCATED;
+    }
+    else
+	LogicError ("Dimensions cannot be less than zero");
 
-    Grid grid (ga_handles[g_a].comm);
-    DistMatrix< T > D (grid); 
-    D.Resize( ga_handles[g_a].dims[0], ga_handles[g_a].dims[1] ); 
-    Zeros( D, ga_handles[g_a].dims[0], ga_handles[g_a].dims[1] );
-    ga_handles[g_a].DM = D;
-    
+    // rmainterface
     ga_handles[g_a].rmaint.Attach( ga_handles[g_a].DM );
-    
-    ga_handles[g_a].status = ALLOCATED;
-    ga_handles[g_a].pending_transfer = false;
-    
+
     return 1;
+}
+
+// interface to create+allocate global array
+// INFO: type argument will most probably be removed
+// from the interface
+template<typename T>
+int GlobalArrays< T >::GA_Create(int type, int ndim, int dims[], const char *array_name)
+{
+    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Create" ) )
+
+    // create GA handle
+    int ga = GA_Create_handle ();
+    
+    // set dimensions of GA
+    GA_Set_data (ga, ndim, dims, type);
+    
+    // allocation of GA
+    int status = GA_Allocate (ga);
+
+    return ga;
 }
 
 // creates a new array with the same properties as 
@@ -116,30 +147,21 @@ template<typename T>
 int GlobalArrays< T >::GA_Duplicate(int g_a, const char *array_name)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Duplicate" ) )
-
+    
+    // create handle	
     int g_b = GA_Create_handle ();
 
+    // set
+    ga_handles[g_b].ndims = ga_handles[g_a].ndims;
     ga_handles[g_b].dims[0] = ga_handles[g_a].dims[0];
     ga_handles[g_b].dims[1] = ga_handles[g_a].dims[1];
-    ga_handles[g_b].status = ga_handles[g_a].status;
-    ga_handles[g_b].pending_transfer = false;
-
     ga_handles[g_b].comm = ga_handles[g_a].comm;
-    if (ga_handles[g_b].dims[0] > 0 && ga_handles[g_b].dims[1] > 0)
-    {
-	Grid grid (ga_handles[g_a].comm);
-	DistMatrix< T > D (grid); 
-	D.Resize( ga_handles[g_a].dims[0], ga_handles[g_a].dims[1] ); 
-	Zeros( D, ga_handles[g_a].dims[0], ga_handles[g_a].dims[1] );
-	ga_handles[g_b].DM = D;
-    }
- 
-    if (ga_handles[g_a].status == ALLOCATED)
-    	ga_handles[g_b].rmaint.Attach (ga_handles[g_b].DM);
+
+    // allocate
+    GA_Allocate (g_b);
 
     return g_b;
 }
-
 
 #define FALLBACK_STRIDE 8
 #define SCALAR_x_GA(scalar, g_a) \
@@ -313,7 +335,16 @@ void GlobalArrays< T >::GA_Copy(int g_a, int g_b)
 
     // copy
     // GA_COPY (g_a, g_b)
-    Copy (ga_handles[g_a].DM, ga_handles[g_b].DM);
+    Copy( ga_handles[g_a].DM, ga_handles[g_b].DM );
+}
+
+// print GA distribution
+// void GA_Print_distribution(int ga)
+template<typename T>
+void GlobalArrays< T >::GA_Print_distribution(int g_a)
+{
+    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Print_distribution" ) )
+    Print( ga_handles[g_a].DM );
 }
 
 // deallocates ga and frees associated resources
@@ -444,10 +475,25 @@ void GlobalArrays< T >::GA_Fill(int g_a, void *value)
 template<typename T>
 void GlobalArrays< T >::GA_Initialize()
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Initialize" ) )
+   DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Initialize" ) )
 
-   if (ga_handles.size() == 0)
-	ga_initialized = true;
+   // initialize ga_handles vector
+   if (ga_handles.empty())
+   {
+       struct GA ga;
+
+       ga.handle = -1;
+       ga.status = UNDEFINED;
+       ga.ndims = -1;
+       ga.dims[0] = -1;
+       ga.dims[1] = -1;
+       ga.pending_transfer = false;
+       ga.comm = mpi::COMM_NULL;
+
+       ga_handles.push_back( ga );
+    
+       ga_initialized = true;
+   }
 }
 
 // barrier
@@ -457,6 +503,17 @@ template<typename T>
 void GlobalArrays< T >::GA_Sync()
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Sync" ) )
+
+    // ensure all GA operations are complete	
+    for (int i = 0; i < ga_handles.size(); i++)
+    {
+	if (ga_handles[i].pending_transfer)
+	{
+	    ga_handles[i].rmaint.Waitall ();
+	    ga_handles[i].pending_transfer = false;
+	}
+    }
+
     mpi::Barrier (mpi::COMM_WORLD);
 }
 
@@ -474,6 +531,8 @@ void GlobalArrays< T >::GA_Terminate()
     for (Int i = 0; i < ga_handles.size(); i++)
 	ga_handles[i].rmaint.Detach();
     ga_handles.clear();
+
+    mpi::Barrier (mpi::COMM_WORLD);
 }
 
 // B = A'
@@ -542,9 +601,9 @@ void GlobalArrays< T >::NGA_Access(int g_a, int lo[], int hi[], void *ptr, int l
 
 // transfers
 // locally blocking transfers
-#define BXFER(str, g_a, M, i, j) \
+#define BXFER(type, g_a, M, i, j) \
     do { \
-	switch (str) \
+	switch (type) \
 	{ \
 	    case 'A': \
 		ga_handles[g_a].rmaint.Acc (M, i, j); \
@@ -559,9 +618,9 @@ void GlobalArrays< T >::NGA_Access(int g_a, int lo[], int hi[], void *ptr, int l
     } while (0)
 
 // locally nonblocking transfers
-#define NBXFER(str, g_a, M, i, j) \
+#define NBXFER(type, g_a, M, i, j) \
     do { \
-	switch (str) \
+	switch (type) \
 	{ \
 	    case 'A': \
 		ga_handles[g_a].rmaint.Iacc (M, i, j); \
@@ -580,28 +639,36 @@ void  GlobalArrays< T >::NGA_Acc(int g_a, int lo[], int hi[], void* buf, int ld[
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Acc" ) )
 
-    T * a = (T *)(alpha);
-    
+    if (buf == NULL)
+	LogicError ("Input buffer cannot be NULL");
+
+    T * a = (T *)alpha;
+    T * buffer = (T *) buf;
+
     if (*a == 0.0) // no-op
 	return;
 
-    T * buffer = (T *) buf;
+    // calculate local height and width
+    int width = hi[0] - lo[0] + 1;
+    int height = hi[1] - lo[1] + 1;
 
-    // calculate height and width from lo and hi
-    int width = hi[0] - lo[0];
-    int height = hi[1] - lo[1];
-    int ldim = width;
+    // declare a matrix
+    Matrix< T > A;
+    Zeros (A, height, width);
+    T * source = A.Buffer ();
 
     if (*a != 1.0) // then a * buf
     {
-	for (int i = 0; i < height; i++)
-	    for (int j = 0; j < width; j++)
-	    buffer[i * width + j] *= *a;
+	for (int i = 0; i < width; i++)
+	    for (int j = 0; j < height; j++)
+		buffer[i + j*height] *= *a;
     }
 
-    // unpack buf into Matrix<T>
-    Matrix< T > A;
-    A.Attach(height, width, buffer, ldim);
+    // memcopy to source
+    MemCopy (source, buffer, (width * height));
+
+    const Int i = lo[0];
+    const Int j = lo[1];
 
     // Acc - (locally) blocking transfer
     BXFER ('A', g_a, A, lo[0], hi[0]);
@@ -614,27 +681,30 @@ void GlobalArrays< T >::NGA_Get(int g_a, int lo[], int hi[], void* buf, int ld[]
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Get" ) )
 
      // calculate height and width from lo and hi
-    int width = hi[0] - lo[0];
-    int height = hi[1] - lo[1];
-    
-    // unpack buf into Matrix<T>
-    Matrix< T > A (height, width);
-    BXFER ('G', g_a, A, lo[0], hi[0]);
+    int width = hi[0] - lo[0] + 1;
+    int height = hi[1] - lo[1] + 1;
+   
+    const Int i = lo[0];
+    const Int j = lo[1];
+
+    // declare Matrix<T> for get
+    Matrix< T > A; 
+    Zeros (A, height, width);
+    BXFER ('G', g_a, A, i, j);
 
     T * buffer = A.Buffer();
     T * inbuf = (T *)buf;
 
-    const int ldim = A.LDim();
-
-    for( int j = 0; j < height; j++ )
-    for( int i = 0; i < width; i++ )
-	inbuf[i+j*ldim] = buffer[i+j*ldim];
+    MemCopy (inbuf, buffer, (width * height));
 }
  
 template<typename T>
-void GlobalArrays< T >::NGA_NbAcc(int g_a,int lo[], int hi[],void* buf,int ld[],void* alpha, ga_nbhdl_t* nbhandle)
+void GlobalArrays< T >::NGA_NbAcc(int g_a, int lo[], int hi[], void* buf, int ld[], void* alpha, ga_nbhdl_t* nbhandle)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbAcc" ) )
+
+    if (buf == NULL)
+	LogicError ("Input buffer cannot be NULL");
 
     T * a = (T *)alpha;
     T * buffer = (T *) buf;
@@ -642,24 +712,30 @@ void GlobalArrays< T >::NGA_NbAcc(int g_a,int lo[], int hi[],void* buf,int ld[],
     if (*a == 0.0) // no-op
 	return;
 
-    // calculate height and width from lo and hi
-    int width = hi[0] - lo[0];
-    int height = hi[1] - lo[1];
-    int ldim = width;
+    // calculate local height and width
+    int width = hi[0] - lo[0] + 1;
+    int height = hi[1] - lo[1] + 1;
+
+    // declare a matrix
+    Matrix< T > A;
+    Zeros (A, height, width);
+    T * source = A.Buffer ();
 
     if (*a != 1.0) // then a * buf
     {
-	for (int i = 0; i < height; i++)
-	    for (int j = 0; j < width; j++)
-	    buffer[i * width + j] *= *a;
+	for (int i = 0; i < width; i++)
+	    for (int j = 0; j < height; j++)
+		buffer[i + j*height] *= *a;
     }
 
-    // unpack buf into Matrix<T>
-    Matrix< T > A;
-    A.Attach(height, width, buffer, ldim);
+    // memcopy to source
+    MemCopy (source, buffer, (width * height));
 
+    const Int i = lo[0];
+    const Int j = lo[1];
+    
     // Acc - (locally) nonblocking transfer
-    NBXFER ('A', g_a, A, lo[0], hi[0]);
+    NBXFER ('A', g_a, A, i, j);
 
     *nbhandle = ga_handles[g_a].handle;
     if ( !ga_handles[g_a].pending_transfer ) 
@@ -678,19 +754,28 @@ void GlobalArrays< T >::NGA_NbPut(int g_a, int lo[], int hi[], void* buf, int ld
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbPut" ) )
 
-    // calculate height and width from lo and hi
-    int width = hi[0] - lo[0];
-    int height = hi[1] - lo[1];
-    const int ldim = width;
+    if (buf == NULL)
+	LogicError ("Input buffer cannot be NULL");
 
     T * buffer = (T *) buf;
 
-    // unpack buf into Matrix<T>
-    Matrix< T > A;
-    A.Attach(height, width, buffer, ldim);
+    // calculate local height and width
+    int width = hi[0] - lo[0] + 1;
+    int height = hi[1] - lo[1] + 1;
 
+    // declare a matrix
+    Matrix< T > A;
+    Zeros (A, height, width);
+    T * source = A.Buffer ();
+
+    // memcopy to source
+    MemCopy (source, buffer, (width * height));
+
+    const Int i = lo[0];
+    const Int j = lo[1];
+    
     // Put - (locally) nonblocking transfer
-    NBXFER ('P', g_a, A, lo[0], hi[0]);
+    NBXFER ('P', g_a, A, i, j);
 
     *nbhandle = ga_handles[g_a].handle;
     if ( !ga_handles[g_a].pending_transfer ) 
@@ -735,19 +820,28 @@ void GlobalArrays< T >::NGA_Put(int g_a, int lo[], int hi[], void* buf, int ld[]
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Put" ) )
 
-    // calculate height and width from lo and hi
-    int width = hi[0] - lo[0];
-    int height = hi[1] - lo[1];
-    const int ldim = width;
+    if (buf == NULL)
+	LogicError ("Input buffer cannot be NULL");
 
     T * buffer = (T *) buf;
 
-    // unpack buf into Matrix<T>
+    // calculate local height and width
+    int width = hi[0] - lo[0] + 1;
+    int height = hi[1] - lo[1] + 1;
+
+    // declare a matrix
     Matrix< T > A;
-    A.Attach(height, width, buffer, ldim);
+    Zeros (A, height, width);
+    T * source = A.Buffer ();
+
+    // memcopy to source
+    MemCopy (source, buffer, (width * height));
+
+    const Int i = lo[0];
+    const Int j = lo[1];
 
     // Put - (locally) nonblocking transfer
-    BXFER('P', g_a, A, lo[0], hi[0]);
+    BXFER('P', g_a, A, i, j);
     ga_handles[g_a].rmaint.Flush (A);
 }
 

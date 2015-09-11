@@ -14,19 +14,14 @@ class GlobalArrays
 
 		typedef Int ga_nbhdl_t;
 
-		// ga creation status
-		typedef enum ga_status_
-		{
-			CREATED, // handle created
-			SET, // called ga_set_data
-			ALLOCATED // memory allocated
-		} ga_status_t;
-
 		// Subset of GA C API
-		int GA_Create_handle();
+		// TODO follow either NGA_ or GA_ in function names
+		int  GA_Create_handle();
 		void GA_Set_data (int g_a, int ndim, int dims[], int type);
 		int  GA_Allocate(int g_a);
+		int  GA_Create(int type, int ndim, int dims[], const char *array_name);
 		void GA_Copy(int g_a, int g_b); 
+		void GA_Print_distribution(int g_a);
 		void GA_Destroy(int g_a);
 		void GA_Add(void *alpha, int g_a, void* beta, int g_b, int g_c); 
 		void GA_Dgemm(char ta, char tb, int m, int n, int k, double alpha, int g_a, int g_b, double beta, int g_c );
@@ -51,6 +46,15 @@ class GlobalArrays
 
 	private:
 		bool ga_initialized;
+	
+		// ga creation status
+		typedef enum ga_status_
+		{
+		    UNDEFINED, // undefined, while init
+		    CREATED, // handle created
+		    SET, // called ga_set_data
+		    ALLOCATED // memory allocated
+		} ga_status_t;
 
 		struct GA
 		{
@@ -60,9 +64,10 @@ class GlobalArrays
 			bool pending_transfer; // whether there is a pending xfer to/from this ga
 			ga_status_t status; // whether GA is set, allocated or just handle created
 			mpi::Comm comm; // comm for window allocation and everything
-			DistMatrix < T > DM; // distmatrix      
-			RmaInterface < T > rmaint; // rma object
+			DistMatrix < T, MC, MR > DM; // distmatrix      
+			RmaInterface < T > rmaint; // rmainterface
 		};
+
 		// vector of GA handles
 		std::vector < struct GA > ga_handles;
 		

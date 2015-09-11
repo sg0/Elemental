@@ -16,7 +16,7 @@ using namespace El;
 extern "C" {
 #define GA_BASE(SIG,SIGBASE,T) \
   /* GlobalArrays<T>::GlobalArrays() */ \
-  ElError ElGlobalArraysCreate_ ## SIG ( ElGlobalArrays_ ## SIG * A ) \
+  ElError ElGlobalArraysConstruct_ ## SIG ( ElGlobalArrays_ ## SIG * A ) \
   { EL_TRY( *A = CReflect( new GlobalArrays<T> ) ) } \
   /* GlobalArrays<T>::~GlobalArrays() */ \
   ElError ElGlobalArraysDestruct_ ## SIG ( ElGlobalArrays_ ## SIG A ) \
@@ -32,9 +32,15 @@ extern "C" {
   /* void GlobalArrays<T>::GA_Allocate (int g_a) */ \
   ElError ElGlobalArraysAllocate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a ) \
   { EL_TRY( CReflect(A)->GA_Allocate (g_a) ) } \
+  /* int GlobalArrays< T >::GA_Create(int type, int ndim, int dims[], const char *array_name) */ \
+  ElError ElGlobalArraysCreate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt type, ElInt ndim, ElInt dims[], const char *array_name, ElInt* g_a ) \
+  { EL_TRY( *g_a = CReflect(A)->GA_Create (type, ndim, dims, array_name) ) } \
   /* void GlobalArrays<T>::GA_Copy(int g_a, int g_b) */ \
   ElError ElGlobalArraysCopy_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt g_b ) \
   { EL_TRY( CReflect(A)->GA_Copy (g_a, g_b) ) } \
+  /* void GlobalArrays<T>::GA_Print_distribution(int g_a) */ \
+  ElError ElGlobalArraysPrintDistribution_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a ) \
+  { EL_TRY( CReflect(A)->GA_Print_distribution (g_a) ) } \
   /* void GlobalArrays<T>::GA_Symmetrize(int g_a) */ \
   ElError ElGlobalArraysSymmetrize_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a ) \
   { EL_TRY( CReflect(A)->GA_Symmetrize (g_a) ) } \
@@ -68,30 +74,30 @@ extern "C" {
   { EL_TRY( CReflect(A)->GA_Transpose(g_a, g_b) ) } \
   /* void GlobalArrays<T>::NGA_Access(int g_a, int lo[], int hi[], void *ptr, int ld[]) */ \
   ElError ElGlobalArraysAccess_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], ElInt hi[], CREFLECT(T)* ptr, ElInt ld[] ) \
-  { EL_TRY( CReflect(A)->NGA_Access(g_a, lo, hi, ptr, ld) ) } \
+  { EL_TRY( CReflect(A)->NGA_Access(g_a, lo, hi, CReflect(ptr), ld) ) } \
   /* void GlobalArrays<T>::NGA_Distribution(int g_a, int iproc, int lo[], int hi[]) */ \
   ElError ElGlobalArraysDistribution_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt iproc, ElInt lo[], ElInt hi[] ) \
   { EL_TRY( CReflect(A)->NGA_Distribution(g_a, iproc, lo, hi) ) } \
   /* void GlobalArrays<T>::NGA_Acc(int g_a, int lo[], int hi[],void* ptr,int ld[],void* alpha) */ \
   ElError ElGlobalArraysAccumulate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], \
 	ElInt hi[], CREFLECT(T)* ptr, ElInt ld[], void* alpha ) \
-  { EL_TRY( CReflect(A)->NGA_Acc(g_a, lo, hi, ptr, ld, alpha) ) } \
+  { EL_TRY( CReflect(A)->NGA_Acc(g_a, lo, hi, CReflect(ptr), ld, alpha) ) } \
   /* void GlobalArrays<T>::NGA_Get(int g_a, int lo[], int hi[], void* buf, int ld[]) */ \
   ElError ElGlobalArraysGet_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], \
 	ElInt hi[], CREFLECT(T)* buf, ElInt ld[] ) \
-  { EL_TRY( CReflect(A)->NGA_Get(g_a, lo, hi, buf, ld) ) } \
+  { EL_TRY( CReflect(A)->NGA_Get(g_a, lo, hi, CReflect(buf), ld) ) } \
   /* void GlobalArrays<T>::NGA_NbAcc(int g_a,int lo[], int hi[],void* ptr,int ld[],void* alpha, ga_nbhdl_t* nbhandle) */ \
   ElError ElGlobalArraysNBAccumulate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], \
 	ElInt hi[], CREFLECT(T)* ptr, ElInt ld[], void* alpha, ElInt* nbhandle ) \
-  { EL_TRY( CReflect(A)->NGA_NbAcc(g_a, lo, hi, ptr, ld, alpha, nbhandle) ) } \
+  { EL_TRY( CReflect(A)->NGA_NbAcc(g_a, lo, hi, CReflect(ptr), ld, alpha, nbhandle) ) } \
   /* void GlobalArrays<T>::NGA_NbGet(int g_a, int lo[], int hi[], void* buf, int ld[], ga_nbhdl_t* nbhandle) */ \
   ElError ElGlobalArraysNBGet_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], \
 	ElInt hi[], CREFLECT(T)* buf, ElInt ld[], ElInt* nbhandle ) \
-  { EL_TRY( CReflect(A)->NGA_NbGet(g_a, lo, hi, buf, ld, nbhandle) ) } \
+  { EL_TRY( CReflect(A)->NGA_NbGet(g_a, lo, hi, CReflect(buf), ld, nbhandle) ) } \
   /* void GlobalArrays<T>::NGA_NbPut(int g_a, int lo[], int hi[], void* buf, int ld[], ga_nbhdl_t* nbhandle) */ \
   ElError ElGlobalArraysNBPut_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], \
 	ElInt hi[], CREFLECT(T)* ptr, ElInt ld[], ElInt* nbhandle ) \
-  { EL_TRY( CReflect(A)->NGA_NbPut(g_a, lo, hi, ptr, ld, nbhandle) ) } \
+  { EL_TRY( CReflect(A)->NGA_NbPut(g_a, lo, hi, CReflect(ptr), ld, nbhandle) ) } \
   /* int GlobalArrays<T>::NGA_NbTest(ga_nbhdl_t* nbhandle) */ \
   ElError ElGlobalArraysNBTest_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt* nbhandle, ElInt* status ) \
   { EL_TRY( *status = CReflect(A)->NGA_NbTest(nbhandle) ) } \
@@ -101,7 +107,7 @@ extern "C" {
   /* void GlobalArrays<T>::NGA_Put(int g_a, int lo[], int hi[], void* buf, int ld[]) */ \
   ElError ElGlobalArraysPut_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], \
 	  ElInt hi[], CREFLECT(T)* ptr, ElInt ld[] ) \
-  { EL_TRY( CReflect(A)->NGA_Put(g_a, lo, hi, ptr, ld) ) } \
+  { EL_TRY( CReflect(A)->NGA_Put(g_a, lo, hi, CReflect(ptr), ld) ) } \
   /* long GlobalArrays<T>::NGA_Read_inc(int g_a, int subscript[], long inc) */ \
   ElError ElGlobalArraysReadIncrement_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, \
 	  ElInt subscript[], ElInt inc, ElInt* prev ) \

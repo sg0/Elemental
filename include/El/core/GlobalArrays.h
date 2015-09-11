@@ -13,40 +13,52 @@ typedef struct ElGlobalArrays_sDummy* ElGlobalArrays_s;
 typedef struct ElGlobalArrays_dDummy* ElGlobalArrays_d;
 
 /* GlobalArrays<T>::GlobalArrays()
-   ------------------- */
-EL_EXPORT ElError ElGlobalArraysCreate_i( ElGlobalArrays_i* A );
-EL_EXPORT ElError ElGlobalArraysCreate_s( ElGlobalArrays_s* A );
-EL_EXPORT ElError ElGlobalArraysCreate_d( ElGlobalArrays_d* A );
+   ------------------------------- */
+EL_EXPORT ElError ElGlobalArraysConstruct_i( ElGlobalArrays_i* A );
+EL_EXPORT ElError ElGlobalArraysConstruct_s( ElGlobalArrays_s* A );
+EL_EXPORT ElError ElGlobalArraysConstruct_d( ElGlobalArrays_d* A );
 
 /* GlobalArrays<T>::~GlobalArrays() 
-   -------------------- */
+   -------------------------------- */
 EL_EXPORT ElError ElGlobalArraysDestruct_i( ElGlobalArrays_i A );
 EL_EXPORT ElError ElGlobalArraysDestruct_s( ElGlobalArrays_s A );
 EL_EXPORT ElError ElGlobalArraysDestruct_d( ElGlobalArrays_d A );
 
 /* int GlobalArrays<T>::GA_Create_handle();
-   ----------------------- */
+   --------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysCreateHandle_i( ElGlobalArrays_i A, ElInt* g_a );
 EL_EXPORT ElError ElGlobalArraysCreateHandle_s( ElGlobalArrays_s A, ElInt* g_a );
 EL_EXPORT ElError ElGlobalArraysCreateHandle_d( ElGlobalArrays_d A, ElInt* g_a );
 
 /* void GlobalArrays<T>::GA_Set_data (int g_a, int ndim, int dims[], int type);
-   ----------------------------------------------- */
+   ---------------------------------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysSetData_i( ElGlobalArrays_i A, ElInt g_a, ElInt ndim, ElInt dims[], ElInt type );
 EL_EXPORT ElError ElGlobalArraysSetData_s( ElGlobalArrays_s A, ElInt g_a, ElInt ndim, ElInt dims[], ElInt type );
 EL_EXPORT ElError ElGlobalArraysSetData_d( ElGlobalArrays_d A, ElInt g_a, ElInt ndim, ElInt dims[], ElInt type );
 
 /* void GlobalArrays<T>::GA_Allocate (int g_a);
-   ----------------------------------------------- */
+   ------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysAllocate_i( ElGlobalArrays_i A, ElInt g_a );
 EL_EXPORT ElError ElGlobalArraysAllocate_s( ElGlobalArrays_s A, ElInt g_a );
 EL_EXPORT ElError ElGlobalArraysAllocate_d( ElGlobalArrays_d A, ElInt g_a );
+    
+/* int GlobalArrays< T >::GA_Create(int type, int ndim, int dims[], const char *array_name); 
+   ---------------------------------------------------------------------------------------- */
+EL_EXPORT ElError ElGlobalArraysCreate_i ( ElGlobalArrays_i A, ElInt type, ElInt ndim, ElInt dims[], const char* array_name, ElInt* g_a );
+EL_EXPORT ElError ElGlobalArraysCreate_s ( ElGlobalArrays_s A, ElInt type, ElInt ndim, ElInt dims[], const char* array_name, ElInt* g_a );
+EL_EXPORT ElError ElGlobalArraysCreate_d ( ElGlobalArrays_d A, ElInt type, ElInt ndim, ElInt dims[], const char* array_name, ElInt* g_a );
 
 /* void GlobalArrays<T>::GA_Copy(int g_a, int g_b); 
- -----------------------------------------------------*/
+ ------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysCopy_i( ElGlobalArrays_i A, ElInt g_a, ElInt g_b );
 EL_EXPORT ElError ElGlobalArraysCopy_s( ElGlobalArrays_s A, ElInt g_a, ElInt g_b );
 EL_EXPORT ElError ElGlobalArraysCopy_d( ElGlobalArrays_d A, ElInt g_a, ElInt g_b );
+
+/* void GlobalArrays<T>::GA_Print_distribution(int g_a); 
+ -----------------------------------------------------*/
+EL_EXPORT ElError ElGlobalArraysPrintDistribution_i( ElGlobalArrays_i A, ElInt g_a );
+EL_EXPORT ElError ElGlobalArraysPrintDistribution_s( ElGlobalArrays_s A, ElInt g_a );
+EL_EXPORT ElError ElGlobalArraysPrintDistribution_d( ElGlobalArrays_d A, ElInt g_a );
 
 /* void GlobalArrays<T>::GA_Symmetrize(int g_a); 
  -----------------------------------------------------*/
