@@ -671,7 +671,7 @@ void  GlobalArrays< T >::NGA_Acc(int g_a, int lo[], int hi[], void* buf, int ld[
     const Int j = lo[1];
 
     // Acc - (locally) blocking transfer
-    BXFER ('A', g_a, A, lo[0], hi[0]);
+    BXFER ('A', g_a, A, i, j);
     ga_handles[g_a].rmaint.Flush (A);
 }
 
