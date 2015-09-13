@@ -106,17 +106,17 @@ int GlobalArrays< T >::GA_Allocate(int g_a)
     {
 	// distmatrix
 	// TODO check if this is required?
-	// Grid grid (ga_handles[g_a].comm);
+	//const Grid grid (ga_handles[g_a].comm);
+	//ga_handles[g_a].DM.Resize (ga_handles[g_a].dims[0], ga_handles[g_a].dims[1]);
 	//ga_handles[g_a].DM.SetGrid (grid);
 	// zeros is resize followed by memset to 0
 	Zeros( ga_handles[g_a].DM, ga_handles[g_a].dims[0], ga_handles[g_a].dims[1] );
+	// rmainterface
+	ga_handles[g_a].rmaint.Attach( ga_handles[g_a].DM );
 	ga_handles[g_a].status = ALLOCATED;
     }
     else
-	LogicError ("Dimensions cannot be less than zero");
-
-    // rmainterface
-    ga_handles[g_a].rmaint.Attach( ga_handles[g_a].DM );
+	LogicError ("Incorrect Global Arrays parameter");
 
     return 1;
 }
@@ -642,10 +642,17 @@ void  GlobalArrays< T >::NGA_Acc(int g_a, int lo[], int hi[], void* buf, int ld[
     if (buf == NULL)
 	LogicError ("Input buffer cannot be NULL");
 
-    T * a = (T *)alpha;
-    T * buffer = (T *) buf;
+    T zero = static_cast<T> (0.0);
+    T one = static_cast<T> (1.0);
+    T * a;
 
-    if (*a == 0.0) // no-op
+    if (alpha == NULL)
+	a = (T *)&one;
+    else
+	a = (T *)alpha;
+    T * buffer = (T *) buf;
+    
+    if (*a == zero) // no-op
 	return;
 
     // calculate local height and width
@@ -657,7 +664,7 @@ void  GlobalArrays< T >::NGA_Acc(int g_a, int lo[], int hi[], void* buf, int ld[
     Zeros (A, height, width);
     T * source = A.Buffer ();
 
-    if (*a != 1.0) // then a * buf
+    if (*a != one) // then a * buf
     {
 	for (int i = 0; i < width; i++)
 	    for (int j = 0; j < height; j++)
@@ -706,10 +713,17 @@ void GlobalArrays< T >::NGA_NbAcc(int g_a, int lo[], int hi[], void* buf, int ld
     if (buf == NULL)
 	LogicError ("Input buffer cannot be NULL");
 
-    T * a = (T *)alpha;
+    T zero = static_cast<T> (0.0);
+    T one = static_cast<T> (1.0);
+    T * a;
+
+    if (alpha == NULL)
+	a = (T *)&one;
+    else
+	a = (T *)alpha;
     T * buffer = (T *) buf;
 
-    if (*a == 0.0) // no-op
+    if (*a == zero) // no-op
 	return;
 
     // calculate local height and width
@@ -721,7 +735,7 @@ void GlobalArrays< T >::NGA_NbAcc(int g_a, int lo[], int hi[], void* buf, int ld
     Zeros (A, height, width);
     T * source = A.Buffer ();
 
-    if (*a != 1.0) // then a * buf
+    if (*a != one) // then a * buf
     {
 	for (int i = 0; i < width; i++)
 	    for (int j = 0; j < height; j++)
