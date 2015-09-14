@@ -103,7 +103,7 @@ GlobalArrays< T >::~GlobalArrays()
 
 // create an integer handle and return
 template<typename T>
-int GlobalArrays< T >::GA_Create_handle()
+Int GlobalArrays< T >::GA_Create_handle()
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Create_handle" ) )
   
@@ -124,7 +124,7 @@ int GlobalArrays< T >::GA_Create_handle()
 
 // set dims for the handle
 template<typename T>
-void GlobalArrays< T >::GA_Set_data (int g_a, int ndim, int dims[], int type)
+void GlobalArrays< T >::GA_Set_data (Int g_a, Int ndim, Int dims[], Int type)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Set_data" ) )
 
@@ -141,7 +141,7 @@ void GlobalArrays< T >::GA_Set_data (int g_a, int ndim, int dims[], int type)
     // if DM was not initialized, then resize 
     if (!ga_dm_dim_initialized)
     {
-	for (int i = 0; i < ndim; i++)
+	for (Int i = 0; i < ndim; i++)
 	    ga_handles[g_a].dims[i] = dims[i];
 	if (ndim == 1)
 	    ga_handles[g_a].dims[1] = 1;
@@ -153,7 +153,7 @@ void GlobalArrays< T >::GA_Set_data (int g_a, int ndim, int dims[], int type)
 // assumes GA_Set_data and GA_Create_handle
 // is already called
 template<typename T>
-int GlobalArrays< T >::GA_Allocate(int g_a)
+Int GlobalArrays< T >::GA_Allocate(Int g_a)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Allocate" ) )
     if (!ga_initialized)
@@ -176,18 +176,18 @@ int GlobalArrays< T >::GA_Allocate(int g_a)
 // INFO: type argument will most probably be removed
 // from the interface
 template<typename T>
-int GlobalArrays< T >::GA_Create(int type, int ndim, int dims[], const char *array_name)
+Int GlobalArrays< T >::GA_Create(Int type, Int ndim, Int dims[], const char *array_name)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Create" ) )
 
     // create GA handle
-    int ga = GA_Create_handle ();
+    Int ga = GA_Create_handle ();
     
     // set dimensions of GA
     GA_Set_data (ga, ndim, dims, type);
     
     // allocation of GA
-    int status = GA_Allocate (ga);
+    Int status = GA_Allocate (ga);
 
     return ga;
 }
@@ -195,15 +195,15 @@ int GlobalArrays< T >::GA_Create(int type, int ndim, int dims[], const char *arr
 // creates a new array with the same properties as 
 // the given array. new array handle returned
 template<typename T>
-int GlobalArrays< T >::GA_Duplicate(int g_a, const char *array_name)
+Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Duplicate" ) )
     
     // create handle	
-    int g_b = GA_Create_handle ();
+    Int g_b = GA_Create_handle ();
 
     // set
-    int dims[2];
+    Int dims[2];
     dims[0] = ga_handles[g_a].dims[0];
     dims[1] = ga_handles[g_a].dims[1];
     GA_Set_data (g_b, 2, dims, 0);
@@ -219,9 +219,9 @@ int GlobalArrays< T >::GA_Duplicate(int g_a, const char *array_name)
     do { \
 	mpi::Window fop_win; \
 	long *fop_win_base; \
-	int ga_local_dims[2] = {1, 1}; \
+	Int ga_local_dims[2] = {1, 1}; \
 	/* calculate block sizes */ \
-	for (int i = 0; i < ga_handles[g_a].ndims; i++) \
+	for (Int i = 0; i < ga_handles[g_a].ndims; i++) \
 	{ \
 	    ga_local_dims[i] =  ((ga_handles[g_a].dims[i] / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].dims[i] / 64)); \
 	    ga_local_dims[i] = (( ga_local_dims[i] >= ga_handles[g_a].dims[i] ) ? (ga_handles[g_a].dims[i] / 2) : ga_local_dims[i] ); \
@@ -241,11 +241,11 @@ int GlobalArrays< T >::GA_Duplicate(int g_a, const char *array_name)
 	Int ga_width = ga_handles[g_a].dims[0]; \
 	Int height_stride = ga_local_dims[1]; \
 	Int width_stride = ga_local_dims[0]; \
-	for (int i = 0; i < ga_height; i += height_stride) \
+	for (Int i = 0; i < ga_height; i += height_stride) \
 	{ \
 	    if (counter == next) \
 	    { \
-		for (int j = 0; j < ga_width; j += width_stride) \
+		for (Int j = 0; j < ga_width; j += width_stride) \
 		{ \
 		    ga_handles[g_a].rmaint.Getx( scalar, A, i, j ); \
 		    ga_handles[g_a].rmaint.Iput( A, i, j ); \
@@ -270,8 +270,8 @@ int GlobalArrays< T >::GA_Duplicate(int g_a, const char *array_name)
     do { \
 	mpi::Window fop_win; \
 	long *fop_win_base; \
-	int ga_local_dims[2] = {1, 1}; \
-	for (int i = 0; i < ga_handles[g_a].ndims; i++) \
+	Int ga_local_dims[2] = {1, 1}; \
+	for (Int i = 0; i < ga_handles[g_a].ndims; i++) \
 	{ \
 	    ga_local_dims[i] =  ((ga_handles[g_a].dims[i] / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].dims[i] / 64)); \
 	    ga_local_dims[i] = (( ga_local_dims[i] >= ga_handles[g_a].dims[i] ) ? (ga_handles[g_a].dims[i] / 2) : ga_local_dims[i] ); \
@@ -287,11 +287,11 @@ int GlobalArrays< T >::GA_Duplicate(int g_a, const char *array_name)
 	long counter = 0, next = 0; \
 	mpi::Barrier( comm ); \
 	next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
-	for (int i = 0; i < ga_handles[g_a].dims[1]; i += ga_local_dims[1]) \
+	for (Int i = 0; i < ga_handles[g_a].dims[1]; i += ga_local_dims[1]) \
 	{ \
 	    if (counter == next) \
 	    { \
-		for (int j = 0; j < ga_handles[g_a].dims[0]; j += ga_local_dims[0]) \
+		for (Int j = 0; j < ga_handles[g_a].dims[0]; j += ga_local_dims[0]) \
 		{ \
 		    ga_handles[g_a].rmaint.Getx( alpha, A, i, j ); \
 		    ga_handles[g_b].rmaint.Getx( beta, B, i, j ); \
@@ -316,8 +316,8 @@ int GlobalArrays< T >::GA_Duplicate(int g_a, const char *array_name)
     do { \
 	mpi::Window fop_win; \
 	long *fop_win_base; \
-	int ga_local_dims[2] = {1, 1}; \
-	for (int i = 0; i < ga_handles[g_a].ndims; i++) \
+	Int ga_local_dims[2] = {1, 1}; \
+	for (Int i = 0; i < ga_handles[g_a].ndims; i++) \
 	{ \
 	    ga_local_dims[i] =  ((ga_handles[g_a].dims[i] / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].dims[i] / 64)); \
 	    ga_local_dims[i] = (( ga_local_dims[i] >= ga_handles[g_a].dims[i] ) ? (ga_handles[g_a].dims[i] / 2) : ga_local_dims[i] ); \
@@ -331,11 +331,11 @@ int GlobalArrays< T >::GA_Duplicate(int g_a, const char *array_name)
 	long counter = 0, next = 0; \
 	mpi::Barrier( comm ); \
 	next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
-	for (int i = 0; i < ga_handles[g_a].dims[1]; i += ga_local_dims[1]) \
+	for (Int i = 0; i < ga_handles[g_a].dims[1]; i += ga_local_dims[1]) \
 	{ \
 	    if (counter == next) \
 	    { \
-		for (int j = 0; j < ga_handles[g_a].dims[0]; j += ga_local_dims[0]) \
+		for (Int j = 0; j < ga_handles[g_a].dims[0]; j += ga_local_dims[0]) \
 		{ \
 		    ga_handles[g_a].rmaint.Get( A, i, j ); \
 		    ga_handles[g_b].rmaint.Iput( A, i, j ); \
@@ -354,7 +354,7 @@ int GlobalArrays< T >::GA_Duplicate(int g_a, const char *array_name)
 
 // g_c = alpha * g_a  +  beta * g_b;
 template<typename T>
-void GlobalArrays< T >::GA_Add(void *alpha, int g_a, void* beta, int g_b, int g_c)
+void GlobalArrays< T >::GA_Add(void *alpha, Int g_a, void* beta, Int g_b, Int g_c)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Add" ) )
     if (!ga_initialized)
@@ -364,7 +364,7 @@ void GlobalArrays< T >::GA_Add(void *alpha, int g_a, void* beta, int g_b, int g_
     T * b = (T *)beta;
     
     // arrays must have the same shape
-    for (int i = 0; i < ga_handles[g_a].ndims; i++)
+    for (Int i = 0; i < ga_handles[g_a].ndims; i++)
     {
 	if ((ga_handles[g_a].dims[i] != ga_handles[g_b].dims[i]) 
 		|| (ga_handles[g_a].dims[i] != ga_handles[g_c].dims[i]) 
@@ -378,14 +378,14 @@ void GlobalArrays< T >::GA_Add(void *alpha, int g_a, void* beta, int g_b, int g_
 
 // copies g_a into g_b, must be of same shape
 template<typename T>
-void GlobalArrays< T >::GA_Copy(int g_a, int g_b)
+void GlobalArrays< T >::GA_Copy(Int g_a, Int g_b)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Allocate" ) )
     if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
 
     // arrays must have the same shape
-    for (int i = 0; i < ga_handles[g_a].ndims; i++)
+    for (Int i = 0; i < ga_handles[g_a].ndims; i++)
     {
 	if (ga_handles[g_a].dims[i] != ga_handles[g_b].dims[i])
 	    LogicError ("Global Arrays of different shapes cannot be copied. ");
@@ -397,9 +397,9 @@ void GlobalArrays< T >::GA_Copy(int g_a, int g_b)
 }
 
 // print GA distribution
-// void GA_Print_distribution(int ga)
+// void GA_Print_distribution(Int ga)
 template<typename T>
-void GlobalArrays< T >::GA_Print_distribution(int g_a)
+void GlobalArrays< T >::GA_Print_distribution(Int g_a)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Print_distribution" ) )
     if (!ga_initialized)
@@ -410,7 +410,7 @@ void GlobalArrays< T >::GA_Print_distribution(int g_a)
 
 // deallocates ga and frees associated resources
 template<typename T>
-void GlobalArrays< T >::GA_Destroy(int g_a)
+void GlobalArrays< T >::GA_Destroy(Int g_a)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Destroy" ) )
     if (!ga_initialized)
@@ -424,11 +424,11 @@ void GlobalArrays< T >::GA_Destroy(int g_a)
 
 // A := 0.5 * ( A + A' )
 template<typename T>
-void GlobalArrays< T >::GA_Symmetrize (int g_a)
+void GlobalArrays< T >::GA_Symmetrize (Int g_a)
 {
     // create an empty GA for transpose
-    int g_at = GA_Duplicate( g_a, "transpose array" ); 
-    int g_c = GA_Duplicate( g_a, "final array" ); 
+    Int g_at = GA_Duplicate( g_a, "transpose array" ); 
+    Int g_c = GA_Duplicate( g_a, "final array" ); 
 
     // transpose
     GA_Transpose( g_a, g_at );
@@ -451,14 +451,14 @@ void GlobalArrays< T >::GA_Symmetrize (int g_a)
 // where op( X ) = X or X' (transpose)
 // A = m x k -- B = k x n -- C = m x n
 template<typename T>
-void GlobalArrays< T >::GA_Dgemm(char ta, char tb, int m, int n, int k, double alpha, int g_a, int g_b, double beta, int g_c )
+void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, double alpha, Int g_a, Int g_b, double beta, Int g_c )
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Dgemm" ) )
     if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
     
     // set algorithmic block size	
-    int nb = 96;
+    Int nb = 96;
     GemmAlgorithm alg = GEMM_SUMMA_A;
     
     const Orientation orientA = CharToOrientation( ((ta == 'T' || ta == 't') ? 'T' : 'N') );
@@ -476,8 +476,8 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, int m, int n, int k, double a
     do { \
 	mpi::Window fop_win; \
 	long *fop_win_base; \
-	int ga_local_dims[2] = {1, 1}; \
-	for (int i = 0; i < ga_handles[g_a].ndims; i++) \
+	Int ga_local_dims[2] = {1, 1}; \
+	for (Int i = 0; i < ga_handles[g_a].ndims; i++) \
 	{ \
 	    ga_local_dims[i] =  ((ga_handles[g_a].dims[i] / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].dims[i] / 64)); \
 	    ga_local_dims[i] = (( ga_local_dims[i] >= ga_handles[g_a].dims[i] ) ? (ga_handles[g_a].dims[i] / 2) : ga_local_dims[i] ); \
@@ -487,11 +487,11 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, int m, int n, int k, double a
 	Int local_width = ga_local_dims[0]; \
 	Matrix < T >A (local_width, local_height); \
 	T* buffer = A.Buffer(); \
-	const int ldim = A.LDim(); \
+	const Int ldim = A.LDim(); \
 	/* fill local matrix with particular value */ \
-	for( int j = 0; j < local_height; j++ ) \
+	for( Int j = 0; j < local_height; j++ ) \
 	{ \
-	    for( int i = 0; i < local_width; i++ ) \
+	    for( Int i = 0; i < local_width; i++ ) \
 	    { \
 		buffer[i + j * ldim] = value; \
 	    } \
@@ -506,11 +506,11 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, int m, int n, int k, double a
 	/* update GA with chunks initialized with particular value */ \
 	Int ga_height = ga_handles[g_a].dims[1]; \
 	Int ga_width = ga_handles[g_a].dims[0]; \
-	for (int i = 0; i < ga_height; i += local_height) \
+	for (Int i = 0; i < ga_height; i += local_height) \
 	{ \
 	    if (counter == next) \
 	    { \
-		for (int j = 0; j < ga_width; j += local_width) \
+		for (Int j = 0; j < ga_width; j += local_width) \
 		{ \
 		    ga_handles[g_a].rmaint.Iput( A, i, j ); \
 		} \
@@ -526,7 +526,7 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, int m, int n, int k, double a
 
 // fills a global array with a specific value
 template<typename T>
-void GlobalArrays< T >::GA_Fill(int g_a, void *value)
+void GlobalArrays< T >::GA_Fill(Int g_a, void *value)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Fill" ) )
     if (!ga_initialized)
@@ -576,7 +576,7 @@ void GlobalArrays< T >::GA_Sync()
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Sync" ) )
 
     // ensure all GA operations are complete	
-    for (int i = 0; i < ga_handles.size(); i++)
+    for (Int i = 0; i < ga_handles.size(); i++)
     {
 	if (ga_handles[i].pending_transfer)
 	{
@@ -608,7 +608,7 @@ void GlobalArrays< T >::GA_Terminate()
 
 // B = A'
 template<typename T>
-void GlobalArrays< T >::GA_Transpose(int g_a, int g_b)
+void GlobalArrays< T >::GA_Transpose(Int g_a, Int g_b)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Transpose" ) )
 
@@ -617,14 +617,14 @@ void GlobalArrays< T >::GA_Transpose(int g_a, int g_b)
 
 // Inquires for the data range on a specified processor
 template<typename T>
-void GlobalArrays< T >::NGA_Distribution(int g_a, int iproc, int lo[], int hi[])
+void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Distribution" ) )
 
-    int dim[2] = {-1, -1};
+    Int dim[2] = {-1, -1};
     mpi::Comm comm = ga_handles[g_a].DM.DistComm();
     Grid grid (comm);
-    const int my_rank = grid.VCRank();
+    const Int my_rank = grid.VCRank();
 
     // find the width and height of the submatrix held by process iproc
     dim[0] = ga_handles[g_a].DM.LocalWidth();
@@ -648,11 +648,11 @@ void GlobalArrays< T >::NGA_Distribution(int g_a, int iproc, int lo[], int hi[])
 
 // accesses data locally allocated for a global array    
 template<typename T>
-void GlobalArrays< T >::NGA_Access(int g_a, int lo[], int hi[], void *ptr, int ld[])
+void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void *ptr, Int ld[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Access" ) )
 
-    int width, height;
+    Int width, height;
     // calculate height and width from lo and hi if possible
     if (lo[0] != -1 && hi[0] != -2)
     {
@@ -665,10 +665,10 @@ void GlobalArrays< T >::NGA_Access(int g_a, int lo[], int hi[], void *ptr, int l
 	height = ga_handles[g_a].DM.LocalHeight();
     } 
 
-    T * buffer = (T *)ptr;
-    T * Abuf = (T *)ga_handles[g_a].DM.Buffer();
+    T * buffer = reinterpret_cast<T *>( ptr );
+    T * Abuf = reinterpret_cast<T *>( ga_handles[g_a].DM.Buffer() );
 	
-    memcpy (buffer, Abuf, (height * width * sizeof(T)));
+    MemCopy( buffer, Abuf, (height * width) );
 }
 
 // transfers
@@ -707,7 +707,7 @@ void GlobalArrays< T >::NGA_Access(int g_a, int lo[], int hi[], void *ptr, int l
     } while (0)
 
 template<typename T>
-void  GlobalArrays< T >::NGA_Acc(int g_a, int lo[], int hi[], void* buf, int ld[], void* alpha)
+void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[], void* alpha)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Acc" ) )
 
@@ -728,25 +728,24 @@ void  GlobalArrays< T >::NGA_Acc(int g_a, int lo[], int hi[], void* buf, int ld[
 	return;
 
     // calculate local height and width
-    //int width = hi[0] - lo[0] + 1;
-    //int height = hi[1] - lo[1] + 1;
-    int width = hi[0] - lo[0];
-    int height = hi[1] - lo[1];
+    Int width = hi[0] - lo[0];
+    Int height = hi[1] - lo[1];
+    Int ldim = ld[0];
 
     // declare a matrix
     Matrix< T > A;
-    Zeros (A, height, width);
+    Zeros( A, height, width );
     T * source = A.Buffer ();
 
     if (*a != one) // then a * buf
     {
-	for (int i = 0; i < width; i++)
-	    for (int j = 0; j < height; j++)
-		buffer[i + j*height] *= *a;
+	for (Int i = 0; i < width; i++)
+	    for (Int j = 0; j < height; j++)
+		buffer[i + j*ldim] *= *a;
     }
 
     // memcopy to source
-    MemCopy (source, buffer, (width * height));
+    MemCopy( source, buffer, (width * height) );
 
     const Int i = lo[0];
     const Int j = lo[1];
@@ -757,13 +756,13 @@ void  GlobalArrays< T >::NGA_Acc(int g_a, int lo[], int hi[], void* buf, int ld[
 }
 
 template<typename T>
-void GlobalArrays< T >::NGA_Get(int g_a, int lo[], int hi[], void* buf, int ld[])
+void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], void* buf, Int ld[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Get" ) )
 
      // calculate height and width from lo and hi
-    int width = hi[0] - lo[0] + 1;
-    int height = hi[1] - lo[1] + 1;
+    Int width = hi[0] - lo[0] + 1;
+    Int height = hi[1] - lo[1] + 1;
    
     const Int i = lo[0];
     const Int j = lo[1];
@@ -774,13 +773,13 @@ void GlobalArrays< T >::NGA_Get(int g_a, int lo[], int hi[], void* buf, int ld[]
     BXFER ('G', g_a, A, i, j);
 
     T * buffer = A.Buffer();
-    T * inbuf = (T *)buf;
+    T * inbuf = reinterpret_cast<T *>(buf);
 
-    MemCopy (inbuf, buffer, (width * height));
+    MemCopy( inbuf, buffer, (width * height) );
 }
  
 template<typename T>
-void GlobalArrays< T >::NGA_NbAcc(int g_a, int lo[], int hi[], void* buf, int ld[], void* alpha, ga_nbhdl_t* nbhandle)
+void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[], void* alpha, ga_nbhdl_t* nbhandle)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbAcc" ) )
 
@@ -795,29 +794,30 @@ void GlobalArrays< T >::NGA_NbAcc(int g_a, int lo[], int hi[], void* buf, int ld
 	a = (T *)&one;
     else
 	a = (T *)alpha;
-    T * buffer = (T *) buf;
+    T * buffer = reinterpret_cast<T *>( buf );
 
     if (*a == zero) // no-op
 	return;
 
     // calculate local height and width
-    int width = hi[0] - lo[0] + 1;
-    int height = hi[1] - lo[1] + 1;
+    Int width = hi[0] - lo[0];
+    Int height = hi[1] - lo[1];
+    Int ldim = ld[0];
 
     // declare a matrix
     Matrix< T > A;
-    Zeros (A, height, width);
+    Zeros( A, height, width );
     T * source = A.Buffer ();
 
     if (*a != one) // then a * buf
     {
-	for (int i = 0; i < width; i++)
-	    for (int j = 0; j < height; j++)
-		buffer[i + j*height] *= *a;
+	for (Int i = 0; i < width; i++)
+	    for (Int j = 0; j < height; j++)
+		buffer[i + j*ldim] *= *a;
     }
 
     // memcopy to source
-    MemCopy (source, buffer, (width * height));
+    MemCopy( source, buffer, (width * height) );
 
     const Int i = lo[0];
     const Int j = lo[1];
@@ -831,25 +831,26 @@ void GlobalArrays< T >::NGA_NbAcc(int g_a, int lo[], int hi[], void* buf, int ld
 }
 
 template<typename T>
-void GlobalArrays< T >::NGA_NbGet(int g_a, int lo[], int hi[], void* buf, int ld[], ga_nbhdl_t* nbhandle)
+void GlobalArrays< T >::NGA_NbGet(Int g_a, Int lo[], Int hi[], void* buf, Int ld[], ga_nbhdl_t* nbhandle)
 {
     NGA_Get (g_a, lo, hi, buf, ld);
     *nbhandle = -1; // no nb get implementation in el::rmainterface
 }
 
 template<typename T>
-void GlobalArrays< T >::NGA_NbPut(int g_a, int lo[], int hi[], void* buf, int ld[], ga_nbhdl_t* nbhandle)
+void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], void* buf, Int ld[], ga_nbhdl_t* nbhandle)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbPut" ) )
 
     if (buf == NULL)
 	LogicError ("Input buffer cannot be NULL");
 
-    T * buffer = (T *) buf;
+    T * buffer = reinterpret_cast<T *>( buf ); 
 
     // calculate local height and width
-    int width = hi[0] - lo[0] + 1;
-    int height = hi[1] - lo[1] + 1;
+    Int width = hi[0] - lo[0];
+    Int height = hi[1] - lo[1];
+    Int ldim = ld[0];
 
     // declare a matrix
     Matrix< T > A;
@@ -857,7 +858,7 @@ void GlobalArrays< T >::NGA_NbPut(int g_a, int lo[], int hi[], void* buf, int ld
     T * source = A.Buffer ();
 
     // memcopy to source
-    MemCopy (source, buffer, (width * height));
+    MemCopy( source, buffer, (width * height) );
 
     const Int i = lo[0];
     const Int j = lo[1];
@@ -871,7 +872,7 @@ void GlobalArrays< T >::NGA_NbPut(int g_a, int lo[], int hi[], void* buf, int ld
 }
  
 template<typename T>
-int GlobalArrays< T >::NGA_NbTest(ga_nbhdl_t* nbhandle)
+Int GlobalArrays< T >::NGA_NbTest(ga_nbhdl_t* nbhandle)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbTest" ) )
 
@@ -904,26 +905,26 @@ void GlobalArrays< T >::NGA_NbWait(ga_nbhdl_t* nbhandle)
 }
 
 template<typename T>
-void GlobalArrays< T >::NGA_Put(int g_a, int lo[], int hi[], void* buf, int ld[])
+void GlobalArrays< T >::NGA_Put(Int g_a, Int lo[], Int hi[], void* buf, Int ld[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Put" ) )
 
     if (buf == NULL)
 	LogicError ("Input buffer cannot be NULL");
 
-    T * buffer = (T *) buf;
+    T * buffer = reinterpret_cast<T *>( buf );
 
     // calculate local height and width
-    int width = hi[0] - lo[0] + 1;
-    int height = hi[1] - lo[1] + 1;
+    Int width = hi[0] - lo[0];
+    Int height = hi[1] - lo[1];
 
     // declare a matrix
     Matrix< T > A;
-    Zeros (A, height, width);
+    Zeros( A, height, width );
     T * source = A.Buffer ();
 
     // memcopy to source
-    MemCopy (source, buffer, (width * height));
+    MemCopy( source, buffer, (width * height) );
 
     const Int i = lo[0];
     const Int j = lo[1];
@@ -934,7 +935,7 @@ void GlobalArrays< T >::NGA_Put(int g_a, int lo[], int hi[], void* buf, int ld[]
 }
 
 template<typename T>
-long GlobalArrays< T >::NGA_Read_inc(int g_a, int subscript[], long inc)
+long GlobalArrays< T >::NGA_Read_inc(Int g_a, Int subscript[], long inc)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Read_inc" ) )
 
@@ -942,13 +943,13 @@ long GlobalArrays< T >::NGA_Read_inc(int g_a, int subscript[], long inc)
 
     if (ga_handles[g_a].ndims == 2)
     {
-	int i = subscript[0];
-	int j = subscript[1];
+	Int i = subscript[0];
+	Int j = subscript[1];
 	prev = ga_handles[g_a].rmaint.CompareAndSwap (i, j, inc);
     }
     else // 1 dimension
     {
-	int j = subscript[0];
+	Int j = subscript[0];
 	prev = ga_handles[g_a].rmaint.CompareAndSwap (1, j, inc);
     }
 

@@ -18,33 +18,33 @@ class GlobalArrays
 
 		// Subset of GA C API
 		// TODO follow either NGA_ or GA_ in function names
-		int  GA_Create_handle();
-		void GA_Set_data (int g_a, int ndim, int dims[], int type);
-		int  GA_Allocate(int g_a);
-		int  GA_Create(int type, int ndim, int dims[], const char *array_name);
-		void GA_Copy(int g_a, int g_b); 
-		void GA_Print_distribution(int g_a);
-		void GA_Destroy(int g_a);
-		void GA_Add(void *alpha, int g_a, void* beta, int g_b, int g_c); 
-		void GA_Dgemm(char ta, char tb, int m, int n, int k, double alpha, int g_a, int g_b, double beta, int g_c );
-		int  GA_Duplicate(int g_a, const char *array_name);
-		void GA_Fill(int g_a, void *value);
+		Int  GA_Create_handle();
+		void GA_Set_data (Int g_a, Int ndim, Int dims[], Int type);
+		Int  GA_Allocate(Int g_a);
+		Int  GA_Create(Int type, Int ndim, Int dims[], const char *array_name);
+		void GA_Copy(Int g_a, Int g_b); 
+		void GA_Print_distribution(Int g_a);
+		void GA_Destroy(Int g_a);
+		void GA_Add(void *alpha, Int g_a, void* beta, Int g_b, Int g_c); 
+		void GA_Dgemm(char ta, char tb, Int m, Int n, Int k, double alpha, Int g_a, Int g_b, double beta, Int g_c );
+		Int  GA_Duplicate(Int g_a, const char *array_name);
+		void GA_Fill(Int g_a, void *value);
 		void GA_Initialize();
 		void GA_Sync();
 		void GA_Terminate();
-		void GA_Transpose(int g_a, int g_b);
-		void NGA_Access(int g_a, int lo[], int hi[], void *ptr, int ld[]);
-		void NGA_Acc(int g_a, int lo[], int hi[],void* buf,int ld[],void* alpha);
-		void NGA_Get(int g_a, int lo[], int hi[], void* buf, int ld[]); 
-		void NGA_NbAcc(int g_a,int lo[], int hi[],void* buf,int ld[],void* alpha, ga_nbhdl_t* nbhandle);
-		void NGA_NbGet(int g_a, int lo[], int hi[], void* buf, int ld[], ga_nbhdl_t* nbhandle);
-		void NGA_NbPut(int g_a, int lo[], int hi[], void* buf, int ld[], ga_nbhdl_t* nbhandle);
-		int  NGA_NbTest(ga_nbhdl_t* nbhandle);
+		void GA_Transpose(Int g_a, Int g_b);
+		void NGA_Access(Int g_a, Int lo[], Int hi[], void *ptr, Int ld[]);
+		void NGA_Acc(Int g_a, Int lo[], Int hi[],void* buf,Int ld[],void* alpha);
+		void NGA_Get(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]); 
+		void NGA_NbAcc(Int g_a,Int lo[], Int hi[],void* buf,Int ld[],void* alpha, ga_nbhdl_t* nbhandle);
+		void NGA_NbGet(Int g_a, Int lo[], Int hi[], void* buf, Int ld[], ga_nbhdl_t* nbhandle);
+		void NGA_NbPut(Int g_a, Int lo[], Int hi[], void* buf, Int ld[], ga_nbhdl_t* nbhandle);
+		Int  NGA_NbTest(ga_nbhdl_t* nbhandle);
 		void NGA_NbWait(ga_nbhdl_t* nbhandle);
-		void NGA_Put(int g_a, int lo[], int hi[], void* buf, int ld[]); 
-		long NGA_Read_inc(int g_a, int subscript[], long inc);
-		void NGA_Distribution(int g_a, int iproc, int lo[], int hi[]);
-		void GA_Symmetrize(int g_a);
+		void NGA_Put(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]); 
+		long NGA_Read_inc(Int g_a, Int subscript[], long inc);
+		void NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[]);
+		void GA_Symmetrize(Int g_a);
 
 	private:
 		bool ga_initialized;
@@ -61,9 +61,9 @@ class GlobalArrays
 
 		struct GA
 		{
-			int handle; // integer handle
-			int ndims; // number of dimensions
-			int dims[2]; // x and y dims of distmatrix
+			Int handle; // integer handle
+			Int ndims; // number of dimensions
+			Int dims[2]; // x and y dims of distmatrix
 			bool pending_transfer; // whether there is a pending xfer to/from this ga
 			ga_status_t status; // whether GA is set, allocated or just handle created
 			DistMatrix < T > DM; // distmatrix  
