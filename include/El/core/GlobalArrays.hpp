@@ -10,6 +10,8 @@ class GlobalArrays
 {
 	public:
 		GlobalArrays();
+		GlobalArrays(DistMatrix< T > & DM);
+		GlobalArrays(DistMatrix< T > & DM, Int height, Int width);
 		~GlobalArrays();
 
 		typedef Int ga_nbhdl_t;
@@ -46,6 +48,7 @@ class GlobalArrays
 
 	private:
 		bool ga_initialized;
+		bool ga_dm_dim_initialized;
 	
 		// ga creation status
 		typedef enum ga_status_
@@ -63,25 +66,12 @@ class GlobalArrays
 			int dims[2]; // x and y dims of distmatrix
 			bool pending_transfer; // whether there is a pending xfer to/from this ga
 			ga_status_t status; // whether GA is set, allocated or just handle created
-			mpi::Comm comm; // comm for window allocation and everything
-			DistMatrix < T, MC, MR > DM; // distmatrix      
+			DistMatrix < T > DM; // distmatrix  
 			RmaInterface < T > rmaint; // rmainterface
 		};
 
 		// vector of GA handles
 		std::vector < struct GA > ga_handles;
-		
-                // Friend declarations
-		// ===================
-		template <typename F>               friend class GlobalArrays;
-		template <typename F>               friend class Matrix;
-		template <typename F>               friend class AbstractDistMatrix;
-		template <typename F>               friend class AbstractBlockDistMatrix;
-		template <typename F>               friend class RmaInterface;
-		template <typename F,Dist U,Dist V> friend class GeneralDistMatrix;
-		template <typename F,Dist U,Dist V> friend class GeneralBlockDistMatrix;
-		template <typename F,Dist U,Dist V> friend class DistMatrix;
-		template <typename F,Dist U,Dist V> friend class BlockDistMatrix;
 };
 #endif // EL_ENABLE_RMA_GLOBAL_ARRAYS
 } // namespace El
