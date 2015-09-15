@@ -23,17 +23,9 @@ extern "C" {
   { EL_TRY( delete CReflect(A) ) } \
   
 #define GA_OPS(SIG,SIGBASE,T) \
-  /* int GlobalArrays<T>::GA_Create_handle() */ \
-  ElError ElGlobalArraysCreateHandle_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt* g_a ) \
-  { EL_TRY( *g_a = CReflect(A)->GA_Create_handle() ) } \
-  /* void GlobalArrays<T>::GA_Set_data (int g_a, int ndim, int dims[], int type) */ \
-  ElError ElGlobalArraysSetData_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt ndim, ElInt dims[], ElInt type ) \
-  { EL_TRY( CReflect(A)->GA_Set_data (g_a, ndim, dims, type) ) } \
-  /* void GlobalArrays<T>::GA_Allocate (int g_a) */ \
-  ElError ElGlobalArraysAllocate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a ) \
-  { EL_TRY( CReflect(A)->GA_Allocate (g_a) ) } \
   /* int GlobalArrays< T >::GA_Create(int type, int ndim, int dims[], const char *array_name) */ \
-  ElError ElGlobalArraysCreate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt type, ElInt ndim, ElInt dims[], const char *array_name, ElInt* g_a ) \
+  ElError ElGlobalArraysCreate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt type, ElInt ndim, \
+	  ElInt dims[], const char *array_name, ElInt* g_a ) \
   { EL_TRY( *g_a = CReflect(A)->GA_Create (type, ndim, dims, array_name) ) } \
   /* void GlobalArrays<T>::GA_Copy(int g_a, int g_b) */ \
   ElError ElGlobalArraysCopy_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt g_b ) \
@@ -55,7 +47,8 @@ extern "C" {
 	double alpha, ElInt g_a, ElInt g_b, double beta, ElInt g_c ) \
   { EL_TRY( CReflect(A)->GA_Dgemm(ta, tb, m, n, k, alpha, g_a, g_b, beta, g_c ) ) } \
   /* int GlobalArrays<T>::GA_Duplicate(int g_a, const char* array_name) */ \
-  ElError ElGlobalArraysDuplicate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, const char *array_name, ElInt* g_dup ) \
+  ElError ElGlobalArraysDuplicate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, \
+	  const char *array_name, ElInt* g_dup ) \
   { EL_TRY( *g_dup = CReflect(A)->GA_Duplicate(g_a, array_name) ) } \
   /* void GlobalArrays<T>::GA_Fill(int g_a, void *value) */ \
   ElError ElGlobalArraysFill_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, void* value ) \
@@ -108,10 +101,10 @@ extern "C" {
   ElError ElGlobalArraysPut_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], \
 	  ElInt hi[], CREFLECT(T)* ptr, ElInt ld[] ) \
   { EL_TRY( CReflect(A)->NGA_Put(g_a, lo, hi, CReflect(ptr), ld) ) } \
-  /* long GlobalArrays<T>::NGA_Read_inc(int g_a, int subscript[], long inc) */ \
+  /* long GlobalArrays<T>::NGA_Read_inc(int g_a, int ndim, int subscript[], long inc) */ \
   ElError ElGlobalArraysReadIncrement_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, \
-	  ElInt subscript[], ElInt inc, ElInt* prev ) \
-  { EL_TRY( *prev = CReflect(A)->NGA_Read_inc(g_a, subscript, inc) ) } \
+	  ElInt ndim, ElInt subscript[], ElInt inc, ElInt* prev ) \
+  { EL_TRY( *prev = CReflect(A)->NGA_Read_inc(g_a, ndim, subscript, inc) ) } \
 
 #define C_PROTO(SIG,SIGBASE,T) \
   GA_BASE(SIG,SIGBASE,T) \

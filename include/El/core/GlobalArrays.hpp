@@ -10,27 +10,27 @@ class GlobalArrays
 {
 	public:
 		GlobalArrays();
-		GlobalArrays(DistMatrix< T > & DM);
-		GlobalArrays(DistMatrix< T > & DM, Int height, Int width);
 		~GlobalArrays();
 
 		typedef Int ga_nbhdl_t;
 
 		// Subset of GA C API
 		// TODO follow either NGA_ or GA_ in function names
-		Int  GA_Create_handle();
-		void GA_Set_data (Int g_a, Int ndim, Int dims[], Int type);
-		Int  GA_Allocate(Int g_a);
 		Int  GA_Create(Int type, Int ndim, Int dims[], const char *array_name);
+		Int  GA_Duplicate(Int g_a, const char *array_name);
+		/* Create rmainterface object, and attach DM corresponding to g_a */
+		Int  GA_Allocate(Int g_a);
 		void GA_Copy(Int g_a, Int g_b); 
+		/* At present, this is similar to Print (DistMatrix<T> ...) */
 		void GA_Print_distribution(Int g_a);
+		/* call Detach on rmainterface, empty DM corresponding to g_a and erase entry from ga_handles */
 		void GA_Destroy(Int g_a);
 		void GA_Add(void *alpha, Int g_a, void* beta, Int g_b, Int g_c); 
 		void GA_Dgemm(char ta, char tb, Int m, Int n, Int k, double alpha, Int g_a, Int g_b, double beta, Int g_c );
-		Int  GA_Duplicate(Int g_a, const char *array_name);
 		void GA_Fill(Int g_a, void *value);
 		void GA_Initialize();
 		void GA_Sync();
+		/* Check if Detach was called already on rmainterface objects, and erase ga_handles */
 		void GA_Terminate();
 		void GA_Transpose(Int g_a, Int g_b);
 		void NGA_Access(Int g_a, Int lo[], Int hi[], void *ptr, Int ld[]);
@@ -42,36 +42,21 @@ class GlobalArrays
 		Int  NGA_NbTest(ga_nbhdl_t* nbhandle);
 		void NGA_NbWait(ga_nbhdl_t* nbhandle);
 		void NGA_Put(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]); 
-		long NGA_Read_inc(Int g_a, Int subscript[], long inc);
+		long NGA_Read_inc(Int g_a, Int ndim, Int subscript[], long inc);
 		void NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[]);
 		void GA_Symmetrize(Int g_a);
 
 	private:
 		bool ga_initialized;
-		bool ga_dm_dim_initialized;
 	
-		// ga creation status
-		typedef enum ga_status_
+		typedef struct GA_t
 		{
-		    UNDEFINED, // undefined, while init
-		    CREATED, // handle created
-		    SET, // called ga_set_data
-		    ALLOCATED // memory allocated
-		} ga_status_t;
-
-		struct GA
-		{
-			Int handle; // integer handle
-			Int ndims; // number of dimensions
-			Int dims[2]; // x and y dims of distmatrix
-			bool pending_transfer; // whether there is a pending xfer to/from this ga
-			ga_status_t status; // whether GA is set, allocated or just handle created
-			DistMatrix < T > DM; // distmatrix  
-			RmaInterface < T > rmaint; // rmainterface
-		};
+		    DistMatrix < T > * DM; // distmatrix instance
+		    RmaInterface < T > * rmaint; // rmainterface instance
+		} GA;
 
 		// vector of GA handles
-		std::vector < struct GA > ga_handles;
+		std::vector < GA > ga_handles;
 };
 #endif // EL_ENABLE_RMA_GLOBAL_ARRAYS
 } // namespace El

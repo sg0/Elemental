@@ -24,29 +24,14 @@ EL_EXPORT ElError ElGlobalArraysDestruct_i( ElGlobalArrays_i A );
 EL_EXPORT ElError ElGlobalArraysDestruct_s( ElGlobalArrays_s A );
 EL_EXPORT ElError ElGlobalArraysDestruct_d( ElGlobalArrays_d A );
 
-/* int GlobalArrays<T>::GA_Create_handle();
-   --------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysCreateHandle_i( ElGlobalArrays_i A, ElInt* g_a );
-EL_EXPORT ElError ElGlobalArraysCreateHandle_s( ElGlobalArrays_s A, ElInt* g_a );
-EL_EXPORT ElError ElGlobalArraysCreateHandle_d( ElGlobalArrays_d A, ElInt* g_a );
-
-/* void GlobalArrays<T>::GA_Set_data (int g_a, int ndim, int dims[], int type);
-   ---------------------------------------------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysSetData_i( ElGlobalArrays_i A, ElInt g_a, ElInt ndim, ElInt dims[], ElInt type );
-EL_EXPORT ElError ElGlobalArraysSetData_s( ElGlobalArrays_s A, ElInt g_a, ElInt ndim, ElInt dims[], ElInt type );
-EL_EXPORT ElError ElGlobalArraysSetData_d( ElGlobalArrays_d A, ElInt g_a, ElInt ndim, ElInt dims[], ElInt type );
-
-/* void GlobalArrays<T>::GA_Allocate (int g_a);
-   ------------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysAllocate_i( ElGlobalArrays_i A, ElInt g_a );
-EL_EXPORT ElError ElGlobalArraysAllocate_s( ElGlobalArrays_s A, ElInt g_a );
-EL_EXPORT ElError ElGlobalArraysAllocate_d( ElGlobalArrays_d A, ElInt g_a );
-    
 /* int GlobalArrays< T >::GA_Create(int type, int ndim, int dims[], const char *array_name); 
    ---------------------------------------------------------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysCreate_i ( ElGlobalArrays_i A, ElInt type, ElInt ndim, ElInt dims[], const char* array_name, ElInt* g_a );
-EL_EXPORT ElError ElGlobalArraysCreate_s ( ElGlobalArrays_s A, ElInt type, ElInt ndim, ElInt dims[], const char* array_name, ElInt* g_a );
-EL_EXPORT ElError ElGlobalArraysCreate_d ( ElGlobalArrays_d A, ElInt type, ElInt ndim, ElInt dims[], const char* array_name, ElInt* g_a );
+EL_EXPORT ElError ElGlobalArraysCreate_i ( ElGlobalArrays_i A, ElInt type, ElInt ndim, 
+	ElInt dims[], const char* array_name, ElInt* g_a );
+EL_EXPORT ElError ElGlobalArraysCreate_s ( ElGlobalArrays_s A, ElInt type, ElInt ndim, 
+	ElInt dims[], const char* array_name, ElInt* g_a );
+EL_EXPORT ElError ElGlobalArraysCreate_d ( ElGlobalArrays_d A, ElInt type, ElInt ndim, 
+	ElInt dims[], const char* array_name, ElInt* g_a );
 
 /* void GlobalArrays<T>::GA_Copy(int g_a, int g_b); 
  ------------------------------------------------- */
@@ -89,9 +74,12 @@ EL_EXPORT ElError ElGlobalArraysDgemm_d( ElGlobalArrays_d A, char ta, char tb, E
 
 /* int GlobalArrays<T>::GA_Duplicate(int g_a, const char *array_name);
  ------------------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysDuplicate_i( ElGlobalArrays_i A, ElInt g_a, const char* array_name, ElInt* g_dup );
-EL_EXPORT ElError ElGlobalArraysDuplicate_s( ElGlobalArrays_s A, ElInt g_a, const char* array_name, ElInt* g_dup );
-EL_EXPORT ElError ElGlobalArraysDuplicate_d( ElGlobalArrays_d A, ElInt g_a, const char* array_name, ElInt* g_dup );
+EL_EXPORT ElError ElGlobalArraysDuplicate_i( ElGlobalArrays_i A, ElInt g_a, 
+	const char* array_name, ElInt* g_dup );
+EL_EXPORT ElError ElGlobalArraysDuplicate_s( ElGlobalArrays_s A, ElInt g_a, 
+	const char* array_name, ElInt* g_dup );
+EL_EXPORT ElError ElGlobalArraysDuplicate_d( ElGlobalArrays_d A, ElInt g_a, 
+	const char* array_name, ElInt* g_dup );
 
 /* void GlobalArrays<T>::GA_Fill(int g_a, void *value);
  -------------------------------------- */
@@ -201,11 +189,14 @@ EL_EXPORT ElError ElGlobalArraysPut_s( ElGlobalArrays_s A, ElInt g_a, ElInt lo[]
 EL_EXPORT ElError ElGlobalArraysPut_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[], 
 	ElInt hi[], double* ptr, ElInt ld[] );
 
-/* long GlobalArrays<T>::NGA_Read_inc(int g_a, int subscript[], long inc);
+/* long GlobalArrays<T>::NGA_Read_inc(int g_a, int ndim, int subscript[], long inc);
  ----------------------------------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysReadIncrement_i( ElGlobalArrays_i A, ElInt g_a, ElInt subscript[], ElInt inc, ElInt* prev );
-EL_EXPORT ElError ElGlobalArraysReadIncrement_s( ElGlobalArrays_s A, ElInt g_a, ElInt subscript[], ElInt inc, ElInt* prev );
-EL_EXPORT ElError ElGlobalArraysReadIncrement_d( ElGlobalArrays_d A, ElInt g_a, ElInt subscript[], ElInt inc, ElInt* prev );
+EL_EXPORT ElError ElGlobalArraysReadIncrement_i( ElGlobalArrays_i A, ElInt g_a, ElInt ndim, 
+	ElInt subscript[], ElInt inc, ElInt* prev );
+EL_EXPORT ElError ElGlobalArraysReadIncrement_s( ElGlobalArrays_s A, ElInt g_a, ElInt ndim, 
+	ElInt subscript[], ElInt inc, ElInt* prev );
+EL_EXPORT ElError ElGlobalArraysReadIncrement_d( ElGlobalArrays_d A, ElInt g_a, ElInt ndim, 
+	ElInt subscript[], ElInt inc, ElInt* prev );
 
 #ifdef __cplusplus
 } // extern "C"

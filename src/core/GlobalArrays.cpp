@@ -28,58 +28,11 @@ remote put/gets El::RmaInterface should be used.
 #if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && defined(EL_ENABLE_RMA_GLOBAL_ARRAYS)
 namespace El
 {
-// constructor    
+// constructors    
 template<typename T>
 GlobalArrays< T >::GlobalArrays()
-    : ga_initialized (false), ga_dm_dim_initialized (false),
-      ga_handles (0)
+    : ga_initialized (false), ga_handles (0)
 {}
-
-template<typename T>
-GlobalArrays< T >::GlobalArrays( DistMatrix< T > & DM )
-{
-   // initialize ga_handles vector
-   if (ga_handles.empty())
-   {
-       struct GA ga;
-
-       ga.handle = -1;
-       ga.status = UNDEFINED;
-       ga.ndims = 2;
-       ga.dims[0] = DM.Width();
-       ga.dims[1] = DM.Height();
-       ga.pending_transfer = false;
-       ga.DM = DM;
-
-       ga_handles.push_back( ga );
-    
-       ga_initialized = true;
-       ga_dm_dim_initialized = true;
-   }
-}
-
-template<typename T>
-GlobalArrays< T >::GlobalArrays( DistMatrix< T > & DM, Int height, Int width )
-{
-   // initialize ga_handles vector
-   if (ga_handles.empty())
-   {
-       struct GA ga;
-
-       ga.handle = -1;
-       ga.status = UNDEFINED;
-       ga.ndims = 2;
-       ga.dims[0] = width;
-       ga.dims[1] = height;
-       ga.pending_transfer = false;
-       ga.DM = DM;
-
-       ga_handles.push_back( ga );
-    
-       ga_initialized = true;
-       ga_dm_dim_initialized = true;
-   }
-}
 
 // destructor
 template<typename T>
@@ -101,117 +54,72 @@ GlobalArrays< T >::~GlobalArrays()
 	GA_Terminate();
 }
 
-// create an integer handle and return
-template<typename T>
-Int GlobalArrays< T >::GA_Create_handle()
-{
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Create_handle" ) )
-  
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-       
-   const Int numCreated = ga_handles.size();
-    // at this step, we just need to extend the handle vector
-    // by 1, struct fields will be populated in other functions
-    ga_handles[numCreated - 1].handle = (numCreated - 1);
-    ga_handles[numCreated - 1].status = CREATED;
-       
-    // resize GA handle vector	
-    ga_handles.resize( numCreated + 1 );
-
-    return (numCreated - 1);
-}
-
-// set dims for the handle
-template<typename T>
-void GlobalArrays< T >::GA_Set_data (Int g_a, Int ndim, Int dims[], Int type)
-{
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Set_data" ) )
-
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array. ");
-    
-    if (ndim > 2)
-	LogicError ("Up to 2-D arrays are supported. ");
-    
-    if ( dims[0] < 0 || dims[1] < 0 )
-	LogicError ("Global Arrays dimensions cannot be less than zero. ");
-    
-     // ndim is always 2, already set in GA_Initialized
-    // if DM was not initialized, then resize 
-    if (!ga_dm_dim_initialized)
-    {
-	for (Int i = 0; i < ndim; i++)
-	    ga_handles[g_a].dims[i] = dims[i];
-	if (ndim == 1)
-	    ga_handles[g_a].dims[1] = 1;
-    }
-    ga_handles[g_a].status = SET;
-}
-
-// last stage of GA creation,
-// assumes GA_Set_data and GA_Create_handle
-// is already called
-template<typename T>
-Int GlobalArrays< T >::GA_Allocate(Int g_a)
-{
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Allocate" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");   
- 
-    if ( !ga_dm_dim_initialized ) // resize distmatrix
-    {
-	Zeros( ga_handles[g_a].DM, ga_handles[g_a].dims[0], ga_handles[g_a].dims[1] );
-	ga_dm_dim_initialized = true;
-    }
-	
-    // rmainterface
-    ga_handles[g_a].rmaint.Attach( ga_handles[g_a].DM );
-    ga_handles[g_a].status = ALLOCATED;
-
-    return 1;
-}
-
-// interface to create+allocate global array
 // INFO: type argument will most probably be removed
 // from the interface
 template<typename T>
 Int GlobalArrays< T >::GA_Create(Int type, Int ndim, Int dims[], const char *array_name)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Create" ) )
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");   
 
-    // create GA handle
-    Int ga = GA_Create_handle ();
-    
-    // set dimensions of GA
-    GA_Set_data (ga, ndim, dims, type);
-    
-    // allocation of GA
-    Int status = GA_Allocate (ga);
+    Int handle = ga_handles.size();
 
-    return ga;
+    Int dim[2] = {1, 1};
+    if (ndim == 1)
+	dim[0] = dims[0];
+    else
+    {
+	dim[0] = dims[0];
+	dim[1] = dims[1];
+    }
+
+    // call GA constructor to initialize DM
+    GA ga;
+    // call rmainterface/dm constructor
+    RmaInterface< T > * rmaint = new RmaInterface< T >();
+    DistMatrix< T > * DM = new DistMatrix< T, MC, MR>( dim[0], dim[1] );
+    ga.rmaint = rmaint;
+    ga.DM = DM;
+    // attach DM for RMA ops
+    ga.rmaint->Attach( *ga.DM );
+    // push into vector
+    ga_handles.push_back( ga );
+
+    return handle;
 }
 
-// creates a new array with the same properties as 
-// the given array. new array handle returned
+// DM might be resized here
 template<typename T>
 Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Duplicate" ) )
-    
-    // create handle	
-    Int g_b = GA_Create_handle ();
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");   
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
 
-    // set
-    Int dims[2];
-    dims[0] = ga_handles[g_a].dims[0];
-    dims[1] = ga_handles[g_a].dims[1];
-    GA_Set_data (g_b, 2, dims, 0);
+    Int handle = ga_handles.size();
 
-    // allocate
-    GA_Allocate (g_b);
+    Int dim[2];
+    dim[0] = ga_handles[g_a].DM->Height();
+    dim[1] = ga_handles[g_a].DM->Width();
 
-    return g_b;
+    mpi::Comm comm = ga_handles[g_a].DM->DistComm();
+    Grid grid( comm );
+    // call GA constructor to initialize DM
+    GA ga;
+    // call rmainterface/dm constructor
+    RmaInterface< T > * rmaint = new RmaInterface< T >();
+    DistMatrix< T > * DM = new DistMatrix< T, MC, MR >( dim[0], dim[1], grid );
+    ga.rmaint = rmaint;
+    ga.DM = DM;
+    // attach DM for RMA ops
+    ga.rmaint->Attach( *ga.DM );
+    // push into vector
+    ga_handles.push_back( ga );
+
+    return handle;
 }
 
 #define FALLBACK_STRIDE 8
@@ -219,42 +127,41 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
     do { \
 	mpi::Window fop_win; \
 	long *fop_win_base; \
-	Int ga_local_dims[2] = {1, 1}; \
+	Int local_height, local_width; \
 	/* calculate block sizes */ \
-	for (Int i = 0; i < ga_handles[g_a].ndims; i++) \
-	{ \
-	    ga_local_dims[i] =  ((ga_handles[g_a].dims[i] / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].dims[i] / 64)); \
-	    ga_local_dims[i] = (( ga_local_dims[i] >= ga_handles[g_a].dims[i] ) ? (ga_handles[g_a].dims[i] / 2) : ga_local_dims[i] ); \
-	} \
+	local_height =  ((ga_handles[g_a].DM->Height() / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].DM->Height() / 64)); \
+	local_height = (( local_height >= ga_handles[g_a].DM->Height() ) ? (ga_handles[g_a].DM->Height() / 2) : local_height ); \
+	local_width =  ((ga_handles[g_a].DM->Width() / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].DM->Width() / 64)); \
+	local_width = (( local_width >= ga_handles[g_a].DM->Width() ) ? (ga_handles[g_a].DM->Width() / 2) : local_width ); \
 	/* initialize matrix (block, block) to hold a portion of GA */ \
-	Matrix < T >A (ga_local_dims[0], ga_local_dims[1]); \
-	Zeros (A, ga_local_dims[0], ga_local_dims[1]); \
+	Matrix < T >A; \
+	Zeros( A, local_height, local_width ); \
 	/* initialize fetch-and-op window */ \
-	mpi::Comm comm = ga_handles[g_a].DM.DistComm(); \
+	mpi::Comm comm = ga_handles[g_a].DM->DistComm(); \
 	mpi::WindowAllocate (sizeof (long), comm, fop_win); \
 	memset (fop_win_base, 0, sizeof (long)); \
 	mpi::WindowLock( fop_win ); \
 	long counter = 0, next = 0; \
 	next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
 	/* initialize GA dim and strides */ \
-	Int ga_height = ga_handles[g_a].dims[1]; \
-	Int ga_width = ga_handles[g_a].dims[0]; \
-	Int height_stride = ga_local_dims[1]; \
-	Int width_stride = ga_local_dims[0]; \
+	Int ga_height = ga_handles[g_a].DM->Height(); \
+	Int ga_width = ga_handles[g_a].DM->Width(); \
+	Int height_stride = local_height; \
+	Int width_stride = local_width; \
 	for (Int i = 0; i < ga_height; i += height_stride) \
 	{ \
 	    if (counter == next) \
 	    { \
 		for (Int j = 0; j < ga_width; j += width_stride) \
 		{ \
-		    ga_handles[g_a].rmaint.Getx( scalar, A, i, j ); \
-		    ga_handles[g_a].rmaint.Iput( A, i, j ); \
+		    ga_handles[g_a].rmaint->Getx( scalar, A, i, j ); \
+		    ga_handles[g_a].rmaint->Iput( A, i, j ); \
 		} \
 		next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
 	    } \
 	    counter++; \
 	} \
-	ga_handles[g_a].rmaint.Flush( A ); \
+	ga_handles[g_a].rmaint->Flush( A ); \
 	mpi::Barrier( comm ); \
 	mpi::WindowUnlock(fop_win ); \
 	mpi::WindowFree(fop_win ); \
@@ -265,92 +172,55 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 // not integer handles
 // all 3 arrays have same shape
 // and distributed over same comm
-
 #define GA_ADD(alpha, beta, g_a, g_b, g_c) \
     do { \
 	mpi::Window fop_win; \
 	long *fop_win_base; \
-	Int ga_local_dims[2] = {1, 1}; \
-	for (Int i = 0; i < ga_handles[g_a].ndims; i++) \
-	{ \
-	    ga_local_dims[i] =  ((ga_handles[g_a].dims[i] / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].dims[i] / 64)); \
-	    ga_local_dims[i] = (( ga_local_dims[i] >= ga_handles[g_a].dims[i] ) ? (ga_handles[g_a].dims[i] / 2) : ga_local_dims[i] ); \
-	} \
-	Matrix < T >A (ga_local_dims[0], ga_local_dims[1]); \
-	Matrix < T >B (ga_local_dims[0], ga_local_dims[1]); \
-	Zeros (A, ga_local_dims[0], ga_local_dims[1]); \
-	Zeros (B, ga_local_dims[0], ga_local_dims[1]); \
-	mpi::Comm comm = ga_handles[g_a].DM.DistComm(); \
+	Int local_height, local_width; \
+	/* calculate block sizes */ \
+	local_height =  ((ga_handles[g_a].DM->Height() / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].DM->Height() / 64)); \
+	local_height = (( local_height >= ga_handles[g_a].DM->Height() ) ? (ga_handles[g_a].DM->Height() / 2) : local_height ); \
+	local_width =  ((ga_handles[g_a].DM->Width() / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].DM->Width() / 64)); \
+	local_width = (( local_width >= ga_handles[g_a].DM->Width() ) ? (ga_handles[g_a].DM->Width() / 2) : local_width ); \
+	Matrix < T >A; \
+	Matrix < T >B; \
+	Zeros( A, local_height, local_width ); \
+	Zeros( B, local_height, local_width ); \
+	mpi::Comm comm = ga_handles[g_a].DM->DistComm(); \
 	mpi::WindowAllocate (sizeof (long), comm, fop_win); \
 	memset (fop_win_base, 0, sizeof (long)); \
 	mpi::WindowLock( fop_win ); \
+	/* initialize GA dim and strides */ \
+	Int ga_height = ga_handles[g_a].DM->Height(); \
+	Int ga_width = ga_handles[g_a].DM->Width(); \
+	Int height_stride = local_height; \
+	Int width_stride = local_width; \
 	long counter = 0, next = 0; \
 	mpi::Barrier( comm ); \
 	next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
-	for (Int i = 0; i < ga_handles[g_a].dims[1]; i += ga_local_dims[1]) \
+	for (Int i = 0; i < ga_height; i += height_stride) \
 	{ \
 	    if (counter == next) \
 	    { \
-		for (Int j = 0; j < ga_handles[g_a].dims[0]; j += ga_local_dims[0]) \
+		for (Int j = 0; j < ga_width; j += width_stride) \
 		{ \
-		    ga_handles[g_a].rmaint.Getx( alpha, A, i, j ); \
-		    ga_handles[g_b].rmaint.Getx( beta, B, i, j ); \
-		    ga_handles[g_c].rmaint.Iput( A, i, j ); \
-		    ga_handles[g_c].rmaint.Iacc( B, i, j ); \
+		    ga_handles[g_a].rmaint->Getx( alpha, A, i, j ); \
+		    ga_handles[g_b].rmaint->Getx( beta, B, i, j ); \
+		    ga_handles[g_c].rmaint->Iput( A, i, j ); \
+		    ga_handles[g_c].rmaint->Iacc( B, i, j ); \
 		} \
 		next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
 	    } \
 	    counter++; \
 	} \
-	ga_handles[g_a].rmaint.Flush( A ); \
-	ga_handles[g_b].rmaint.Flush( B ); \
-	ga_handles[g_c].rmaint.Flush( A ); \
-	ga_handles[g_c].rmaint.Flush( B ); \
+	ga_handles[g_a].rmaint->Flush( A ); \
+	ga_handles[g_b].rmaint->Flush( B ); \
+	ga_handles[g_c].rmaint->Flush( A ); \
+	ga_handles[g_c].rmaint->Flush( B ); \
 	mpi::Barrier( comm ); \
 	mpi::WindowUnlock(fop_win ); \
 	mpi::WindowFree(fop_win ); \
     } while (0)
-
-// copy g_a into g_b
-#define GA_COPY(g_a, g_b) \
-    do { \
-	mpi::Window fop_win; \
-	long *fop_win_base; \
-	Int ga_local_dims[2] = {1, 1}; \
-	for (Int i = 0; i < ga_handles[g_a].ndims; i++) \
-	{ \
-	    ga_local_dims[i] =  ((ga_handles[g_a].dims[i] / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].dims[i] / 64)); \
-	    ga_local_dims[i] = (( ga_local_dims[i] >= ga_handles[g_a].dims[i] ) ? (ga_handles[g_a].dims[i] / 2) : ga_local_dims[i] ); \
-	} \
-	Matrix < T >A (ga_local_dims[0], ga_local_dims[1]); \
-	Zeros (A, ga_local_dims[0], ga_local_dims[1]); \
-	mpi::Comm comm = ga_handles[g_a].DM.DistComm(); \
-	mpi::WindowAllocate (sizeof (long), comm, fop_win); \
-	memset (fop_win_base, 0, sizeof (long));\
-	mpi::WindowLock( fop_win ); \
-	long counter = 0, next = 0; \
-	mpi::Barrier( comm ); \
-	next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
-	for (Int i = 0; i < ga_handles[g_a].dims[1]; i += ga_local_dims[1]) \
-	{ \
-	    if (counter == next) \
-	    { \
-		for (Int j = 0; j < ga_handles[g_a].dims[0]; j += ga_local_dims[0]) \
-		{ \
-		    ga_handles[g_a].rmaint.Get( A, i, j ); \
-		    ga_handles[g_b].rmaint.Iput( A, i, j ); \
-		} \
-		next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
-	    } \
-	    counter++; \
-	} \
-	ga_handles[g_a].rmaint.Flush( A ); \
-	ga_handles[g_b].rmaint.Flush( A ); \
-	mpi::Barrier( comm ); \
-	mpi::WindowUnlock(fop_win ); \
-	mpi::WindowFree(fop_win ); \
-    } while (0)
-
 
 // g_c = alpha * g_a  +  beta * g_b;
 template<typename T>
@@ -359,18 +229,25 @@ void GlobalArrays< T >::GA_Add(void *alpha, Int g_a, void* beta, Int g_b, Int g_
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Add" ) )
     if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
+    if (g_b < 0 || g_b > ga_handles.size())
+	LogicError ("Invalid GA handle");
+    if (g_c < 0 || g_c > ga_handles.size())
+	LogicError ("Invalid GA handle");
+
     T * a = (T *)alpha;
     T * b = (T *)beta;
     
     // arrays must have the same shape
-    for (Int i = 0; i < ga_handles[g_a].ndims; i++)
-    {
-	if ((ga_handles[g_a].dims[i] != ga_handles[g_b].dims[i]) 
-		|| (ga_handles[g_a].dims[i] != ga_handles[g_c].dims[i]) 
-		|| (ga_handles[g_b].dims[i] != ga_handles[g_c].dims[i]))
-	    LogicError ("Global Arrays of different shapes cannot be added. ");
-    }
+    if ((ga_handles[g_a].DM->Width() != ga_handles[g_b].DM->Width()) 
+	    || (ga_handles[g_a].DM->Width() != ga_handles[g_c].DM->Width()) 
+	    || (ga_handles[g_b].DM->Width() != ga_handles[g_c].DM->Width()))
+	LogicError ("Global Arrays of different widths cannot be added. ");
+    if ((ga_handles[g_a].DM->Height() != ga_handles[g_b].DM->Height()) 
+	    || (ga_handles[g_a].DM->Height() != ga_handles[g_c].DM->Height()) 
+	    || (ga_handles[g_b].DM->Height() != ga_handles[g_c].DM->Height()))
+	LogicError ("Global Arrays of different heights cannot be added. ");
 
     // add
     GA_ADD (*a, *b, g_a, g_b, g_c);
@@ -383,17 +260,19 @@ void GlobalArrays< T >::GA_Copy(Int g_a, Int g_b)
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Allocate" ) )
     if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
+    if (g_b < 0 || g_b > ga_handles.size())
+	LogicError ("Invalid GA handle");
 
     // arrays must have the same shape
-    for (Int i = 0; i < ga_handles[g_a].ndims; i++)
-    {
-	if (ga_handles[g_a].dims[i] != ga_handles[g_b].dims[i])
-	    LogicError ("Global Arrays of different shapes cannot be copied. ");
-    }
+    if ((ga_handles[g_a].DM->Width() != ga_handles[g_b].DM->Width()))
+	LogicError ("Global Arrays of different widths cannot be copied. ");
+    if ((ga_handles[g_a].DM->Height() != ga_handles[g_b].DM->Height()))
+	LogicError ("Global Arrays of different heights cannot be copied. ");
 
     // copy
-    // GA_COPY (g_a, g_b)
-    Copy( ga_handles[g_a].DM, ga_handles[g_b].DM );
+    Copy( *ga_handles[g_a].DM, *ga_handles[g_b].DM );
 }
 
 // print GA distribution
@@ -404,8 +283,10 @@ void GlobalArrays< T >::GA_Print_distribution(Int g_a)
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Print_distribution" ) )
     if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    
-    Print( ga_handles[g_a].DM );
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
+   
+    Print( *ga_handles[g_a].DM );
 }
 
 // deallocates ga and frees associated resources
@@ -415,9 +296,12 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Destroy" ) )
     if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
-   
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
+
     // detach RmaInterface
-    ga_handles[g_a].rmaint.Detach();
+    ga_handles[g_a].rmaint->Detach();
+    ga_handles[g_a].DM->Empty();
     // erase
     ga_handles.erase( ga_handles.begin() + g_a );
 }
@@ -426,9 +310,23 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
 template<typename T>
 void GlobalArrays< T >::GA_Symmetrize (Int g_a)
 {
-    // create an empty GA for transpose
-    Int g_at = GA_Duplicate( g_a, "transpose array" ); 
-    Int g_c = GA_Duplicate( g_a, "final array" ); 
+    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Symmetrize" ) )
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
+
+    Int width = ga_handles[g_a].DM->Width();
+    Int height = ga_handles[g_a].DM->Height();
+    mpi::Comm comm = ga_handles[g_a].DM->DistComm();
+    Grid grid( comm );
+
+    // create intermediate GAs using g_a parameters
+    Int dims[2];
+    dims[0] = height;
+    dims[1] = width;
+    Int g_at = GA_Create( 0, 2, dims, "transpose array");
+    Int g_c = GA_Create( 0, 2, dims, "final array");
 
     // transpose
     GA_Transpose( g_a, g_at );
@@ -456,7 +354,13 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, double a
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Dgemm" ) )
     if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
+    if (g_b < 0 || g_b > ga_handles.size())
+	LogicError ("Invalid GA handle");
+    if (g_c < 0 || g_c > ga_handles.size())
+	LogicError ("Invalid GA handle");
+
     // set algorithmic block size	
     Int nb = 96;
     GemmAlgorithm alg = GEMM_SUMMA_A;
@@ -468,61 +372,9 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, double a
     T a = static_cast<T>( alpha );
     T b = static_cast<T>( beta );
 
-    Gemm( orientA, orientB, a, ga_handles[g_a].DM, ga_handles[g_b].DM, 
-		b, ga_handles[g_c].DM, alg);
+    Gemm( orientA, orientB, a, *ga_handles[g_a].DM, *ga_handles[g_b].DM, 
+		b, *ga_handles[g_c].DM, alg);
 }
-
-#define FILL_GA(value, g_a) \
-    do { \
-	mpi::Window fop_win; \
-	long *fop_win_base; \
-	Int ga_local_dims[2] = {1, 1}; \
-	for (Int i = 0; i < ga_handles[g_a].ndims; i++) \
-	{ \
-	    ga_local_dims[i] =  ((ga_handles[g_a].dims[i] / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].dims[i] / 64)); \
-	    ga_local_dims[i] = (( ga_local_dims[i] >= ga_handles[g_a].dims[i] ) ? (ga_handles[g_a].dims[i] / 2) : ga_local_dims[i] ); \
-	} \
-	/* initialize matrix (block, block) as a portion of GA */ \
-	Int local_height = ga_local_dims[1]; \
-	Int local_width = ga_local_dims[0]; \
-	Matrix < T >A (local_width, local_height); \
-	T* buffer = A.Buffer(); \
-	const Int ldim = A.LDim(); \
-	/* fill local matrix with particular value */ \
-	for( Int j = 0; j < local_height; j++ ) \
-	{ \
-	    for( Int i = 0; i < local_width; i++ ) \
-	    { \
-		buffer[i + j * ldim] = value; \
-	    } \
-	} \
-	mpi::Comm comm = ga_handles[g_a].DM.DistComm(); \
-	mpi::WindowAllocate (sizeof (long), comm, fop_win); \
-	memset (fop_win_base, 0, sizeof (long));\
-	mpi::WindowLock( fop_win ); \
-	long counter = 0, next = 0; \
-	mpi::Barrier( comm ); \
-	next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
-	/* update GA with chunks initialized with particular value */ \
-	Int ga_height = ga_handles[g_a].dims[1]; \
-	Int ga_width = ga_handles[g_a].dims[0]; \
-	for (Int i = 0; i < ga_height; i += local_height) \
-	{ \
-	    if (counter == next) \
-	    { \
-		for (Int j = 0; j < ga_width; j += local_width) \
-		{ \
-		    ga_handles[g_a].rmaint.Iput( A, i, j ); \
-		} \
-		next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
-	    } \
-	    counter++; \
-	} \
-	ga_handles[g_a].rmaint.Flush( A ); \
-	mpi::Barrier( comm ); \
-	mpi::WindowUnlock(fop_win ); \
-	mpi::WindowFree(fop_win ); \
-    } while (0)
 
 // fills a global array with a specific value
 template<typename T>
@@ -531,12 +383,18 @@ void GlobalArrays< T >::GA_Fill(Int g_a, void *value)
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Fill" ) )
     if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    
-    T * v = (T *)(value);
-    if (*v != 0)
-	FILL_GA (*v, g_a);
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
+   
+    T zero = static_cast<T>( 0.0 );
+    T * alpha;
+    if (value == NULL)
+	alpha = (T *)(value);
     else
-	Zeros( ga_handles[g_a].DM, ga_handles[g_a].dims[0], ga_handles[g_a].dims[1] );
+	alpha = (T *)(&zero);
+
+    // fill DM with alpha
+    Fill( *ga_handles[g_a].DM, *alpha );
 }
 
 // allocate and initialize internal data structures in Global Arrays.
@@ -545,26 +403,8 @@ void GlobalArrays< T >::GA_Initialize()
 {
    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Initialize" ) )
 
-   // initialize ga_handles vector
-   if (ga_handles.empty())
-   {
-       struct GA ga;
-
-       ga.handle = -1;
-       ga.status = UNDEFINED;
-       ga.ndims = 2;
-       ga.dims[0] = 1;
-       ga.dims[1] = 1;
-       ga.pending_transfer = false;
-       // create a 1 x 1 distmatrix
-       // which will be resized later
-       ga.DM.Resize (ga.dims[0], ga.dims[1]);
-
-       ga_handles.push_back( ga );
-    
+   if (!ga_initialized)
        ga_initialized = true;
-       ga_dm_dim_initialized = false;
-   }
 }
 
 // barrier
@@ -577,13 +417,7 @@ void GlobalArrays< T >::GA_Sync()
 
     // ensure all GA operations are complete	
     for (Int i = 0; i < ga_handles.size(); i++)
-    {
-	if (ga_handles[i].pending_transfer)
-	{
-	    ga_handles[i].rmaint.Waitall ();
-	    ga_handles[i].pending_transfer = false;
-	}
-    }
+	    ga_handles[i].rmaint->Waitall ();
 
     mpi::Barrier (mpi::COMM_WORLD);
 }
@@ -600,7 +434,10 @@ void GlobalArrays< T >::GA_Terminate()
     ga_initialized = false;
     // detach if not yet already
     for (Int i = 0; i < ga_handles.size(); i++)
-	ga_handles[i].rmaint.Detach();
+    {
+	ga_handles[i].rmaint->Detach();
+	ga_handles[i].DM->Empty();
+    }
     ga_handles.clear();
 
     mpi::Barrier (mpi::COMM_WORLD);
@@ -611,8 +448,14 @@ template<typename T>
 void GlobalArrays< T >::GA_Transpose(Int g_a, Int g_b)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Transpose" ) )
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
+    if (g_b < 0 || g_b > ga_handles.size())
+	LogicError ("Invalid GA handle");
 
-    Transpose( ga_handles[g_a].DM, ga_handles[g_b].DM );
+    Transpose( *ga_handles[g_a].DM, *ga_handles[g_b].DM );
 }
 
 // Inquires for the data range on a specified processor
@@ -620,19 +463,23 @@ template<typename T>
 void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Distribution" ) )
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
 
     Int dim[2] = {-1, -1};
-    mpi::Comm comm = ga_handles[g_a].DM.DistComm();
-    Grid grid (comm);
+    mpi::Comm comm  = ga_handles[g_a].DM->DistComm();
+    Grid grid( comm );
     const Int my_rank = grid.VCRank();
 
     // find the width and height of the submatrix held by process iproc
-    dim[0] = ga_handles[g_a].DM.LocalWidth();
-    dim[1] = ga_handles[g_a].DM.LocalHeight();
+    dim[1] = ga_handles[g_a].DM->LocalWidth();
+    dim[0] = ga_handles[g_a].DM->LocalHeight();
 
     // broadcast iproc's dim to everyone
     if (iproc != my_rank)
-	mpi::Broadcast(dim, 2, iproc, comm);
+	mpi::Broadcast( dim, 2, iproc, comm );
 
     if (dim[0] == 0 && dim[1] == 0) // in case iproc does not own a submatrix
     {
@@ -651,22 +498,27 @@ template<typename T>
 void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void *ptr, Int ld[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Access" ) )
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
 
     Int width, height;
     // calculate height and width from lo and hi if possible
     if (lo[0] != -1 && hi[0] != -2)
     {
-	width = hi[0] - lo[0];
-	height = hi[1] - lo[1];
+	height = hi[0] - lo[0];
+	width = hi[1] - lo[1];
     }
     else // full local dimensions
     {
-	width = ga_handles[g_a].DM.LocalWidth();
-	height = ga_handles[g_a].DM.LocalHeight();
+	width = ga_handles[g_a].DM->LocalWidth();
+	height = ga_handles[g_a].DM->LocalHeight();
     } 
 
     T * buffer = reinterpret_cast<T *>( ptr );
-    T * Abuf = reinterpret_cast<T *>( ga_handles[g_a].DM.Buffer() );
+    // pointer to local portion of DM
+    T * Abuf = reinterpret_cast<T *>( ga_handles[g_a].DM->Buffer() );
 	
     MemCopy( buffer, Abuf, (height * width) );
 }
@@ -678,13 +530,13 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void *ptr, Int l
 	switch (type) \
 	{ \
 	    case 'A': \
-		ga_handles[g_a].rmaint.Acc (M, i, j); \
+		ga_handles[g_a].rmaint->Acc (M, i, j); \
 	        break; \
 	    case 'P': \
-		ga_handles[g_a].rmaint.Put (M, i, j); \
+		ga_handles[g_a].rmaint->Put (M, i, j); \
 	        break; \
 	    case 'G': \
-		ga_handles[g_a].rmaint.Get (M, i, j); \
+		ga_handles[g_a].rmaint->Get (M, i, j); \
 	    	break; \
 	} \
     } while (0)
@@ -695,13 +547,13 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void *ptr, Int l
 	switch (type) \
 	{ \
 	    case 'A': \
-		ga_handles[g_a].rmaint.Iacc (M, i, j); \
+		ga_handles[g_a].rmaint->Iacc (M, i, j); \
 	        break; \
 	    case 'P': \
-		ga_handles[g_a].rmaint.Iput (M, i, j); \
+		ga_handles[g_a].rmaint->Iput (M, i, j); \
 	        break; \
 	    case 'G': \
-		ga_handles[g_a].rmaint.Get (M, i, j); \
+		ga_handles[g_a].rmaint->Get (M, i, j); \
 	    	break; \
 	} \
     } while (0)
@@ -710,7 +562,10 @@ template<typename T>
 void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[], void* alpha)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Acc" ) )
-
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
     if (buf == NULL)
 	LogicError ("Input buffer cannot be NULL");
 
@@ -728,11 +583,11 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[
 	return;
 
     // calculate local height and width
-    Int width = hi[0] - lo[0];
-    Int height = hi[1] - lo[1];
+    Int width = hi[1] - lo[1];
+    Int height = hi[0] - lo[0];
     Int ldim = ld[0];
 
-    // declare a matrix
+    // create a matrix
     Matrix< T > A;
     Zeros( A, height, width );
     T * source = A.Buffer ();
@@ -751,38 +606,47 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[
     const Int j = lo[1];
 
     // Acc - (locally) blocking transfer
-    BXFER ('A', g_a, A, i, j);
-    ga_handles[g_a].rmaint.Flush (A);
+    BXFER ('A', g_a, A, i, j);		
+    ga_handles[g_a].rmaint->Flush (A);
 }
 
 template<typename T>
 void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], void* buf, Int ld[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Get" ) )
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
+    if (buf == NULL)
+	LogicError ("Output buffer cannot be NULL");
 
      // calculate height and width from lo and hi
-    Int width = hi[0] - lo[0] + 1;
-    Int height = hi[1] - lo[1] + 1;
+    Int width = hi[1] - lo[1];
+    Int height = hi[0] - lo[0];
    
     const Int i = lo[0];
     const Int j = lo[1];
 
-    // declare Matrix<T> for get
+    // create Matrix<T> for get
     Matrix< T > A; 
-    Zeros (A, height, width);
+    Zeros( A, height, width );
     BXFER ('G', g_a, A, i, j);
 
     T * buffer = A.Buffer();
-    T * inbuf = reinterpret_cast<T *>(buf);
+    T * outbuf = reinterpret_cast<T *>(buf);
 
-    MemCopy( inbuf, buffer, (width * height) );
+    MemCopy( outbuf, buffer, (width * height) );
 }
  
 template<typename T>
 void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[], void* alpha, ga_nbhdl_t* nbhandle)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbAcc" ) )
-
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
     if (buf == NULL)
 	LogicError ("Input buffer cannot be NULL");
 
@@ -800,11 +664,11 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], void* buf, Int ld
 	return;
 
     // calculate local height and width
-    Int width = hi[0] - lo[0];
-    Int height = hi[1] - lo[1];
+    Int width = hi[1] - lo[1];
+    Int height = hi[0] - lo[0];
     Int ldim = ld[0];
 
-    // declare a matrix
+    // create a local matrix
     Matrix< T > A;
     Zeros( A, height, width );
     T * source = A.Buffer ();
@@ -824,10 +688,7 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], void* buf, Int ld
     
     // Acc - (locally) nonblocking transfer
     NBXFER ('A', g_a, A, i, j);
-
-    *nbhandle = ga_handles[g_a].handle;
-    if ( !ga_handles[g_a].pending_transfer ) 
-	ga_handles[g_a].pending_transfer = true; 
+    *nbhandle = g_a;
 }
 
 template<typename T>
@@ -841,20 +702,23 @@ template<typename T>
 void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], void* buf, Int ld[], ga_nbhdl_t* nbhandle)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbPut" ) )
-
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
     if (buf == NULL)
 	LogicError ("Input buffer cannot be NULL");
 
     T * buffer = reinterpret_cast<T *>( buf ); 
 
     // calculate local height and width
-    Int width = hi[0] - lo[0];
-    Int height = hi[1] - lo[1];
+    Int width = hi[1] - lo[1];
+    Int height = hi[0] - lo[0];
     Int ldim = ld[0];
 
-    // declare a matrix
+    // create a matrix
     Matrix< T > A;
-    Zeros (A, height, width);
+    Zeros( A, height, width );
     T * source = A.Buffer ();
 
     // memcopy to source
@@ -865,23 +729,21 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], void* buf, Int ld
     
     // Put - (locally) nonblocking transfer
     NBXFER ('P', g_a, A, i, j);
-
-    *nbhandle = ga_handles[g_a].handle;
-    if ( !ga_handles[g_a].pending_transfer ) 
-	ga_handles[g_a].pending_transfer = true; 
+    *nbhandle = g_a;
 }
  
 template<typename T>
 Int GlobalArrays< T >::NGA_NbTest(ga_nbhdl_t* nbhandle)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbTest" ) )
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
 
     if (*nbhandle != -1)
     {
-	bool status = ga_handles[*nbhandle].rmaint.Testall ();
+	bool status = ga_handles[*nbhandle].rmaint->Testall ();
 	if (status) // release handle
 	{
-	    ga_handles[*nbhandle].pending_transfer = false; 
 	    *nbhandle = -1;
 	    return 1;
 	}
@@ -894,11 +756,12 @@ template<typename T>
 void GlobalArrays< T >::NGA_NbWait(ga_nbhdl_t* nbhandle)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbWait" ) )
-    
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+   
     if (*nbhandle != -1)
     {
-	ga_handles[*nbhandle].rmaint.Waitall ();
-	ga_handles[*nbhandle].pending_transfer = false; 
+	ga_handles[*nbhandle].rmaint->Waitall ();
 	// release handle
 	*nbhandle = -1;
     }
@@ -908,17 +771,20 @@ template<typename T>
 void GlobalArrays< T >::NGA_Put(Int g_a, Int lo[], Int hi[], void* buf, Int ld[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Put" ) )
-
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
     if (buf == NULL)
 	LogicError ("Input buffer cannot be NULL");
 
     T * buffer = reinterpret_cast<T *>( buf );
 
     // calculate local height and width
-    Int width = hi[0] - lo[0];
-    Int height = hi[1] - lo[1];
+    Int width = hi[1] - lo[1];
+    Int height = hi[0] - lo[0];
 
-    // declare a matrix
+    // create a matrix
     Matrix< T > A;
     Zeros( A, height, width );
     T * source = A.Buffer ();
@@ -931,26 +797,30 @@ void GlobalArrays< T >::NGA_Put(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]
 
     // Put - (locally) nonblocking transfer
     BXFER('P', g_a, A, i, j);
-    ga_handles[g_a].rmaint.Flush (A);
+    ga_handles[g_a].rmaint->Flush (A);
 }
 
 template<typename T>
-long GlobalArrays< T >::NGA_Read_inc(Int g_a, Int subscript[], long inc)
+long GlobalArrays< T >::NGA_Read_inc(Int g_a, Int ndim, Int subscript[], long inc)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Read_inc" ) )
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
 
     long prev;
 
-    if (ga_handles[g_a].ndims == 2)
+    if (ndim == 2)
     {
 	Int i = subscript[0];
 	Int j = subscript[1];
-	prev = ga_handles[g_a].rmaint.CompareAndSwap (i, j, inc);
+	prev = ga_handles[g_a].rmaint->CompareAndSwap (i, j, inc);
     }
     else // 1 dimension
     {
 	Int j = subscript[0];
-	prev = ga_handles[g_a].rmaint.CompareAndSwap (1, j, inc);
+	prev = ga_handles[g_a].rmaint->CompareAndSwap (1, j, inc);
     }
 
     return prev;   
