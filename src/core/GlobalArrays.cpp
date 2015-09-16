@@ -507,8 +507,8 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void *ptr, Int l
     // calculate height and width from lo and hi if possible
     if (lo[0] != -1 && hi[0] != -2)
     {
-	height = hi[0] - lo[0];
-	width = hi[1] - lo[1];
+	height = hi[0] - lo[0] + 1;
+	width = hi[1] - lo[1] + 1;
     }
     else // full local dimensions
     {
@@ -583,8 +583,8 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[
 	return;
 
     // calculate local height and width
-    Int width = hi[1] - lo[1];
-    Int height = hi[0] - lo[0];
+    Int width = hi[1] - lo[1] + 1;
+    Int height = hi[0] - lo[0] + 1;
     Int ldim = ld[0];
 
     // create a matrix
@@ -622,8 +622,8 @@ void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]
 	LogicError ("Output buffer cannot be NULL");
 
      // calculate height and width from lo and hi
-    Int width = hi[1] - lo[1];
-    Int height = hi[0] - lo[0];
+    Int width = hi[1] - lo[1] + 1;
+    Int height = hi[0] - lo[0] + 1;
    
     const Int i = lo[0];
     const Int j = lo[1];
@@ -664,8 +664,8 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], void* buf, Int ld
 	return;
 
     // calculate local height and width
-    Int width = hi[1] - lo[1];
-    Int height = hi[0] - lo[0];
+    Int width = hi[1] - lo[1] + 1;
+    Int height = hi[0] - lo[0] + 1;
     Int ldim = ld[0];
 
     // create a local matrix
@@ -712,8 +712,8 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], void* buf, Int ld
     T * buffer = reinterpret_cast<T *>( buf ); 
 
     // calculate local height and width
-    Int width = hi[1] - lo[1];
-    Int height = hi[0] - lo[0];
+    Int width = hi[1] - lo[1] + 1;
+    Int height = hi[0] - lo[0] + 1;
     Int ldim = ld[0];
 
     // create a matrix
@@ -781,8 +781,8 @@ void GlobalArrays< T >::NGA_Put(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]
     T * buffer = reinterpret_cast<T *>( buf );
 
     // calculate local height and width
-    Int width = hi[1] - lo[1];
-    Int height = hi[0] - lo[0];
+    Int width = hi[1] - lo[1] + 1;
+    Int height = hi[0] - lo[0] + 1;
 
     // create a matrix
     Matrix< T > A;
