@@ -78,7 +78,8 @@ Int GlobalArrays< T >::GA_Create(Int type, Int ndim, Int dims[], const char *arr
     GA ga;
     // call rmainterface/dm constructor
     RmaInterface< T > * rmaint = new RmaInterface< T >();
-    DistMatrix< T > * DM = new DistMatrix< T, MC, MR>( dim[0], dim[1] );
+    // create distmatrix over default grid, i.e mpi::COMM_WORLD
+    DistMatrix< T, MC, MR > * DM = new DistMatrix< T, MC, MR >( dim[0], dim[1] );
     ga.rmaint = rmaint;
     ga.DM = DM;
     // attach DM for RMA ops
@@ -111,7 +112,7 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
     GA ga;
     // call rmainterface/dm constructor
     RmaInterface< T > * rmaint = new RmaInterface< T >();
-    DistMatrix< T > * DM = new DistMatrix< T, MC, MR >( dim[0], dim[1], grid );
+    DistMatrix< T, MC, MR > * DM = new DistMatrix< T, MC, MR >( dim[0], dim[1], grid );
     ga.rmaint = rmaint;
     ga.DM = DM;
     // attach DM for RMA ops
