@@ -21,8 +21,7 @@ class GlobalArrays
 		/* Create rmainterface object, and attach DM corresponding to g_a */
 		Int  GA_Allocate(Int g_a);
 		void GA_Copy(Int g_a, Int g_b); 
-		/* At present, this is similar to Print (DistMatrix<T> ...) */
-		void GA_Print_distribution(Int g_a);
+		void GA_Print(Int g_a);
 		/* call Detach on rmainterface, empty DM corresponding to g_a and erase entry from ga_handles */
 		void GA_Destroy(Int g_a);
 		void GA_Add(void *alpha, Int g_a, void* beta, Int g_b, Int g_c); 

@@ -278,10 +278,10 @@ void GlobalArrays< T >::GA_Copy(Int g_a, Int g_b)
     Copy( *ga_handles[g_a].DM, *ga_handles[g_b].DM );
 }
 
-// print GA distribution
-// void GA_Print_distribution(Int ga)
+// print GA
+// void GA_Print(Int ga)
 template<typename T>
-void GlobalArrays< T >::GA_Print_distribution(Int g_a)
+void GlobalArrays< T >::GA_Print(Int g_a)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Print_distribution" ) )
     if (!ga_initialized)

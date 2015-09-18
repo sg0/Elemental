@@ -39,11 +39,11 @@ EL_EXPORT ElError ElGlobalArraysCopy_i( ElGlobalArrays_i A, ElInt g_a, ElInt g_b
 EL_EXPORT ElError ElGlobalArraysCopy_s( ElGlobalArrays_s A, ElInt g_a, ElInt g_b );
 EL_EXPORT ElError ElGlobalArraysCopy_d( ElGlobalArrays_d A, ElInt g_a, ElInt g_b );
 
-/* void GlobalArrays<T>::GA_Print_distribution(int g_a); 
+/* void GlobalArrays<T>::GA_Print(int g_a); 
  -----------------------------------------------------*/
-EL_EXPORT ElError ElGlobalArraysPrintDistribution_i( ElGlobalArrays_i A, ElInt g_a );
-EL_EXPORT ElError ElGlobalArraysPrintDistribution_s( ElGlobalArrays_s A, ElInt g_a );
-EL_EXPORT ElError ElGlobalArraysPrintDistribution_d( ElGlobalArrays_d A, ElInt g_a );
+EL_EXPORT ElError ElGlobalArraysPrint_i( ElGlobalArrays_i A, ElInt g_a );
+EL_EXPORT ElError ElGlobalArraysPrint_s( ElGlobalArrays_s A, ElInt g_a );
+EL_EXPORT ElError ElGlobalArraysPrint_d( ElGlobalArrays_d A, ElInt g_a );
 
 /* void GlobalArrays<T>::GA_Symmetrize(int g_a); 
  -----------------------------------------------------*/

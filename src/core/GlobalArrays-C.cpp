@@ -30,9 +30,9 @@ extern "C" {
   /* void GlobalArrays<T>::GA_Copy(int g_a, int g_b) */ \
   ElError ElGlobalArraysCopy_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt g_b ) \
   { EL_TRY( CReflect(A)->GA_Copy (g_a, g_b) ) } \
-  /* void GlobalArrays<T>::GA_Print_distribution(int g_a) */ \
-  ElError ElGlobalArraysPrintDistribution_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a ) \
-  { EL_TRY( CReflect(A)->GA_Print_distribution (g_a) ) } \
+  /* void GlobalArrays<T>::GA_Print(int g_a) */ \
+  ElError ElGlobalArraysPrint_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a ) \
+  { EL_TRY( CReflect(A)->GA_Print (g_a) ) } \
   /* void GlobalArrays<T>::GA_Symmetrize(int g_a) */ \
   ElError ElGlobalArraysSymmetrize_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a ) \
   { EL_TRY( CReflect(A)->GA_Symmetrize (g_a) ) } \
