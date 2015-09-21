@@ -50,8 +50,8 @@ class GlobalArrays
 	
 		typedef struct GA_t
 		{
-		    DistMatrix   < T, MC, MR >* DM;     // distmatrix instance
-		    RmaInterface < T >*         rmaint; // rmainterface instance
+		    DistMatrix   < T >* DM;     // distmatrix instance
+		    RmaInterface < T >* rmaint; // rmainterface instance
 		} GA;
 
 		// vector of GA handles

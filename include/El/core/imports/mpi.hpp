@@ -242,7 +242,8 @@ void WindowUnlock( int rank, Window & window );
 void WindowUnlock( Window & window );
 void WindowCreate( void * baseptr, int size, Comm comm, Window & window );
 void WindowAllocate( int count, Comm comm, Window & window );    
-void GetWindowBase( void * base, Window & window );
+template<typename T>
+void GetWindowBase( T ** base, Window & window );
 void WindowFree (Window& window);
 // One-sided operations
 // --------------------

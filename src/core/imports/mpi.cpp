@@ -662,15 +662,30 @@ void WindowFree (Window & window)
     SafeMpi (MPI_Win_free (&window));
 }
 
-void GetWindowBase (void * base, Window & window)
+template<typename R>
+void GetWindowBase (R ** base, Window & window)
 {
     DEBUG_ONLY( CallStackEntry cse ("mpi::GetWindowBase") )
 
     int flag = 0;
     // TODO check flag
+    R * attribute_val = NULL;
     SafeMpi( MPI_Win_get_attr
-             ( window, MPI_WIN_BASE, base, &flag) );
+             ( window, MPI_WIN_BASE, &attribute_val, &flag) );
+    *base = attribute_val;
 }
+
+template void GetWindowBase < byte >(byte ** base, Window & window);
+template void GetWindowBase < int >(int ** base, Window & window);
+template void GetWindowBase < unsigned >(unsigned ** base, Window & window);
+template void GetWindowBase < long int >(long int ** base, Window & window);
+template void GetWindowBase < unsigned >(unsigned long ** base, Window & window);
+#ifdef EL_HAVE_MPI_LONG_LONG
+template void GetWindowBase < long long int >(long long int ** base, Window & window);
+template void GetWindowBase < unsigned long long >(unsigned long long ** base, Window & window);
+#endif
+template void GetWindowBase < float >(float ** base, Window & window);
+template void GetWindowBase < double >(double ** base, Window & window);
 
 void WindowAllocate (int size, Comm comm, Window & window)
 {
@@ -840,13 +855,13 @@ template void Rput (const Complex<float>* source, int origin_count, int target_r
 
 // when source-target size == 1
 template<typename T>
-void Iput( T source, int target_rank, Aint disp, Window& window )
+void Iput( const T source, int target_rank, Aint disp, Window& window )
 {
     Iput ( &source, 1, target_rank, disp, 1, window );
 }
 
 template<typename T>
-void Rput( T source, int target_rank, Aint disp,
+void Rput( const T source, int target_rank, Aint disp,
            Window& window, Request& request )
 {
     Rput ( &source, 1, target_rank, disp, 1, window, request );
