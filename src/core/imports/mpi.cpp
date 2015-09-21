@@ -679,7 +679,7 @@ template void GetWindowBase < byte >(byte ** base, Window & window);
 template void GetWindowBase < int >(int ** base, Window & window);
 template void GetWindowBase < unsigned >(unsigned ** base, Window & window);
 template void GetWindowBase < long int >(long int ** base, Window & window);
-template void GetWindowBase < unsigned >(unsigned long ** base, Window & window);
+template void GetWindowBase < unsigned long>(unsigned long ** base, Window & window);
 #ifdef EL_HAVE_MPI_LONG_LONG
 template void GetWindowBase < long long int >(long long int ** base, Window & window);
 template void GetWindowBase < unsigned long long >(unsigned long long ** base, Window & window);
