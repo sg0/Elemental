@@ -686,6 +686,9 @@ template void GetWindowBase < unsigned long long >(unsigned long long ** base, W
 #endif
 template void GetWindowBase < float >(float ** base, Window & window);
 template void GetWindowBase < double >(double ** base, Window & window);
+// FIXME
+template void GetWindowBase < Complex< float > >(Complex< float > ** base, Window & window);
+template void GetWindowBase < Complex< double > >(Complex< double > ** base, Window & window);
 
 void WindowAllocate (int size, Comm comm, Window & window)
 {
