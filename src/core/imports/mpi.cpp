@@ -662,33 +662,17 @@ void WindowFree (Window & window)
     SafeMpi (MPI_Win_free (&window));
 }
 
-template<typename R>
-void GetWindowBase (R ** base, Window & window)
+void * GetWindowBase (Window & window)
 {
     DEBUG_ONLY( CallStackEntry cse ("mpi::GetWindowBase") )
 
     int flag = 0;
     // TODO check flag
-    R * attribute_val = NULL;
+    void * attribute_val = NULL;
     SafeMpi( MPI_Win_get_attr
              ( window, MPI_WIN_BASE, &attribute_val, &flag) );
-    *base = attribute_val;
+    return attribute_val;
 }
-
-template void GetWindowBase < byte >(byte ** base, Window & window);
-template void GetWindowBase < int >(int ** base, Window & window);
-template void GetWindowBase < unsigned >(unsigned ** base, Window & window);
-template void GetWindowBase < long int >(long int ** base, Window & window);
-template void GetWindowBase < unsigned long>(unsigned long ** base, Window & window);
-#ifdef EL_HAVE_MPI_LONG_LONG
-template void GetWindowBase < long long int >(long long int ** base, Window & window);
-template void GetWindowBase < unsigned long long >(unsigned long long ** base, Window & window);
-#endif
-template void GetWindowBase < float >(float ** base, Window & window);
-template void GetWindowBase < double >(double ** base, Window & window);
-// FIXME
-template void GetWindowBase < Complex< float > >(Complex< float > ** base, Window & window);
-template void GetWindowBase < Complex< double > >(Complex< double > ** base, Window & window);
 
 void WindowAllocate (int size, Comm comm, Window & window)
 {

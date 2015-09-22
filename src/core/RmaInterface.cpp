@@ -138,8 +138,7 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
         const Int bufferSize = numEntries * sizeof( T );
 	
 	mpi::WindowAllocate( bufferSize, g.VCComm(), window );
-        T * baseptr = NULL;
-	mpi::GetWindowBase( &baseptr, window );
+        T * baseptr = reinterpret_cast< T *>( mpi::GetWindowBase( window ) );
 	Z.SetWindowBase( baseptr );
 
 	mpi::WindowLock( window );
