@@ -473,29 +473,33 @@ void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
     if (g_a < 0 || g_a > ga_handles.size())
 	LogicError ("Invalid GA handle");
 
-    Int dim[2] = {-1, -1};
-    mpi::Comm comm  = ga_handles[g_a].DM->DistComm();
-    Grid grid( comm );
+    // find the distmatrix coordinates held by PE iproc
+    const Grid& grid = ga_handles[g_a].DM->Grid();
     const Int my_rank = grid.VCRank();
+    mpi::Comm comm  = ga_handles[g_a].DM->DistComm();
+    const Int height = ga_handles[g_a].DM->LocalHeight();
+    const Int width = ga_handles[g_a].DM->LocalWidth();
 
-    // find the width and height of the submatrix held by process iproc
-    dim[1] = ga_handles[g_a].DM->LocalWidth();
-    dim[0] = ga_handles[g_a].DM->LocalHeight();
-
-    // broadcast iproc's dim to everyone
-    if (iproc != my_rank)
-	mpi::Broadcast( dim, 2, iproc, comm );
-
-    if (dim[0] == 0 && dim[1] == 0) // in case iproc does not own a submatrix
+    Int dims[4] = {-1, -1, -2, -2};
+    if (height == 0) // in case iproc does not own a submatrix
     {
-	lo[0] = -1; lo[1] = -1;
-	hi[0] = -2; hi[1] = -2;
+	dims[0] = -1; dims[1] = -1;
+	dims[2] = -2; dims[3] = -2;
     }
     else
     {
-	lo[0] = 0; lo[1] = 0;
-	hi[0] = dim[0]; hi[1] = dim[1];
+	dims[0] = my_rank * height; 
+	dims[1] = my_rank * width;
+	dims[2] = dims[0] + height; 
+	dims[3] = dims[1] + width;
     }
+
+    // broadcast iproc's dim to everyone
+    if (iproc != my_rank)
+	mpi::Broadcast( dims, 4, iproc, comm );
+
+    lo[0] = dims[0]; lo[1] = dims[1];
+    hi[0] = dims[2]; hi[1] = dims[3];
 }
 
 // accesses data locally allocated for a global array    
