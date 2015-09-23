@@ -463,7 +463,10 @@ void GlobalArrays< T >::GA_Transpose(Int g_a, Int g_b)
     Transpose( *ga_handles[g_a].DM, *ga_handles[g_b].DM );
 }
 
-// Inquires for the data range on a specified processor
+// returns a data range to my PE from iproc
+// assuming GA contiguous default distribution
+// Note: El data distribution is not contiguous
+// TODO
 template<typename T>
 void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
 {
@@ -474,9 +477,10 @@ void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
 	LogicError ("Invalid GA handle");
 
     // find the distmatrix coordinates held by PE iproc
-    const Grid& grid = ga_handles[g_a].DM->Grid();
+    const Grid &grid = ga_handles[g_a].DM->Grid();
+    const Int p = grid.Size();
     const Int my_rank = grid.VCRank();
-    mpi::Comm comm  = ga_handles[g_a].DM->DistComm();
+    // GA is assumed to be distributed in height x width / nprocs chunks
     const Int height = ga_handles[g_a].DM->LocalHeight();
     const Int width = ga_handles[g_a].DM->LocalWidth();
 
@@ -494,10 +498,6 @@ void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
 	dims[3] = dims[1] + width;
     }
 
-    // broadcast iproc's dim to everyone
-    if (iproc != my_rank)
-	mpi::Broadcast( dims, 4, iproc, comm );
-
     lo[0] = dims[0]; lo[1] = dims[1];
     hi[0] = dims[2]; hi[1] = dims[3];
 }
@@ -512,18 +512,27 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void *ptr, Int l
     if (g_a < 0 || g_a > ga_handles.size())
 	LogicError ("Invalid GA handle");
 
-    Int width, height;
+    // local submatrix width and height
+    Int local_width = ga_handles[g_a].DM->LocalWidth();
+    Int local_height = ga_handles[g_a].DM->LocalHeight();
+
+    Int width = 0, height = 0;
     // calculate height and width from lo and hi if possible
     if (lo[0] != -1 && hi[0] != -2)
     {
-	height = hi[0] - lo[0] + 1;
-	width = hi[1] - lo[1] + 1;
+	height = hi[0] - lo[0];
+	width = hi[1] - lo[1];
     }
-    else // full local dimensions
+    else
     {
-	width = ga_handles[g_a].DM->LocalWidth();
-	height = ga_handles[g_a].DM->LocalHeight();
-    } 
+	height = local_height;
+	width = local_width;
+    }
+
+    if (height > local_height)
+	height = local_height;
+    if (width > local_width)
+	width = local_width;
 
     T * buffer = reinterpret_cast<T *>( ptr );
     // pointer to local portion of DM
