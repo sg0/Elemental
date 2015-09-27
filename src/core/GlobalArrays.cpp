@@ -467,43 +467,6 @@ void GlobalArrays< T >::GA_Transpose(Int g_a, Int g_b)
 // assuming GA contiguous default distribution
 // Note: El data distribution is not contiguous
 // TODO
-#if 0
-template<typename T>
-void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
-{
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Distribution" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a > ga_handles.size())
-	LogicError ("Invalid GA handle");
-
-    // find the distmatrix coordinates held by PE iproc
-    const Grid &grid = ga_handles[g_a].DM->Grid();
-    const Int p = grid.Size();
-    const Int my_rank = grid.VCRank();
-    // GA is assumed to be distributed in height x width / nprocs chunks
-    const Int height = ga_handles[g_a].DM->LocalHeight();
-    const Int width = ga_handles[g_a].DM->LocalWidth();
-
-    Int dims[4] = {-1, -1, -2, -2};
-    if (height == 0) // in case iproc does not own a submatrix
-    {
-	dims[0] = -1; dims[1] = -1;
-	dims[2] = -2; dims[3] = -2;
-    }
-    else
-    {
-	dims[0] = my_rank * height; 
-	dims[1] = my_rank * width;
-	dims[2] = dims[0] + height; 
-	dims[3] = dims[1] + width;
-    }
-
-    lo[0] = dims[0]; lo[1] = dims[1];
-    hi[0] = dims[2]; hi[1] = dims[3];
-}
-#endif
-
 template<typename T>
 void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
 {
