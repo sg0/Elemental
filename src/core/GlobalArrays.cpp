@@ -467,6 +467,7 @@ void GlobalArrays< T >::GA_Transpose(Int g_a, Int g_b)
 // assuming GA contiguous default distribution
 // Note: El data distribution is not contiguous
 // TODO
+#if 0
 template<typename T>
 void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
 {
@@ -500,6 +501,52 @@ void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
 
     lo[0] = dims[0]; lo[1] = dims[1];
     hi[0] = dims[2]; hi[1] = dims[3];
+}
+#endif
+
+template<typename T>
+void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
+{
+    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Distribution" ) )
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
+
+    // find the distmatrix coordinates held by PE iproc
+    const Grid &grid = ga_handles[g_a].DM->Grid();
+    const Int p = grid.Size();
+    const Int my_rank = grid.VCRank();
+    // requests for nonblocking transfers
+    mpi::Request data_recv_req;
+    mpi::Request * send_data_req = new mpi::Request[p];
+    Int dim[2];
+
+    if (iproc == my_rank)
+    {
+	// send notification to iproc to send 
+	// back it's width/height
+	dim[0] = ga_handles[g_a].DM->LocalHeight();
+    	dim[1] = ga_handles[g_a].DM->LocalWidth();
+	for (Int i = 0; i < p; i++)
+		mpi::ISend <Int>( dim, 2, i, grid.VCComm(), send_data_req[i]);
+    }
+    // post recv
+    mpi::IRecv <Int>( dim, 2, iproc, grid.VCComm(), data_recv_req );
+    // wait for send/recv to complete
+    mpi::WaitAll( p, send_data_req );
+    mpi::Wait( data_recv_req );
+
+    if (dim[0] == 0 || dim[1] == 0) // in case iproc does not own a submatrix
+    {
+	lo[0] = -1; lo[1] = -1;
+	hi[0] = -2; hi[1] = -2;
+    }
+    else
+    {
+	lo[0] = 0; lo[1] = 0;
+	hi[0] = dim[0]; hi[1] = dim[1];
+    }
 }
 
 // accesses data locally allocated for a global array    

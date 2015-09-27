@@ -1758,7 +1758,7 @@ void TaggedISend
 (const R * buf, int count, int to, int tag, Comm comm,
  Request & request)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::ISend"))
+    DEBUG_ONLY (CallStackEntry cse ("mpi::TaggedISend"))
     SafeMpi
     (MPI_Isend
      (const_cast < R * >(buf), count,
@@ -1771,7 +1771,7 @@ void TaggedISend
 (const Complex < R > *buf, int count, int to, int tag,
  Comm comm, Request & request)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::ISend"))
+    DEBUG_ONLY (CallStackEntry cse ("mpi::TaggedISend"))
 #ifdef EL_AVOID_COMPLEX_MPI
     SafeMpi
     (MPI_Isend
@@ -2324,7 +2324,7 @@ void TaggedIRecv
 (R * buf, int count, int from, int tag, Comm comm,
  Request & request)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::IRecv"))
+    DEBUG_ONLY (CallStackEntry cse ("mpi::TaggedIRecv"))
     SafeMpi
     (MPI_Irecv
      (buf, count, TypeMap < R > (), from, tag,
@@ -2336,7 +2336,7 @@ void TaggedIRecv
 (Complex < R > *buf, int count, int from, int tag,
  Comm comm, Request & request)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::IRecv"))
+    DEBUG_ONLY (CallStackEntry cse ("mpi::TaggedIRecv"))
 #ifdef EL_AVOID_COMPLEX_MPI
     SafeMpi
     (MPI_Irecv
