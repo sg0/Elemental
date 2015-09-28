@@ -108,20 +108,19 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
     dim[0] = ga_handles[g_a].DM->Height();
     dim[1] = ga_handles[g_a].DM->Width();
 
-    mpi::Comm comm = ga_handles[g_a].DM->DistComm();
-    Grid grid( comm );
+    const Grid& grid = ga_handles[g_a].DM->Grid();
     // call GA constructor to initialize DM
     GA ga;
     // call rmainterface/dm constructor
     RmaInterface< T > * rmaint = new RmaInterface< T >();
-    DistMatrix< T, MC, MR > * DM = new DistMatrix< T, MC, MR >( dim[0], dim[1], grid );
+    DistMatrix< T > * DM = new DistMatrix< T >( dim[0], dim[1], grid );
      // copy objects 
     ga.rmaint = rmaint;
     ga.DM = DM;
     // push into vector
     ga_handles.push_back( ga );
     // attach DM for RMA ops
-    DistMatrix< T, MC, MR > &D = *DM;
+    DistMatrix< T > &D = *DM;
     ga_handles[handle].rmaint->Attach( D );   
 
     return handle;
@@ -477,7 +476,8 @@ void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
 	LogicError ("Invalid GA handle");
 
     // find the distmatrix coordinates held by PE iproc
-    const Grid &grid = ga_handles[g_a].DM->Grid();
+    DistMatrix <T>& Y = *(ga_handles[g_a].DM);
+    const Grid& grid = Y.Grid();
     const Int p = grid.Size();
     const Int my_rank = grid.VCRank();
     // requests for nonblocking transfers
@@ -514,41 +514,20 @@ void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
 
 // accesses data locally allocated for a global array    
 template<typename T>
-void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void *ptr, Int ld[])
+void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void** ptr, Int ld[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Access" ) )
     if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
     if (g_a < 0 || g_a > ga_handles.size())
 	LogicError ("Invalid GA handle");
+    if (lo[0] == -1 && hi[0] == -2)
+	LogicError("Invalid coordinate axes");
 
-    // local submatrix width and height
-    Int local_width = ga_handles[g_a].DM->LocalWidth();
-    Int local_height = ga_handles[g_a].DM->LocalHeight();
-
-    Int width = 0, height = 0;
-    // calculate height and width from lo and hi if possible
-    if (lo[0] != -1 && hi[0] != -2)
-    {
-	height = hi[0] - lo[0];
-	width = hi[1] - lo[1];
-    }
-    else
-    {
-	height = local_height;
-	width = local_width;
-    }
-
-    if (height > local_height)
-	height = local_height;
-    if (width > local_width)
-	width = local_width;
-
-    T * buffer = reinterpret_cast<T *>( ptr );
+    DistMatrix< T >&Y = *(ga_handles[g_a].DM);
+    T ** buffer = reinterpret_cast<T **>( ptr );
     // pointer to local portion of DM
-    T * Abuf = reinterpret_cast<T *>( ga_handles[g_a].DM->Buffer() );
-	
-    MemCopy( buffer, Abuf, (height * width) );
+    *buffer = Y.Buffer();
 }
 
 // transfers

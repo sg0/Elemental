@@ -32,7 +32,7 @@ class GlobalArrays
 		/* Check if Detach was called already on rmainterface objects, and erase ga_handles */
 		void GA_Terminate();
 		void GA_Transpose(Int g_a, Int g_b);
-		void NGA_Access(Int g_a, Int lo[], Int hi[], void *ptr, Int ld[]);
+		void NGA_Access(Int g_a, Int lo[], Int hi[], void **ptr, Int ld[]);
 		void NGA_Acc(Int g_a, Int lo[], Int hi[],void* buf,Int ld[],void* alpha);
 		void NGA_Get(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]); 
 		void NGA_NbAcc(Int g_a,Int lo[], Int hi[],void* buf,Int ld[],void* alpha, ga_nbhdl_t* nbhandle);
