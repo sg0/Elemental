@@ -31,7 +31,7 @@ namespace El
 // constructors    
 template<typename T>
 GlobalArrays< T >::GlobalArrays()
-    : ga_initialized (false), ga_handles (0)
+    : ga_initialized (false), ga_handles (0) 
 {}
 
 // destructor
@@ -80,15 +80,36 @@ Int GlobalArrays< T >::GA_Create(Int type, Int ndim, Int dims[], const char *arr
     RmaInterface< T > * rmaint = new RmaInterface< T >();
     // create distmatrix over default grid, i.e mpi::COMM_WORLD
     DistMatrix< T > * DM = new DistMatrix< T >( dim[0], dim[1] );
+    const Grid& grid = DM->Grid();
+    const Int p = grid.Size();
+    const Int my_rank = grid.VCRank();
+    // create Int vectors for storing local heights and widths
+    std:vector< Int > * hvect = new std:vector< Int >( p );
+    std:vector< Int > * wvect = new std:vector< Int >( p );
+    
     // copy objects 
     ga.rmaint = rmaint;
     ga.DM = DM;
+    ga.ga_local_height = hvect;
+    ga.ga_local_width = wvect;
+
+    // store local heights and widths
+    ga.ga_local_height->at( my_rank ) = DM->LocalHeight();
+    ga.ga_local_width->at( my_rank ) = DM->LocalWidth();
+    // FIXME mpi allgather in el mpi does not have 
+    // MPI_IN_PLACE port
+    const Int local_height = ga.ga_local_height->at( my_rank );
+    const Int local_width = ga.ga_local_width->at( my_rank );
+    mpi::AllGather <Int>( &local_height, 1, ga.ga_local_height->data(), 1, grid.VCComm() );
+    mpi::AllGather <Int>( &local_width, 1, ga.ga_local_width->data(), 1, grid.VCComm() );
+
     // push into vector
     ga_handles.push_back( ga );
+    
     // attach DM for RMA ops
     DistMatrix< T > &D = *DM;
     ga_handles[handle].rmaint->Attach( D );
-    
+
     return handle;
 }
 
@@ -104,21 +125,41 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 
     Int handle = ga_handles.size();
 
+    DistMatrix< T >& GADM = *(ga_handles[g_a].DM);
     Int dim[2];
-    dim[0] = ga_handles[g_a].DM->Height();
-    dim[1] = ga_handles[g_a].DM->Width();
-
-    const Grid& grid = ga_handles[g_a].DM->Grid();
+    dim[0] = GADM.Height();
+    dim[1] = GADM.Width();
+    const Grid& grid = GADM.Grid();
     // call GA constructor to initialize DM
     GA ga;
     // call rmainterface/dm constructor
     RmaInterface< T > * rmaint = new RmaInterface< T >();
     DistMatrix< T > * DM = new DistMatrix< T >( dim[0], dim[1], grid );
-     // copy objects 
+    const Int p = grid.Size();
+    const Int my_rank = grid.VCRank();
+    // create Int vectors for storing local heights and widths
+    std:vector< Int > * hvect = new std:vector< Int >( p );
+    std:vector< Int > * wvect = new std:vector< Int >( p );
+
+    // copy objects 
     ga.rmaint = rmaint;
     ga.DM = DM;
+    ga.ga_local_height = hvect;
+    ga.ga_local_width = wvect;
+
+    // store local heights and widths
+    ga.ga_local_height->at( my_rank ) = DM->LocalHeight();
+    ga.ga_local_width->at( my_rank ) = DM->LocalWidth();
+    // FIXME mpi allgather in el mpi does not have 
+    // MPI_IN_PLACE port
+    const Int local_height = ga.ga_local_height->at( my_rank );
+    const Int local_width = ga.ga_local_width->at( my_rank );
+    mpi::AllGather <Int>( &local_height, 1, ga.ga_local_height->data(), 1, grid.VCComm() );
+    mpi::AllGather <Int>( &local_width, 1, ga.ga_local_width->data(), 1, grid.VCComm() );
+
     // push into vector
     ga_handles.push_back( ga );
+
     // attach DM for RMA ops
     DistMatrix< T > &D = *DM;
     ga_handles[handle].rmaint->Attach( D );   
@@ -275,8 +316,10 @@ void GlobalArrays< T >::GA_Copy(Int g_a, Int g_b)
     if ((ga_handles[g_a].DM->Height() != ga_handles[g_b].DM->Height()))
 	LogicError ("Global Arrays of different heights cannot be copied. ");
 
+    DistMatrix<T>& ADM = *(ga_handles[g_a].DM);
+    DistMatrix<T>& BDM = *(ga_handles[g_b].DM);
     // copy
-    Copy( *ga_handles[g_a].DM, *ga_handles[g_b].DM );
+    Copy( ADM, BDM );
 }
 
 // print GA
@@ -289,8 +332,9 @@ void GlobalArrays< T >::GA_Print(Int g_a)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
     if (g_a < 0 || g_a > ga_handles.size())
 	LogicError ("Invalid GA handle");
-   
-    Print( *ga_handles[g_a].DM );
+  
+    DistMatrix<T>& DM = *(ga_handles[g_a].DM);
+    Print( DM );
 }
 
 // deallocates ga and frees associated resources
@@ -306,6 +350,8 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
     // detach RmaInterface
     ga_handles[g_a].rmaint->Detach();
     ga_handles[g_a].DM->Empty();
+    ga_handles[g_a].ga_local_height->clear();
+    ga_handles[g_a].ga_local_width->clear();
     // erase
     ga_handles.erase( ga_handles.begin() + g_a );
 }
@@ -322,8 +368,6 @@ void GlobalArrays< T >::GA_Symmetrize (Int g_a)
 
     Int width = ga_handles[g_a].DM->Width();
     Int height = ga_handles[g_a].DM->Height();
-    mpi::Comm comm = ga_handles[g_a].DM->DistComm();
-    Grid grid( comm );
 
     // create intermediate GAs using g_a parameters
     Int dims[2];
@@ -365,6 +409,10 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, double a
     if (g_c < 0 || g_c > ga_handles.size())
 	LogicError ("Invalid GA handle");
 
+    DistMatrix<T>& ADM = *(ga_handles[g_a].DM);
+    DistMatrix<T>& BDM = *(ga_handles[g_b].DM);
+    DistMatrix<T>& CDM = *(ga_handles[g_c].DM);
+
     // set algorithmic block size	
     Int nb = 96;
     GemmAlgorithm alg = GEMM_SUMMA_A;
@@ -376,8 +424,7 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, double a
     T a = static_cast<T>( alpha );
     T b = static_cast<T>( beta );
 
-    Gemm( orientA, orientB, a, *ga_handles[g_a].DM, *ga_handles[g_b].DM, 
-		b, *ga_handles[g_c].DM, alg);
+    Gemm( orientA, orientB, a, ADM, BDM, b, CDM, alg);
 }
 
 // fills a global array with a specific value
@@ -397,8 +444,9 @@ void GlobalArrays< T >::GA_Fill(Int g_a, void *value)
     else
 	alpha = (T *)(&zero);
 
+    DistMatrix<T>& DM = *(ga_handles[g_a].DM);
     // fill DM with alpha
-    Fill( *ga_handles[g_a].DM, *alpha );
+    Fill( DM, *alpha );
 }
 
 // allocate and initialize internal data structures in Global Arrays.
@@ -441,6 +489,8 @@ void GlobalArrays< T >::GA_Terminate()
     {
 	ga_handles[i].rmaint->Detach();
 	ga_handles[i].DM->Empty();
+	ga_handles[i].ga_local_height->clear();
+	ga_handles[i].ga_local_width->clear();
     }
     ga_handles.clear();
 
@@ -459,7 +509,10 @@ void GlobalArrays< T >::GA_Transpose(Int g_a, Int g_b)
     if (g_b < 0 || g_b > ga_handles.size())
 	LogicError ("Invalid GA handle");
 
-    Transpose( *ga_handles[g_a].DM, *ga_handles[g_b].DM );
+    DistMatrix<T>& ADM = *(ga_handles[g_a].DM);
+    DistMatrix<T>& BDM = *(ga_handles[g_b].DM);
+    
+    Transpose( ADM, BDM );
 }
 
 // returns a data range to my PE from iproc
@@ -467,7 +520,7 @@ void GlobalArrays< T >::GA_Transpose(Int g_a, Int g_b)
 // Note: El data distribution is not contiguous
 // TODO
 template<typename T>
-void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
+void GlobalArrays< T >::NGA_Distribution( Int g_a, Int iproc, Int lo[], Int hi[] )
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Distribution" ) )
     if (!ga_initialized)
@@ -475,40 +528,21 @@ void GlobalArrays< T >::NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[])
     if (g_a < 0 || g_a > ga_handles.size())
 	LogicError ("Invalid GA handle");
 
-    // find the distmatrix coordinates held by PE iproc
-    DistMatrix <T>& Y = *(ga_handles[g_a].DM);
-    const Grid& grid = Y.Grid();
-    const Int p = grid.Size();
-    const Int my_rank = grid.VCRank();
-    // requests for nonblocking transfers
-    mpi::Request data_recv_req;
-    mpi::Request * send_data_req = new mpi::Request[p];
-    Int dim[2];
+    const Int local_height = ga_handles[g_a].ga_local_height->at( iproc );
+    const Int local_width = ga_handles[g_a].ga_local_width->at( iproc );
 
-    if (iproc == my_rank)
-    {
-	// send notification to iproc to send 
-	// back it's width/height
-	dim[0] = ga_handles[g_a].DM->LocalHeight();
-    	dim[1] = ga_handles[g_a].DM->LocalWidth();
-	for (Int i = 0; i < p; i++)
-		mpi::ISend <Int>( dim, 2, i, grid.VCComm(), send_data_req[i]);
-    }
-    // post recv
-    mpi::IRecv <Int>( dim, 2, iproc, grid.VCComm(), data_recv_req );
-    // wait for send/recv to complete
-    mpi::WaitAll( p, send_data_req );
-    mpi::Wait( data_recv_req );
-
-    if (dim[0] == 0 || dim[1] == 0) // in case iproc does not own a submatrix
+    // lo, hi
+    if (local_height == 0 || local_width == 0)
     {
 	lo[0] = -1; lo[1] = -1;
 	hi[0] = -2; hi[1] = -2;
     }
     else
     {
-	lo[0] = 0; lo[1] = 0;
-	hi[0] = dim[0]; hi[1] = dim[1];
+	hi[0] = local_height;
+	hi[1] = local_width;
+	lo[0] = 0;
+	lo[1] = 0;
     }
 }
 
