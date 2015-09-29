@@ -61,37 +61,33 @@ Int GlobalArrays< T >::GA_Create(Int type, Int ndim, Int dims[], const char *arr
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Create" ) )
     if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");   
+	LogicError ("Global Arrays must be initialized before any operations on the global array");  
+    if (ndim == 1 || dims[1] == 1)
+	LogicError ("Only true 2D matrix supported, DIM X 1 would cause an error due to internal distribution");
 
     Int handle = ga_handles.size();
-
-    Int dim[2] = {1, 1};
-    if (ndim == 1)
-	dim[0] = dims[0];
-    else
-    {
-	dim[0] = dims[0];
-	dim[1] = dims[1];
-    }
 
     // call GA constructor to initialize DM
     GA ga;
     // call rmainterface/dm constructor
     RmaInterface< T > * rmaint = new RmaInterface< T >();
     // create distmatrix over default grid, i.e mpi::COMM_WORLD
-    DistMatrix< T > * DM = new DistMatrix< T >( dim[0], dim[1] );
+    DistMatrix< T > * DM = new DistMatrix< T  >( dims[0], dims[1] );
+
     const Grid& grid = DM->Grid();
     const Int p = grid.Size();
     const Int my_rank = grid.VCRank();
     // create Int vectors for storing local heights and widths
-    std::vector< Int > * hvect = new std::vector< Int >( p );
-    std::vector< Int > * wvect = new std::vector< Int >( p );
+    std::vector< Int > * hvect = new std::vector< Int >();
+    std::vector< Int > * wvect = new std::vector< Int >();
     
     // copy objects 
     ga.rmaint = rmaint;
     ga.DM = DM;
     ga.ga_local_height = hvect;
     ga.ga_local_width = wvect;
+    ga.ga_local_height->resize( p );
+    ga.ga_local_width->resize( p );
 
     // store local heights and widths
     ga.ga_local_height->at( my_rank ) = DM->LocalHeight();
@@ -138,14 +134,16 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
     const Int p = grid.Size();
     const Int my_rank = grid.VCRank();
     // create Int vectors for storing local heights and widths
-    std::vector< Int > * hvect = new std::vector< Int >( p );
-    std::vector< Int > * wvect = new std::vector< Int >( p );
+    std::vector< Int > * hvect = new std::vector< Int >();
+    std::vector< Int > * wvect = new std::vector< Int >();
 
     // copy objects 
     ga.rmaint = rmaint;
     ga.DM = DM;
     ga.ga_local_height = hvect;
     ga.ga_local_width = wvect;
+    ga.ga_local_height->resize( p );
+    ga.ga_local_width->resize( p );
 
     // store local heights and widths
     ga.ga_local_height->at( my_rank ) = DM->LocalHeight();
