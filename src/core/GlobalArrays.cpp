@@ -84,8 +84,8 @@ Int GlobalArrays< T >::GA_Create(Int type, Int ndim, Int dims[], const char *arr
     const Int p = grid.Size();
     const Int my_rank = grid.VCRank();
     // create Int vectors for storing local heights and widths
-    std:vector< Int > * hvect = new std:vector< Int >( p );
-    std:vector< Int > * wvect = new std:vector< Int >( p );
+    std::vector< Int > * hvect = new std::vector< Int >( p );
+    std::vector< Int > * wvect = new std::vector< Int >( p );
     
     // copy objects 
     ga.rmaint = rmaint;
@@ -138,8 +138,8 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
     const Int p = grid.Size();
     const Int my_rank = grid.VCRank();
     // create Int vectors for storing local heights and widths
-    std:vector< Int > * hvect = new std:vector< Int >( p );
-    std:vector< Int > * wvect = new std:vector< Int >( p );
+    std::vector< Int > * hvect = new std::vector< Int >( p );
+    std::vector< Int > * wvect = new std::vector< Int >( p );
 
     // copy objects 
     ga.rmaint = rmaint;
