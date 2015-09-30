@@ -1848,35 +1848,35 @@ void AxpyInterface2<T>::Flush( Matrix<T>& Z )
 
     while( !DONE )
     {
-        DONE = Test( Z );
-        if( mpi::IProbe( mpi::ANY_SOURCE, mpi::ANY_TAG, g.VCComm(), status ) )
-        {
-            switch( status.MPI_TAG )
-            {
-            case DATA_PUT_TAG:
-            {
-                HandleLocalToGlobalData( Z, status.MPI_SOURCE );
-                break;
-            }
+	DONE = Test( Z );
+	if( mpi::IProbe( mpi::ANY_SOURCE, mpi::ANY_TAG, g.VCComm(), status ) )
+	{
+	    switch( status.MPI_TAG )
+	    {
+		case DATA_PUT_TAG:
+		    {
+			HandleLocalToGlobalData( Z, status.MPI_SOURCE );
+			break;
+		    }
 
-            case DATA_ACC_TAG:
-            {
-                HandleLocalToGlobalAcc( Z, status.MPI_SOURCE );
-                break;
-            }
+		case DATA_ACC_TAG:
+		    {
+			HandleLocalToGlobalAcc( Z, status.MPI_SOURCE );
+			break;
+		    }
 
-            case REQUEST_GET_TAG:
-            case DATA_GET_TAG:
-            {
-                HandleGlobalToLocalData( Z );
-                break;
-            }
-            }
-        }
+		case REQUEST_GET_TAG:
+		case DATA_GET_TAG:
+		    {
+			HandleGlobalToLocalData( Z );
+			break;
+		    }
+	    }
+	}
 
-        // wait for requests to
-        // complete one by one
-        WaitAny( Z );
+	// wait for requests to
+	// complete one by one
+	WaitAny( Z );
     }
 }
 

@@ -54,10 +54,8 @@ GlobalArrays< T >::~GlobalArrays()
 	GA_Terminate();
 }
 
-// INFO: type argument will most probably be removed
-// from the interface
 template<typename T>
-Int GlobalArrays< T >::GA_Create(Int type, Int ndim, Int dims[], const char *array_name)
+Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Create" ) )
     if (!ga_initialized)
@@ -75,6 +73,7 @@ Int GlobalArrays< T >::GA_Create(Int type, Int ndim, Int dims[], const char *arr
     DistMatrix< T > * DM = new DistMatrix< T  >( dims[0], dims[1] );
 
     const Grid& grid = DM->Grid();
+    
     const Int p = grid.Size();
     const Int my_rank = grid.VCRank();
     // create Int vectors for storing local heights and widths
@@ -371,8 +370,8 @@ void GlobalArrays< T >::GA_Symmetrize (Int g_a)
     Int dims[2];
     dims[0] = height;
     dims[1] = width;
-    Int g_at = GA_Create( 0, 2, dims, "transpose array");
-    Int g_c = GA_Create( 0, 2, dims, "final array");
+    Int g_at = GA_Create( 2, dims, "transpose array");
+    Int g_c = GA_Create( 2, dims, "final array");
 
     // transpose
     GA_Transpose( g_a, g_at );
@@ -457,6 +456,40 @@ void GlobalArrays< T >::GA_Initialize()
        ga_initialized = true;
 }
 
+// single buffer reduce
+#define REDUCE(x, n, op) \
+    do { \
+	const Grid &grid = DefaultGrid(); \
+	switch (op) \
+	{ \
+	    case '+': \
+		mpi::AllReduce( x, n, mpi::SUM, grid.VCComm() ); \
+	        break; \
+	    case '*': \
+		mpi::AllReduce( x, n, mpi::PROD, grid.VCComm() ); \
+	        break; \
+	    case 'X': \
+		mpi::AllReduce( x, n, mpi::MAX, grid.VCComm() ); \
+	    	break; \
+	    case 'N': \
+		mpi::AllReduce( x, n, mpi::MIN, grid.VCComm() ); \
+	    	break; \
+	    default: \
+		LogicError ("Unsupported global operation specified"); \
+	} \
+    } while (0)
+
+// global commutative operations
+template<typename T>
+void GlobalArrays< T >::GA_Gop(T x[], Int n, char op)
+{
+   DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Gop" ) )
+   if (!ga_initialized)
+       LogicError ("Global Arrays must be initialized before any operations");
+   // op
+   REDUCE( x, n, op );
+}
+
 // barrier
 // TODO dont sync over comm world
 // fetch comm from ga handles
@@ -464,6 +497,8 @@ template<typename T>
 void GlobalArrays< T >::GA_Sync()
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Sync" ) )
+    if (!ga_initialized)
+       LogicError ("Global Arrays must be initialized before any operations on the global array");
 
     // ensure all GA operations are complete	
     for (Int i = 0; i < ga_handles.size(); i++)
@@ -577,6 +612,8 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void** ptr, Int 
 	    case 'G': \
 		ga_handles[g_a].rmaint->Get (M, i, j); \
 	    	break; \
+	    default: \
+		LogicError ("Unsupported transfer type"); \
 	} \
     } while (0)
 
@@ -594,6 +631,8 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void** ptr, Int 
 	    case 'G': \
 		ga_handles[g_a].rmaint->Get (M, i, j); \
 	    	break; \
+	    default: \
+		LogicError ("Unsupported transfer type"); \
 	} \
     } while (0)
 

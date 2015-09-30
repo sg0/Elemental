@@ -24,13 +24,13 @@ EL_EXPORT ElError ElGlobalArraysDestruct_i( ElGlobalArrays_i A );
 EL_EXPORT ElError ElGlobalArraysDestruct_s( ElGlobalArrays_s A );
 EL_EXPORT ElError ElGlobalArraysDestruct_d( ElGlobalArrays_d A );
 
-/* int GlobalArrays< T >::GA_Create(int type, int ndim, int dims[], const char *array_name); 
+/* int GlobalArrays< T >::GA_Create(int ndim, int dims[], const char *array_name); 
    ---------------------------------------------------------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysCreate_i ( ElGlobalArrays_i A, ElInt type, ElInt ndim, 
+EL_EXPORT ElError ElGlobalArraysCreate_i ( ElGlobalArrays_i A, ElInt ndim, 
 	ElInt dims[], const char* array_name, ElInt* g_a );
-EL_EXPORT ElError ElGlobalArraysCreate_s ( ElGlobalArrays_s A, ElInt type, ElInt ndim, 
+EL_EXPORT ElError ElGlobalArraysCreate_s ( ElGlobalArrays_s A, ElInt ndim, 
 	ElInt dims[], const char* array_name, ElInt* g_a );
-EL_EXPORT ElError ElGlobalArraysCreate_d ( ElGlobalArrays_d A, ElInt type, ElInt ndim, 
+EL_EXPORT ElError ElGlobalArraysCreate_d ( ElGlobalArrays_d A, ElInt ndim, 
 	ElInt dims[], const char* array_name, ElInt* g_a );
 
 /* void GlobalArrays<T>::GA_Copy(int g_a, int g_b); 
@@ -80,6 +80,13 @@ EL_EXPORT ElError ElGlobalArraysDuplicate_s( ElGlobalArrays_s A, ElInt g_a,
 	const char* array_name, ElInt* g_dup );
 EL_EXPORT ElError ElGlobalArraysDuplicate_d( ElGlobalArrays_d A, ElInt g_a, 
 	const char* array_name, ElInt* g_dup );
+		
+/* void GA_Gop(T x[], Int n, char op);
+ -------------------------------------- */
+EL_EXPORT ElError ElGlobalArraysOp_i( ElGlobalArrays_i A, ElInt x[], ElInt n, char op );
+EL_EXPORT ElError ElGlobalArraysOp_s( ElGlobalArrays_s A, float x[], ElInt n, char op );
+EL_EXPORT ElError ElGlobalArraysOp_d( ElGlobalArrays_d A, double x[], ElInt n,  char op );
+
 
 /* void GlobalArrays<T>::GA_Fill(int g_a, void *value);
  -------------------------------------- */

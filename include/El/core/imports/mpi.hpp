@@ -79,6 +79,7 @@ typedef MPI_Message Message;
 typedef MPI_User_function UserFunction;
 #if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
 typedef MPI_Win Window;
+const Window WIN_NULL = MPI_WIN_NULL;
 typedef enum
 {
 	STRICT_ACC_ORDERING 	= 0,

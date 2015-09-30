@@ -16,7 +16,7 @@ class GlobalArrays
 
 		// Subset of GA C API
 		// TODO follow either NGA_ or GA_ in function names
-		Int  GA_Create(Int type, Int ndim, Int dims[], const char *array_name);
+		Int  GA_Create(Int ndim, Int dims[], const char *array_name);
 		Int  GA_Duplicate(Int g_a, const char *array_name);
 		/* Create rmainterface object, and attach DM corresponding to g_a */
 		Int  GA_Allocate(Int g_a);
@@ -29,6 +29,7 @@ class GlobalArrays
 		void GA_Fill(Int g_a, void *value);
 		void GA_Initialize();
 		void GA_Sync();
+		void GA_Gop(T x[], Int n, char op);
 		/* Check if Detach was called already on rmainterface objects, and erase ga_handles */
 		void GA_Terminate();
 		void GA_Transpose(Int g_a, Int g_b);
@@ -50,7 +51,7 @@ class GlobalArrays
 	
 		typedef struct GA_t
 		{
-		    // distmatrix instance
+		    // distmatrix_mc_mr instance
 		    DistMatrix   < T >* DM;     
 		    // rmainterface instance
 		    RmaInterface < T >* rmaint; 
@@ -58,7 +59,7 @@ class GlobalArrays
 		    std::vector< Int >* ga_local_height;
 		    std::vector< Int >* ga_local_width;
 		} GA;
-
+		
 		// vector of GA handles
 		std::vector < GA > ga_handles;
 };

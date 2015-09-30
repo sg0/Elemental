@@ -23,10 +23,10 @@ extern "C" {
   { EL_TRY( delete CReflect(A) ) } \
   
 #define GA_OPS(SIG,SIGBASE,T) \
-  /* int GlobalArrays< T >::GA_Create(int type, int ndim, int dims[], const char *array_name) */ \
-  ElError ElGlobalArraysCreate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt type, ElInt ndim, \
+  /* int GlobalArrays< T >::GA_Create(int ndim, int dims[], const char *array_name) */ \
+  ElError ElGlobalArraysCreate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt ndim, \
 	  ElInt dims[], const char *array_name, ElInt* g_a ) \
-  { EL_TRY( *g_a = CReflect(A)->GA_Create (type, ndim, dims, array_name) ) } \
+  { EL_TRY( *g_a = CReflect(A)->GA_Create (ndim, dims, array_name) ) } \
   /* void GlobalArrays<T>::GA_Copy(int g_a, int g_b) */ \
   ElError ElGlobalArraysCopy_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt g_b ) \
   { EL_TRY( CReflect(A)->GA_Copy (g_a, g_b) ) } \
@@ -46,6 +46,9 @@ extern "C" {
   ElError ElGlobalArraysDgemm_ ## SIG ( ElGlobalArrays_ ## SIG A, char ta, char tb, ElInt m, ElInt n, ElInt k, \
 	double alpha, ElInt g_a, ElInt g_b, double beta, ElInt g_c ) \
   { EL_TRY( CReflect(A)->GA_Dgemm(ta, tb, m, n, k, alpha, g_a, g_b, beta, g_c ) ) } \
+  /* void GA_Gop(T x[], Int n, char op); */ \
+  EL_EXPORT ElError ElGlobalArraysOp_ ## SIG ( ElGlobalArrays_ ## SIG A,  CREFLECT(T)* x, ElInt n, char op ) \
+  { EL_TRY( CReflect(A)->GA_Gop(CReflect(x), n, op) ) } \
   /* int GlobalArrays<T>::GA_Duplicate(int g_a, const char* array_name) */ \
   ElError ElGlobalArraysDuplicate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, \
 	  const char *array_name, ElInt* g_dup ) \
