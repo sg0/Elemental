@@ -43,7 +43,7 @@ DM::DistMatrix( Int height, Int width, const El::Grid& grid, int root )
     // do not allocate memory now, just the
     // dimensions
     this->SetShifts(); 
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+#if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
     this->SetDim(height, width);
 #else

@@ -112,7 +112,7 @@ private:
     void Attach_( Int height, Int width, T* buffer, Int ldim );
     void LockedAttach_( Int height, Int width, const T* buffer, Int ldim );
 
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+#if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
     void SetDim_( Int height, Int width );
     void SetWindowBase_( T* ptr );

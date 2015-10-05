@@ -352,6 +352,7 @@ inline ElConstMatrix_c CReflect( const Matrix<Complex<float>>* A )
 inline ElConstMatrix_z CReflect( const Matrix<Complex<double>>* A )
 { return (ElConstMatrix_z)EL_RC(const struct ElMatrix_zDummy*,A); }
 
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && defined(EL_ENABLE_RMA_GLOBAL_ARRAYS)
 // GlobalArrays
 // ------------
 inline GlobalArrays<Int>* CReflect( ElGlobalArrays_i A )
@@ -371,6 +372,7 @@ inline ElGlobalArrays_s CReflect( GlobalArrays<float>* A )
 
 inline ElGlobalArrays_d CReflect( GlobalArrays<double>* A )
 { return (ElGlobalArrays_d)EL_RC(struct ElGlobalArrays_dDummy*,A); }
+#endif
 
 // AbstractDistMatrix
 // ------------------

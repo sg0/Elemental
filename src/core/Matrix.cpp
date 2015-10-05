@@ -555,7 +555,7 @@ void Matrix<T>::Resize_( Int height, Int width )
     }
 }
 
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+#if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
 template<typename T>
 void Matrix<T>::SetDim_( Int height, Int width )

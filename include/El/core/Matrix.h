@@ -92,34 +92,6 @@ EL_EXPORT ElError ElMatrixAttach_z
 ( ElMatrix_z A, ElInt height, ElInt width, 
   complex_double* buffer, ElInt ldim );
 
-/* void Matrix<T>::SetWindowBase( T* buffer )
-   -------------------------------------------------------------------- */
-/*
-EL_EXPORT ElError ElMatrixSetWindowBase_i
-( ElMatrix_i A, ElInt* buffer );
-EL_EXPORT ElError ElMatrixSetWindowBase_s
-( ElMatrix_s A, float* buffer );
-EL_EXPORT ElError ElMatrixSetWindowBase_d
-( ElMatrix_d A, double* buffer );
-EL_EXPORT ElError ElMatrixSetWindowBase_c
-( ElMatrix_c A, complex_float* buffer );
-EL_EXPORT ElError ElMatrixSetWindowBase_z
-( ElMatrix_z A, complex_double* buffer );
-*/
-/* void Matrix<T>::SetDim( Int height, Int width )
-   -------------------------------------------------------------------- */
-/*
-EL_EXPORT ElError ElMatrixSetDim_i
-( ElMatrix_i A, ElInt height, ElInt width );
-EL_EXPORT ElError ElMatrixSetDim_s
-( ElMatrix_s A, ElInt height, ElInt width );
-EL_EXPORT ElError ElMatrixSetDim_d
-( ElMatrix_d A, ElInt height, ElInt width );
-EL_EXPORT ElError ElMatrixSetDim_c
-( ElMatrix_c A, ElInt height, ElInt width );
-EL_EXPORT ElError ElMatrixSetDim_z
-( ElMatrix_z A, ElInt height, ElInt width );
-*/
 /* void Matrix<T>::LockedAttach
    ( Int height, Int width, const T* buffer, Int ldim )
    ---------------------------------------------------- */

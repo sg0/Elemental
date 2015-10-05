@@ -64,6 +64,7 @@ public:
     void LocalFlush( const Matrix<T>& Z );
     void LocalFlush(       Matrix<T>& Z );
     void LocalFlush();
+    void Flush();
    
     bool Testall();
     bool Test(          Matrix<T>& Z );

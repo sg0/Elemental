@@ -40,7 +40,7 @@ void Memory<G>::ShallowSwap( Memory<G>& mem )
 template<typename G>
 Memory<G>::~Memory() 
 {
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+#if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
 #else
     delete[] buffer_; 
@@ -87,7 +87,7 @@ G* Memory<G>::Require( size_t size )
 }
 
 
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+#if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
 template<typename G>
 void Memory<G>::Preallocated( size_t size, G * baseptr )
@@ -116,7 +116,7 @@ void Memory<G>::Release()
 template<typename G>
 void Memory<G>::Empty()
 {
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+#if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
 #else
     delete[] buffer_;

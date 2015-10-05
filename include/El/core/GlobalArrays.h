@@ -63,6 +63,13 @@ EL_EXPORT ElError ElGlobalArraysAdd_i( ElGlobalArrays_i A, void* alpha, ElInt g_
 EL_EXPORT ElError ElGlobalArraysAdd_s( ElGlobalArrays_s A, void* alpha, ElInt g_a, void* beta, ElInt g_b, ElInt g_c );
 EL_EXPORT ElError ElGlobalArraysAdd_d( ElGlobalArrays_d A, void* alpha, ElInt g_a, void* beta, ElInt g_b, ElInt g_c );
 
+/* T GlobalArrays<T>::GA_Dot(int g_a, int g_b); 
+   ---------------------------------------------------------------- */
+EL_EXPORT ElError ElGlobalArraysDot_i( ElGlobalArrays_i A, ElInt g_a, ElInt g_b, ElInt * dotproduct );
+EL_EXPORT ElError ElGlobalArraysDot_s( ElGlobalArrays_s A, ElInt g_a, ElInt g_b, float * dotproduct );
+EL_EXPORT ElError ElGlobalArraysDot_d( ElGlobalArrays_d A, ElInt g_a, ElInt g_b, double * dotproduct );
+
+
 /* void GlobalArrays<T>::GA_Dgemm(char ta, char tb, int m, int n, int k, double alpha, int g_a, int g_b, double beta, int g_c );
    ----------------------------------------------------------------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysDgemm_i( ElGlobalArrays_i A, char ta, char tb, ElInt m, ElInt n, ElInt k, 

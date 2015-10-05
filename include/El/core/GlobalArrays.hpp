@@ -30,6 +30,7 @@ class GlobalArrays
 		void GA_Initialize();
 		void GA_Sync();
 		void GA_Gop(T x[], Int n, char op);
+		T GA_Dot( Int g_a, Int g_b );
 		/* Check if Detach was called already on rmainterface objects, and erase ga_handles */
 		void GA_Terminate();
 		void GA_Transpose(Int g_a, Int g_b);
@@ -58,6 +59,7 @@ class GlobalArrays
 		    // local height/width of distmatrix
 		    std::vector< Int >* ga_local_height;
 		    std::vector< Int >* ga_local_width;
+		    bool pending_rma_op;
 		} GA;
 		
 		// vector of GA handles

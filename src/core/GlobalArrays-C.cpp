@@ -42,6 +42,9 @@ extern "C" {
   /* void GlobalArrays<T>::GA_Add(void *alpha, int g_a, void* beta, int g_b, int g_c) */ \
   ElError ElGlobalArraysAdd_ ## SIG ( ElGlobalArrays_ ## SIG A, void* alpha, ElInt g_a, void* beta, ElInt g_b, ElInt g_c ) \
   { EL_TRY( CReflect(A)->GA_Add(alpha, g_a, beta, g_b, g_c) ) } \
+  /* T GlobalArrays<T>::GA_Dot(int g_a, int g_b); */ \
+  EL_EXPORT ElError ElGlobalArraysDot_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt g_b, CREFLECT(T)* dotproduct ) \
+  { EL_TRY( *dotproduct = CReflect(A)->GA_Dot(g_a, g_b) ) } \
   /* void GlobalArrays<T>::GA_Dgemm(char ta, char tb, int m, int n, int k, double alpha, int g_a, int g_b, double beta, int g_c ) */ \
   ElError ElGlobalArraysDgemm_ ## SIG ( ElGlobalArrays_ ## SIG A, char ta, char tb, ElInt m, ElInt n, ElInt k, \
 	double alpha, ElInt g_a, ElInt g_b, double beta, ElInt g_c ) \

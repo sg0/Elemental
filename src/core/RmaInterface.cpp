@@ -1049,6 +1049,17 @@ void RmaInterface<T>::Flush( Matrix<T>& Z )
 }
 
 template<typename T>
+void RmaInterface<T>::Flush()
+{
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Flush" ) )
+
+    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
+        LogicError( "Must initiate transfer before flushing." );
+
+    mpi::Flush( window );
+}
+
+template<typename T>
 bool RmaInterface<T>::anyPendingXfers( Matrix<T>& Z )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::anyPendingXfers" ) )

@@ -87,6 +87,7 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name)
     ga.ga_local_width = wvect;
     ga.ga_local_height->resize( p );
     ga.ga_local_width->resize( p );
+    ga.pending_rma_op = false;
 
     // store local heights and widths
     ga.ga_local_height->at( my_rank ) = DM->LocalHeight();
@@ -143,6 +144,7 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
     ga.ga_local_width = wvect;
     ga.ga_local_height->resize( p );
     ga.ga_local_width->resize( p );
+    ga.pending_rma_op = false;
 
     // store local heights and widths
     ga.ga_local_height->at( my_rank ) = DM->LocalHeight();
@@ -164,106 +166,6 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
     return handle;
 }
 
-#define FALLBACK_STRIDE 8
-#define SCALAR_x_GA(scalar, g_a) \
-    do { \
-	mpi::Window fop_win; \
-	long *fop_win_base; \
-	Int local_height, local_width; \
-	/* calculate block sizes */ \
-	local_height =  ((ga_handles[g_a].DM->Height() / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].DM->Height() / 64)); \
-	local_height = (( local_height >= ga_handles[g_a].DM->Height() ) ? (ga_handles[g_a].DM->Height() / 2) : local_height ); \
-	local_width =  ((ga_handles[g_a].DM->Width() / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].DM->Width() / 64)); \
-	local_width = (( local_width >= ga_handles[g_a].DM->Width() ) ? (ga_handles[g_a].DM->Width() / 2) : local_width ); \
-	/* initialize matrix (block, block) to hold a portion of GA */ \
-	Matrix < T >A; \
-	Zeros( A, local_height, local_width ); \
-	/* initialize fetch-and-op window */ \
-	mpi::Comm comm = ga_handles[g_a].DM->DistComm(); \
-	mpi::WindowAllocate (sizeof (long), comm, fop_win); \
-	memset (fop_win_base, 0, sizeof (long)); \
-	mpi::WindowLock( fop_win ); \
-	long counter = 0, next = 0; \
-	next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
-	/* initialize GA dim and strides */ \
-	Int ga_height = ga_handles[g_a].DM->Height(); \
-	Int ga_width = ga_handles[g_a].DM->Width(); \
-	Int height_stride = local_height; \
-	Int width_stride = local_width; \
-	for (Int i = 0; i < ga_height; i += height_stride) \
-	{ \
-	    if (counter == next) \
-	    { \
-		for (Int j = 0; j < ga_width; j += width_stride) \
-		{ \
-		    ga_handles[g_a].rmaint->Getx( scalar, A, i, j ); \
-		    ga_handles[g_a].rmaint->Iput( A, i, j ); \
-		} \
-		next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
-	    } \
-	    counter++; \
-	} \
-	ga_handles[g_a].rmaint->Flush( A ); \
-	mpi::Barrier( comm ); \
-	mpi::WindowUnlock(fop_win ); \
-	mpi::WindowFree(fop_win ); \
-    } while (0)
-
-// g_c = alpha * g_a + beta * g_b
-// g_c, g_a, g_b are GA struct type,
-// not integer handles
-// all 3 arrays have same shape
-// and distributed over same comm
-#define GA_ADD(alpha, beta, g_a, g_b, g_c) \
-    do { \
-	mpi::Window fop_win; \
-	long *fop_win_base; \
-	Int local_height, local_width; \
-	/* calculate block sizes */ \
-	local_height =  ((ga_handles[g_a].DM->Height() / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].DM->Height() / 64)); \
-	local_height = (( local_height >= ga_handles[g_a].DM->Height() ) ? (ga_handles[g_a].DM->Height() / 2) : local_height ); \
-	local_width =  ((ga_handles[g_a].DM->Width() / 64) == 0 ? FALLBACK_STRIDE : (ga_handles[g_a].DM->Width() / 64)); \
-	local_width = (( local_width >= ga_handles[g_a].DM->Width() ) ? (ga_handles[g_a].DM->Width() / 2) : local_width ); \
-	Matrix < T >A; \
-	Matrix < T >B; \
-	Zeros( A, local_height, local_width ); \
-	Zeros( B, local_height, local_width ); \
-	mpi::Comm comm = ga_handles[g_a].DM->DistComm(); \
-	mpi::WindowAllocate (sizeof (long), comm, fop_win); \
-	memset (fop_win_base, 0, sizeof (long)); \
-	mpi::WindowLock( fop_win ); \
-	/* initialize GA dim and strides */ \
-	Int ga_height = ga_handles[g_a].DM->Height(); \
-	Int ga_width = ga_handles[g_a].DM->Width(); \
-	Int height_stride = local_height; \
-	Int width_stride = local_width; \
-	long counter = 0, next = 0; \
-	mpi::Barrier( comm ); \
-	next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
-	for (Int i = 0; i < ga_height; i += height_stride) \
-	{ \
-	    if (counter == next) \
-	    { \
-		for (Int j = 0; j < ga_width; j += width_stride) \
-		{ \
-		    ga_handles[g_a].rmaint->Getx( alpha, A, i, j ); \
-		    ga_handles[g_b].rmaint->Getx( beta, B, i, j ); \
-		    ga_handles[g_c].rmaint->Iput( A, i, j ); \
-		    ga_handles[g_c].rmaint->Iacc( B, i, j ); \
-		} \
-		next = mpi::ReadInc( fop_win, 0, (long) 1 ); \
-	    } \
-	    counter++; \
-	} \
-	ga_handles[g_a].rmaint->Flush( A ); \
-	ga_handles[g_b].rmaint->Flush( B ); \
-	ga_handles[g_c].rmaint->Flush( A ); \
-	ga_handles[g_c].rmaint->Flush( B ); \
-	mpi::Barrier( comm ); \
-	mpi::WindowUnlock(fop_win ); \
-	mpi::WindowFree(fop_win ); \
-    } while (0)
-
 // g_c = alpha * g_a  +  beta * g_b;
 template<typename T>
 void GlobalArrays< T >::GA_Add(void *alpha, Int g_a, void* beta, Int g_b, Int g_c)
@@ -278,21 +180,48 @@ void GlobalArrays< T >::GA_Add(void *alpha, Int g_a, void* beta, Int g_b, Int g_
     if (g_c < 0 || g_c > ga_handles.size())
 	LogicError ("Invalid GA handle");
 
-    T * a = (T *)alpha;
-    T * b = (T *)beta;
+    DistMatrix<T>& GA = *(ga_handles[g_a].DM);
+    DistMatrix<T>& GB = *(ga_handles[g_b].DM);
+    DistMatrix<T>& GC = *(ga_handles[g_c].DM);
+
+    const Int g_a_height = GA.Height();
+    const Int g_a_width = GA.Width();
+    const Int g_b_height = GB.Height();
+    const Int g_b_width = GB.Width();   
+    const Int g_c_height = GC.Height();
+    const Int g_c_width = GC.Width();
+    
+    T a = *((T *)alpha);
+    T b = *((T *)beta);
     
     // arrays must have the same shape
-    if ((ga_handles[g_a].DM->Width() != ga_handles[g_b].DM->Width()) 
-	    || (ga_handles[g_a].DM->Width() != ga_handles[g_c].DM->Width()) 
-	    || (ga_handles[g_b].DM->Width() != ga_handles[g_c].DM->Width()))
+    if ((g_a_width != g_b_width) 
+	    || (g_a_width != g_c_width) 
+	    || (g_b_width != g_c_width))
 	LogicError ("Global Arrays of different widths cannot be added. ");
-    if ((ga_handles[g_a].DM->Height() != ga_handles[g_b].DM->Height()) 
-	    || (ga_handles[g_a].DM->Height() != ga_handles[g_c].DM->Height()) 
-	    || (ga_handles[g_b].DM->Height() != ga_handles[g_c].DM->Height()))
+    if ((g_a_height != g_b_height) 
+	    || (g_a_height != g_c_height) 
+	    || (g_b_height != g_c_height))
 	LogicError ("Global Arrays of different heights cannot be added. ");
 
+    DistMatrix< T, MC, MR > Bd;
+    Bd.Resize( g_a_height, g_a_width );
+    T one = static_cast<T>( 1.0 );
+    Fill( Bd, one );
+
     // add
-    GA_ADD (*a, *b, g_a, g_b, g_c);
+    // FIXME dont hardcode
+    Int nb = 128;
+    GemmAlgorithm alg = GEMM_SUMMA_A;
+    
+    const Orientation orientA = CharToOrientation( 'N' );
+    const Orientation orientB = CharToOrientation( 'N' );
+    SetBlocksize( nb );
+
+    // GB = a*GA*Bd + b*GB
+    Gemm( orientA, orientB, a, GA, Bd, b, GB, alg);
+    // GC = GB
+    Copy( GB, GC );
 }
 
 // copies g_a into g_b, must be of same shape
@@ -307,16 +236,22 @@ void GlobalArrays< T >::GA_Copy(Int g_a, Int g_b)
     if (g_b < 0 || g_b > ga_handles.size())
 	LogicError ("Invalid GA handle");
 
+    DistMatrix<T>& GA = *(ga_handles[g_a].DM);
+    DistMatrix<T>& GB = *(ga_handles[g_b].DM);
+
+    const Int g_a_height = GA.Height();
+    const Int g_a_width = GA.Width();
+    const Int g_b_height = GB.Height();
+    const Int g_b_width = GB.Width();   
+
     // arrays must have the same shape
-    if ((ga_handles[g_a].DM->Width() != ga_handles[g_b].DM->Width()))
+    if (g_a_width != g_b_width)
 	LogicError ("Global Arrays of different widths cannot be copied. ");
-    if ((ga_handles[g_a].DM->Height() != ga_handles[g_b].DM->Height()))
+    if (g_a_height != g_b_height)
 	LogicError ("Global Arrays of different heights cannot be copied. ");
 
-    DistMatrix<T>& ADM = *(ga_handles[g_a].DM);
-    DistMatrix<T>& BDM = *(ga_handles[g_b].DM);
     // copy
-    Copy( ADM, BDM );
+    Copy( GA, GB );
 }
 
 // print GA
@@ -346,11 +281,15 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
 
     // detach RmaInterface
     ga_handles[g_a].rmaint->Detach();
-    ga_handles[g_a].DM->Empty();
+    // set matrix size to 0 and free mem
+    ga_handles[g_a].DM->EmptyData();
+    // clear vectors that holds local dims
     ga_handles[g_a].ga_local_height->clear();
     ga_handles[g_a].ga_local_width->clear();
-    // erase
-    ga_handles.erase( ga_handles.begin() + g_a );
+    // erase ga entry from global ga_handles vector
+    // FIXME erasing would mess up g_a handles, so
+    // at present vector is cleared only on terminate
+    // ga_handles.erase( ga_handles.begin() + g_a );
 }
 
 // A := 0.5 * ( A + A' )
@@ -363,31 +302,30 @@ void GlobalArrays< T >::GA_Symmetrize (Int g_a)
     if (g_a < 0 || g_a > ga_handles.size())
 	LogicError ("Invalid GA handle");
 
-    Int width = ga_handles[g_a].DM->Width();
-    Int height = ga_handles[g_a].DM->Height();
+    DistMatrix<T>& GA = *(ga_handles[g_a].DM);
+    Int width = GA.Width();
+    Int height = GA.Height();
 
     // create intermediate GAs using g_a parameters
     Int dims[2];
     dims[0] = height;
     dims[1] = width;
-    Int g_at = GA_Create( 2, dims, "transpose array");
-    Int g_c = GA_Create( 2, dims, "final array");
+    Int g_at = GA_Create( 2, dims, "transpose array" );
+    Int g_c = GA_Create( 2, dims, "final array" );
 
     // transpose
     GA_Transpose( g_a, g_at );
 
-    // add: g_a + g_at
-    // g_c = alpha * g_a  +  beta * g_b;
-    double *scale;
-    *scale = 0.5;
-    GA_Add((void *)scale, g_a, (void *)scale, g_at, g_c);
-
-    // copy, g_a = g_c
-    GA_Copy (g_a, g_c);
+    // add: scale * ( g_a + g_at )
+    // g_c = alpha * g_a  +  beta * g_at;
+    double scale = 0.5;
+    GA_Add( &scale, g_a, &scale, g_at, g_c );
+    // copy g_c into g_a
+    GA_Copy( g_c, g_a );
     
     // destroy the intermediate GAs
-    GA_Destroy (g_at);
-    GA_Destroy (g_c);
+    GA_Destroy( g_at );
+    GA_Destroy( g_c );
 }
 
 // C := alpha*op( A )*op( B ) + beta*C
@@ -490,6 +428,26 @@ void GlobalArrays< T >::GA_Gop(T x[], Int n, char op)
    REDUCE( x, n, op );
 }
 
+// dot product
+template<typename T>
+T GlobalArrays< T >::GA_Dot(Int g_a, Int g_b)
+{
+   DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Dot" ) )
+   if (!ga_initialized)
+       LogicError ("Global Arrays must be initialized before any operations");
+   if (g_a < 0 || g_a > ga_handles.size())
+       LogicError ("Invalid GA handle");
+   if (g_b < 0 || g_b > ga_handles.size())
+       LogicError ("Invalid GA handle");
+
+   const DistMatrix<T>& A = *(ga_handles[g_a].DM);
+   const DistMatrix<T>& B = *(ga_handles[g_b].DM);
+
+   T result = Dot( A, B );
+
+   return result;
+}
+
 // barrier
 // TODO dont sync over comm world
 // fetch comm from ga handles
@@ -502,9 +460,13 @@ void GlobalArrays< T >::GA_Sync()
 
     // ensure all GA operations are complete	
     for (Int i = 0; i < ga_handles.size(); i++)
-	    ga_handles[i].rmaint->Waitall ();
+    {
+	if (ga_handles[i].pending_rma_op)
+	    ga_handles[i].rmaint->Flush();
+    }
 
-    mpi::Barrier (mpi::COMM_WORLD);
+    const Grid &grid = DefaultGrid();
+    mpi::Barrier( grid.VCComm() );
 }
 
 // delete all active arrays and destroy internal data structures.
@@ -516,18 +478,14 @@ void GlobalArrays< T >::GA_Terminate()
     if (!ga_initialized) // already terminated
 	return;
 
-    ga_initialized = false;
     // detach if not yet already
     for (Int i = 0; i < ga_handles.size(); i++)
-    {
-	ga_handles[i].rmaint->Detach();
-	ga_handles[i].DM->Empty();
-	ga_handles[i].ga_local_height->clear();
-	ga_handles[i].ga_local_width->clear();
-    }
+	GA_Destroy (i);
     ga_handles.clear();
-
-    mpi::Barrier (mpi::COMM_WORLD);
+    
+    ga_initialized = false;
+    const Grid &grid = DefaultGrid();
+    mpi::Barrier( grid.VCComm() );
 }
 
 // B = A'
@@ -603,6 +561,7 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void** ptr, Int 
     do { \
 	switch (type) \
 	{ \
+            ga_handles[g_a].pending_rma_op = true; \
 	    case 'A': \
 		ga_handles[g_a].rmaint->Acc (M, i, j); \
 	        break; \
@@ -613,13 +572,14 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void** ptr, Int 
 		ga_handles[g_a].rmaint->Get (M, i, j); \
 	    	break; \
 	    default: \
-		LogicError ("Unsupported transfer type"); \
+		LogicError ("Unsupported blocking transfer type"); \
 	} \
     } while (0)
 
 // locally nonblocking transfers
 #define NBXFER(type, g_a, M, i, j) \
     do { \
+        ga_handles[g_a].pending_rma_op = true; \
 	switch (type) \
 	{ \
 	    case 'A': \
@@ -632,7 +592,7 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void** ptr, Int 
 		ga_handles[g_a].rmaint->Get (M, i, j); \
 	    	break; \
 	    default: \
-		LogicError ("Unsupported transfer type"); \
+		LogicError ("Unsupported nonblocking transfer type"); \
 	} \
     } while (0)
 
@@ -655,6 +615,7 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[
 	a = (T *)&one;
     else
 	a = (T *)alpha;
+    
     T * buffer = (T *) buf;
     
     if (*a == zero) // no-op
@@ -663,12 +624,7 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[
     // calculate local height and width
     Int width = hi[1] - lo[1] + 1;
     Int height = hi[0] - lo[0] + 1;
-    Int ldim = ld[0];
-
-    // create a matrix
-    Matrix< T > A;
-    Zeros( A, height, width );
-    T * source = A.Buffer ();
+    Int ldim = *ld;
 
     if (*a != one) // then a * buf
     {
@@ -677,8 +633,9 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[
 		buffer[i + j*ldim] *= *a;
     }
 
-    // memcopy to source
-    MemCopy( source, buffer, (width * height) );
+    // create a matrix
+    Matrix< T > A;
+    A.Attach( height, width, buffer, ldim );
 
     const Int i = lo[0];
     const Int j = lo[1];
@@ -702,19 +659,17 @@ void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]
      // calculate height and width from lo and hi
     Int width = hi[1] - lo[1] + 1;
     Int height = hi[0] - lo[0] + 1;
+    Int ldim = *ld;
    
     const Int i = lo[0];
     const Int j = lo[1];
 
+    T * buffer = reinterpret_cast<T *>(buf);
     // create Matrix<T> for get
     Matrix< T > A; 
-    Zeros( A, height, width );
+    A.Attach( height, width, buffer, ldim );
+    
     BXFER ('G', g_a, A, i, j);
-
-    T * buffer = A.Buffer();
-    T * outbuf = reinterpret_cast<T *>(buf);
-
-    MemCopy( outbuf, buffer, (width * height) );
 }
  
 template<typename T>
@@ -736,6 +691,7 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], void* buf, Int ld
 	a = (T *)&one;
     else
 	a = (T *)alpha;
+    
     T * buffer = reinterpret_cast<T *>( buf );
 
     if (*a == zero) // no-op
@@ -744,12 +700,7 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], void* buf, Int ld
     // calculate local height and width
     Int width = hi[1] - lo[1] + 1;
     Int height = hi[0] - lo[0] + 1;
-    Int ldim = ld[0];
-
-    // create a local matrix
-    Matrix< T > A;
-    Zeros( A, height, width );
-    T * source = A.Buffer ();
+    Int ldim = *ld;
 
     if (*a != one) // then a * buf
     {
@@ -758,8 +709,9 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], void* buf, Int ld
 		buffer[i + j*ldim] *= *a;
     }
 
-    // memcopy to source
-    MemCopy( source, buffer, (width * height) );
+    // create a local matrix
+    Matrix< T > A;
+    A.Attach( height, width, buffer, ldim );
 
     const Int i = lo[0];
     const Int j = lo[1];
@@ -792,15 +744,11 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], void* buf, Int ld
     // calculate local height and width
     Int width = hi[1] - lo[1] + 1;
     Int height = hi[0] - lo[0] + 1;
-    Int ldim = ld[0];
+    Int ldim = *ld;
 
     // create a matrix
     Matrix< T > A;
-    Zeros( A, height, width );
-    T * source = A.Buffer ();
-
-    // memcopy to source
-    MemCopy( source, buffer, (width * height) );
+    A.Attach( height, width, buffer, ldim );
 
     const Int i = lo[0];
     const Int j = lo[1];
@@ -822,6 +770,7 @@ Int GlobalArrays< T >::NGA_NbTest(ga_nbhdl_t* nbhandle)
 	bool status = ga_handles[*nbhandle].rmaint->Testall ();
 	if (status) // release handle
 	{
+            ga_handles[*nbhandle].pending_rma_op = false;
 	    *nbhandle = -1;
 	    return 1;
 	}
@@ -840,6 +789,7 @@ void GlobalArrays< T >::NGA_NbWait(ga_nbhdl_t* nbhandle)
     if (*nbhandle != -1)
     {
 	ga_handles[*nbhandle].rmaint->Waitall ();
+        ga_handles[*nbhandle].pending_rma_op = false;
 	// release handle
 	*nbhandle = -1;
     }
@@ -861,14 +811,11 @@ void GlobalArrays< T >::NGA_Put(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]
     // calculate local height and width
     Int width = hi[1] - lo[1] + 1;
     Int height = hi[0] - lo[0] + 1;
+    Int ldim = *ld;
 
     // create a matrix
     Matrix< T > A;
-    Zeros( A, height, width );
-    T * source = A.Buffer ();
-
-    // memcopy to source
-    MemCopy( source, buffer, (width * height) );
+    A.Attach( height, width, buffer, ldim );
 
     const Int i = lo[0];
     const Int j = lo[1];
