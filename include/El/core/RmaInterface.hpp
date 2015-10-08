@@ -36,7 +36,6 @@ public:
     void Put( const Matrix<T>& Z, Int i, Int j );
 
     void Get(            Matrix<T>& Z, Int i, Int j );
-    void Getx( T scalar, Matrix<T>& Z, Int i, Int j );
 
     void Acc(       Matrix<T>& Z, Int i, Int j );
     void Acc( const Matrix<T>& Z, Int i, Int j );
