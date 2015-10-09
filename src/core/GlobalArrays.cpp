@@ -536,6 +536,22 @@ void GlobalArrays< T >::NGA_Distribution( Int g_a, Int iproc, Int lo[], Int hi[]
     }
 }
 
+// Inquires the shape of a global array
+template<typename T>
+void GlobalArrays< T >::NGA_Inquire( Int g_a, Int * ndim, Int dims[] )
+{
+    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Inquire" ) )
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a > ga_handles.size())
+	LogicError ("Invalid GA handle");
+
+    DistMatrix< T >&Y = *(ga_handles[g_a].DM);
+    *ndim = 2; // number of dims is always 2
+    dims[0] = Y.Height();
+    dims[1] = Y.Width();
+}
+
 // accesses data locally allocated for a global array    
 template<typename T>
 void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void** ptr, Int ld[])

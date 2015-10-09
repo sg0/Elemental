@@ -77,6 +77,9 @@ extern "C" {
   /* void GlobalArrays<T>::NGA_Distribution(int g_a, int iproc, int lo[], int hi[]) */ \
   ElError ElGlobalArraysDistribution_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt iproc, ElInt lo[], ElInt hi[] ) \
   { EL_TRY( CReflect(A)->NGA_Distribution(g_a, iproc, lo, hi) ) } \
+  /* void NGA_Inquire(Int g_a, Int * ndim, Int dims[]) */ \
+  ElError ElGlobalArraysInquire_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt * ndim, ElInt dims[] ) \
+  { EL_TRY( CReflect(A)->NGA_Inquire(g_a, ndim, dims) ) } \
   /* void GlobalArrays<T>::NGA_Acc(int g_a, int lo[], int hi[],void* ptr,int ld[],void* alpha) */ \
   ElError ElGlobalArraysAccumulate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], \
 	ElInt hi[], CREFLECT(T)* ptr, ElInt ld[], void* alpha ) \

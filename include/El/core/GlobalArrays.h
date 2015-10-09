@@ -136,6 +136,12 @@ EL_EXPORT ElError ElGlobalArraysAccess_d( ElGlobalArrays_d A, ElInt g_a, ElInt l
 EL_EXPORT ElError ElGlobalArraysDistribution_i( ElGlobalArrays_i A, ElInt g_a, ElInt iproc, ElInt lo[], ElInt hi[] );
 EL_EXPORT ElError ElGlobalArraysDistribution_s( ElGlobalArrays_s A, ElInt g_a, ElInt iproc, ElInt lo[], ElInt hi[] );
 EL_EXPORT ElError ElGlobalArraysDistribution_d( ElGlobalArrays_d A, ElInt g_a, ElInt iproc, ElInt lo[], ElInt hi[] );
+		
+/* void NGA_Inquire(Int g_a, Int * ndim, Int dims[]);
+ ------------------------------------------------------ */		
+EL_EXPORT ElError ElGlobalArraysInquire_i( ElGlobalArrays_i A, ElInt g_a, ElInt * ndim, ElInt dims[] );
+EL_EXPORT ElError ElGlobalArraysInquire_s( ElGlobalArrays_s A, ElInt g_a, ElInt * ndim, ElInt dims[] );
+EL_EXPORT ElError ElGlobalArraysInquire_d( ElGlobalArrays_d A, ElInt g_a, ElInt * ndim, ElInt dims[] );
 
 /* void GlobalArrays<T>::NGA_Acc(int g_a, int lo[], int hi[],void* buf,int ld[],void* alpha);
  ---------------------------------------------------------------------------------- */
