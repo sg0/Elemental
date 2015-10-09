@@ -206,8 +206,7 @@ void GlobalArrays< T >::GA_Add(void *alpha, Int g_a, void* beta, Int g_b, Int g_
 
     DistMatrix< T, MC, MR > Bd;
     Bd.Resize( g_a_height, g_a_width );
-    T one = static_cast<T>( 1.0 );
-    Fill( Bd, one );
+    Identity( Bd, g_a_height, g_a_width );
 
     // add
     // FIXME dont hardcode
