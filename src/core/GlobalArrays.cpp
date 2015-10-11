@@ -349,10 +349,10 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, double a
 
     // set algorithmic block size	
     Int nb = 96;
-    GemmAlgorithm alg = GEMM_SUMMA_A;
+    GemmAlgorithm alg = GEMM_SUMMA_B;
     
     const Orientation orientA = CharToOrientation( ((ta == 'T' || ta == 't') ? 'T' : 'N') );
-    const Orientation orientB = CharToOrientation( ((ta == 'T' || ta == 't') ? 'T' : 'N') );
+    const Orientation orientB = CharToOrientation( ((tb == 'T' || tb == 't') ? 'T' : 'N') );
     SetBlocksize( nb );
 
     T a = static_cast<T>( alpha );
@@ -679,12 +679,16 @@ void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]
     const Int i = lo[0];
     const Int j = lo[1];
 
-    T * buffer = reinterpret_cast<T *>(buf);
+    T * buffer = reinterpret_cast<T *>( buf );
     // create Matrix<T> for get
-    Matrix< T > A; 
-    A.Attach( height, width, buffer, ldim );
-    
+    Matrix< T > A (height, width); 
+    // get
     BXFER ('G', g_a, A, i, j);
+    T * inbuf = A.Buffer();
+
+    for (Int i = 0; i < width; i++)
+	for (Int j = 0; j < height; j++)
+	    buffer[i + j*ldim] = inbuf[i + j*ldim];
 }
  
 template<typename T>
