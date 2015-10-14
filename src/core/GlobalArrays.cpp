@@ -76,7 +76,8 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name)
 	// call rmainterface/dm constructor
 	RmaInterface< T > * rmaint = new RmaInterface< T >();
 	// create distmatrix over default grid, i.e mpi::COMM_WORLD
-	// using MC x MR distribution 
+	// using MC x MR distribution
+	// this won't be allocated until RmaInterface->Attach
 	DistMatrix< T > * DM = new DistMatrix< T  >( dims[0], dims[1] );
 
 	const Grid& grid = DM->Grid();
@@ -112,6 +113,8 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name)
 	// attach DM for RMA ops
 	DistMatrix< T > &D = *DM;
 	ga_handles[handle].rmaint->Attach( D );
+	// zero out allocated DM
+	Zeros (D, dims[0], dims[1]);
     }
     else // fetch-and-op
     {
@@ -127,6 +130,9 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name)
 	// push into vector
 	ga_handles.push_back( ga );
     }
+	
+    const Grid& grid = DefaultGrid();
+    mpi::Barrier( grid.VCComm() );
 
     return handle;
 }
@@ -188,7 +194,9 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 
 	// attach DM for RMA ops
 	DistMatrix< T > &D = *DM;
-	ga_handles[handle].rmaint->Attach( D );   
+	ga_handles[handle].rmaint->Attach( D );  
+	// zero out allocated DM
+	Zeros (D, dims[0], dims[1]);
     }
     else // fetch-and-op
     {
@@ -204,6 +212,9 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 	// push into vector
 	ga_handles.push_back( ga );
     }
+    
+    const Grid& grid = DefaultGrid();
+    mpi::Barrier( grid.VCComm() );
 
     return handle;
 }
@@ -664,9 +675,9 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void** ptr, Int 
 // locally blocking transfers
 #define BXFER(type, g_a, M, i, j) \
     do { \
+        ga_handles[g_a].pending_rma_op = true; \
 	switch (type) \
 	{ \
-            ga_handles[g_a].pending_rma_op = true; \
 	    case 'A': \
 		ga_handles[g_a].rmaint->Acc (M, i, j); \
 	        break; \
@@ -714,7 +725,6 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[
     if ( ga_handles[g_a].ndim == 1 )
        LogicError ("A 1D GA is not allowed for this operation");
 
-    T zero = static_cast<T> (0.0);
     T one = static_cast<T> (1.0);
     T * a;
 
@@ -723,15 +733,12 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[
     else
 	a = (T *)alpha;
     
-    T * buffer = (T *) buf;
+    T * buffer = reinterpret_cast<T *>( buf );
     
-    if (*a == zero) // no-op
-	return;
-
     // calculate local height and width
-    Int width = hi[1] - lo[1] + 1;
-    Int height = hi[0] - lo[0] + 1;
-    Int ldim = *ld;
+    const Int width = hi[1] - lo[1] + 1;
+    const Int height = hi[0] - lo[0] + 1;
+    const Int ldim = *ld;
 
     if (*a != one) // then a * buf
     {
@@ -749,7 +756,6 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], void* buf, Int ld[
 
     // Acc - (locally) blocking transfer
     BXFER ('A', g_a, A, i, j);		
-    ga_handles[g_a].rmaint->Flush (A);
 }
 
 template<typename T>
@@ -765,10 +771,10 @@ void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]
     if ( ga_handles[g_a].ndim == 1 )
        LogicError ("A 1D GA is not allowed for this operation");
 
-     // calculate height and width from lo and hi
-    Int width = hi[1] - lo[1] + 1;
-    Int height = hi[0] - lo[0] + 1;
-    Int ldim = *ld;
+    // calculate height and width from lo and hi
+    const Int width = hi[1] - lo[1] + 1;
+    const Int height = hi[0] - lo[0] + 1;
+    const Int ldim = *ld;
    
     const Int i = lo[0];
     const Int j = lo[1];
@@ -798,7 +804,6 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], void* buf, Int ld
     if ( ga_handles[g_a].ndim == 1 )
        LogicError ("A 1D GA is not allowed for this operation");
 
-    T zero = static_cast<T> (0.0);
     T one = static_cast<T> (1.0);
     T * a;
 
@@ -809,13 +814,10 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], void* buf, Int ld
     
     T * buffer = reinterpret_cast<T *>( buf );
 
-    if (*a == zero) // no-op
-	return;
-
     // calculate local height and width
-    Int width = hi[1] - lo[1] + 1;
-    Int height = hi[0] - lo[0] + 1;
-    Int ldim = *ld;
+    const Int width = hi[1] - lo[1] + 1;
+    const Int height = hi[0] - lo[0] + 1;
+    const Int ldim = *ld;
 
     if (*a != one) // then a * buf
     {
@@ -859,9 +861,9 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], void* buf, Int ld
     T * buffer = reinterpret_cast<T *>( buf ); 
 
     // calculate local height and width
-    Int width = hi[1] - lo[1] + 1;
-    Int height = hi[0] - lo[0] + 1;
-    Int ldim = *ld;
+    const Int width = hi[1] - lo[1] + 1;
+    const Int height = hi[0] - lo[0] + 1;
+    const Int ldim = *ld;
 
     // create a matrix
     Matrix< T > A;
@@ -928,9 +930,9 @@ void GlobalArrays< T >::NGA_Put(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]
     T * buffer = reinterpret_cast<T *>( buf );
 
     // calculate local height and width
-    Int width = hi[1] - lo[1] + 1;
-    Int height = hi[0] - lo[0] + 1;
-    Int ldim = *ld;
+    const Int width = hi[1] - lo[1] + 1;
+    const Int height = hi[0] - lo[0] + 1;
+    const Int ldim = *ld;
 
     // create a matrix
     Matrix< T > A;
