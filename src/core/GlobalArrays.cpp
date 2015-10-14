@@ -443,7 +443,7 @@ void GlobalArrays< T >::GA_Fill(Int g_a, void *value)
     if (value == NULL)
 	alpha = (T *)(&zero);
     else
-	alpha = (T *)(&value);
+	alpha = (T *)(value);
 
     if (ga_handles[g_a].ndim == 1)
     {
