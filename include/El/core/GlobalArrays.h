@@ -211,11 +211,11 @@ EL_EXPORT ElError ElGlobalArraysPut_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[]
 
 /* long GlobalArrays<T>::NGA_Read_inc(int g_a, int ndim, int subscript[], long inc);
  ----------------------------------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysReadIncrement_i( ElGlobalArrays_i A, ElInt g_a, ElInt ndim, 
+EL_EXPORT ElError ElGlobalArraysReadIncrement_i( ElGlobalArrays_i A, ElInt g_a, 
 	ElInt subscript[], ElInt inc, ElInt* prev );
-EL_EXPORT ElError ElGlobalArraysReadIncrement_s( ElGlobalArrays_s A, ElInt g_a, ElInt ndim, 
+EL_EXPORT ElError ElGlobalArraysReadIncrement_s( ElGlobalArrays_s A, ElInt g_a, 
 	ElInt subscript[], ElInt inc, ElInt* prev );
-EL_EXPORT ElError ElGlobalArraysReadIncrement_d( ElGlobalArrays_d A, ElInt g_a, ElInt ndim, 
+EL_EXPORT ElError ElGlobalArraysReadIncrement_d( ElGlobalArrays_d A, ElInt g_a,
 	ElInt subscript[], ElInt inc, ElInt* prev );
 
 #ifdef __cplusplus

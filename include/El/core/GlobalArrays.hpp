@@ -45,7 +45,7 @@ class GlobalArrays
 		Int  NGA_NbTest(ga_nbhdl_t* nbhandle);
 		void NGA_NbWait(ga_nbhdl_t* nbhandle);
 		void NGA_Put(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]); 
-		long NGA_Read_inc(Int g_a, Int ndim, Int subscript[], long inc);
+		long NGA_Read_inc(Int g_a, Int subscript[], long inc);
 
 		void GA_Symmetrize(Int g_a);
 		void GA_Transpose(Int g_a, Int g_b);
@@ -65,10 +65,17 @@ class GlobalArrays
 		    std::vector< Int >* ga_local_height;
 		    std::vector< Int >* ga_local_width;
 		    bool pending_rma_op;
+		    // this is only required when a DistMatrix
+		    // is not associated with GA, at present
+		    // this is the case with fetch-and-op
+		    Int ndim;
+		    Int length;
 		} GA;
 		
 		// vector of GA handles
 		std::vector < GA > ga_handles;
+		// MPI_Window for fetch-and-op/read-inc
+		mpi::Window fop_win;
 };
 #endif // EL_ENABLE_RMA_GLOBAL_ARRAYS
 } // namespace El

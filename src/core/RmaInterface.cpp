@@ -288,37 +288,6 @@ Int RmaInterface<T>::NextIndex(
     return numCreated;
 }
 
-// atomic operations
-// atomically update a cell and return it's previous value
-template<typename T>
-long RmaInterface<T>::CompareAndSwap( Int i, Int j, long incr )
-{
-    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::CompareAndSwap" ) )
-
-    if( i < 0 || j < 0 )
-        LogicError( "Submatrix offsets must be non-negative" );
-
-    if( !toBeAttachedForPut_ )
-        LogicError( "Global matrix cannot be updated" );
-
-    DistMatrix<T>& Y = *GlobalArrayPut_;
-    // owner of the cell
-    Int owner = Y.Owner (i, j);
-
-    // calculate offset
-    const Grid& g = Y.Grid();
-    const Int r = g.Height();
-    const Int c = g.Width();
-    const Int iLocalOffset = Length( i, Y.ColShift(), r );
-    const Int jLocalOffset = Length( j, Y.RowShift(), c );
-    const Int YLDim = Y.LDim();
-               
-    mpi::Aint disp = ( iLocalOffset + (jLocalOffset * YLDim) ) * sizeof( T );
-
-    // fetch and op
-    return mpi::ReadInc (window, disp, incr, owner);
-}
-
 // request based RMA operations
 template<typename T>
 void RmaInterface<T>::Rput( const Matrix<T>& Z, Int i, Int j )

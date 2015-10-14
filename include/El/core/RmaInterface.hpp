@@ -55,7 +55,6 @@ public:
     void Racc( const Matrix<T>& Z, Int i, Int j );
 
     // atomic routines
-    long CompareAndSwap (Int i, Int j, long incr);
 
     // Synchronization routines
     void Flush(            Matrix<T>& Z );
