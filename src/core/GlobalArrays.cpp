@@ -196,7 +196,7 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 	DistMatrix< T > &D = *DM;
 	ga_handles[handle].rmaint->Attach( D );  
 	// zero out allocated DM
-	Zeros (D, dims[0], dims[1]);
+	Zeros (D, dim[0], dim[1]);
     }
     else // fetch-and-op
     {
