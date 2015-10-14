@@ -447,7 +447,7 @@ void GlobalArrays< T >::GA_Fill(Int g_a, void *value)
 
     if (ga_handles[g_a].ndim == 1)
     {
-	T * fop_base = reinterpret_cast<T *>( GetWindowBase( fop_win ) );
+	T * fop_base = reinterpret_cast<T *>( mpi::GetWindowBase( fop_win ) );
 	for (Int i = 0; i < ga_handles[g_a].length; i++) fop_base[i] = *alpha;
     }
     else
