@@ -114,7 +114,7 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name)
 	DistMatrix< T > &D = *DM;
 	ga_handles[handle].rmaint->Attach( D );
 	// zero out allocated DM
-	Zeros (D, dims[0], dims[1]);
+	//Zeros (D, dims[0], dims[1]);
     }
     else // fetch-and-op
     {
@@ -196,7 +196,7 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 	DistMatrix< T > &D = *DM;
 	ga_handles[handle].rmaint->Attach( D );  
 	// zero out allocated DM
-	Zeros (D, dim[0], dim[1]);
+	//Zeros (D, dim[0], dim[1]);
     }
     else // fetch-and-op
     {
@@ -957,10 +957,10 @@ long GlobalArrays< T >::NGA_Read_inc(Int g_a, Int subscript[], long inc)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
     if (g_a < 0 || g_a > ga_handles.size())
 	LogicError ("Invalid GA handle");
-    if (*(subscript) < 0 || *(subscript) > ga_handles[g_a].length)
-	LogicError ("Invalid subscript for read increment operation");
     if ( ga_handles[g_a].ndim > 1 )
        LogicError ("A 2-D GA is not allowed for this operation");
+    if (*(subscript) < 0 || *(subscript) > ga_handles[g_a].length)
+	LogicError ("Invalid subscript for read increment operation");
 
     // rank 0 is FOP root
     long prev = mpi::ReadInc( fop_win, *(subscript), inc, 0 );
