@@ -317,11 +317,10 @@ void RmaInterface<T>::Rput( const Matrix<T>& Z, Int i, Int j )
     const Int XLDim = Z.LDim();
     // local matrix width and height
     const Int height = Z.Height();
+    const Int dm_height = Y.Height();
     const Int width = Z.Width();
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
-    const Int iLocalOffset = Length( i, Y.ColShift(), r );
-    const Int jLocalOffset = Length( j, Y.RowShift(), c );
     const Int YLDim = Y.LDim();
     const T* XBuffer = Z.LockedBuffer();
     const void* Buffer = static_cast<void*>( const_cast<T*>( Z.LockedBuffer() ) );
@@ -334,9 +333,9 @@ void RmaInterface<T>::Rput( const Matrix<T>& Z, Int i, Int j )
         // number of entries in my PE
         const Int localHeight = Length( height, colShift, r );
         const Int localWidth = Length( width, rowShift, c );
-        const Int numEntries = localHeight * localWidth;
+        const Int numEntries = localHeight * localWidth;    
 
-        if( numEntries != 0 )
+	if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
             const Int index =
@@ -348,7 +347,19 @@ void RmaInterface<T>::Rput( const Matrix<T>& Z, Int i, Int j )
             DEBUG_ONLY( if
                         ( Int( matrices_[matrix_index].data_[destination][index].size() ) !=
                           numEntries ) LogicError( "Error in NextIndex" ); )
-                T* sendBuffer = reinterpret_cast<T*>( matrices_[matrix_index].data_[destination][index].data() );
+            T* sendBuffer = reinterpret_cast<T*>( matrices_[matrix_index].data_[destination][index].data() );
+	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
+	    Int iMapped, jMapped;
+	    if (remoteHeight == dm_height) // 1-D process grid, each PE gets a column strip
+	    {
+		iMapped = i; 
+		jMapped = ( j / c );
+	    }
+	    else // 2-D process grid 
+	    {
+		iMapped = ( i / r ); 
+		jMapped = ( j / c );
+	    }
 
             for( Int t=0; t<localWidth; ++t )
             {
@@ -357,13 +368,11 @@ void RmaInterface<T>::Rput( const Matrix<T>& Z, Int i, Int j )
 
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
-
-                // put
-                mpi::Aint disp = ( iLocalOffset + ( jLocalOffset+t ) * YLDim ) * sizeof( T );
-                mpi::Rput( &sendBuffer[t*localHeight], localHeight,
-                           destination, disp, localHeight, window,
-                           matrices_[matrix_index].requests_[destination][index] );
-            }
+            }    
+	    // put
+	    mpi::Aint disp = (iMapped + jMapped * remoteHeight) * sizeof( T );
+	    mpi::Rput( sendBuffer, numEntries, destination, 
+		    disp, numEntries, window, matrices_[matrix_index].requests_[destination][index] );
         }
 
         receivingRow = ( receivingRow + 1 ) % r;
@@ -409,13 +418,12 @@ void RmaInterface<T>::Racc( const Matrix<T>& Z, Int i, Int j )
     const Int XLDim = Z.LDim();
     const Int YLDim = Y.LDim();
     // local matrix width and height
+    const Int dm_height = Y.Height();
     const Int height = Z.Height();
     const Int width = Z.Width();
     const T* XBuffer = Z.LockedBuffer();
     const void* Buffer = static_cast <void*>( const_cast <T*>( Z.LockedBuffer() ) );
     Int matrix_index;
-    const Int iLocalOffset = Length( i, Y.ColShift(), r );
-    const Int jLocalOffset = Length( j, Y.RowShift(), c );
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
 
@@ -440,7 +448,21 @@ void RmaInterface<T>::Racc( const Matrix<T>& Z, Int i, Int j )
             DEBUG_ONLY( if
                         ( Int( matrices_[matrix_index].data_[destination][index].size() ) !=
                           numEntries ) LogicError( "Error in NextIndex" ); )
-                T* sendBuffer = reinterpret_cast<T*>( matrices_[matrix_index].data_[destination][index].data() );
+            
+	    T* sendBuffer = reinterpret_cast<T*>( matrices_[matrix_index].data_[destination][index].data() );
+	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
+
+	    Int iMapped, jMapped;
+	    if (remoteHeight == dm_height) // 1-D process grid, each PE gets a column strip
+	    {
+		iMapped = i; 
+		jMapped = ( j / c );
+	    }
+	    else // 2-D process grid 
+	    {
+		iMapped = ( i / r ); 
+		jMapped = ( j / c );
+	    }
 
             for( Int t=0; t<localWidth; ++t )
             {
@@ -449,13 +471,11 @@ void RmaInterface<T>::Racc( const Matrix<T>& Z, Int i, Int j )
 
                 for( Int s=0; s<localHeight; ++s )
                     thisSendCol[s] = thisXCol[colShift+s*r];
-
-                // acc
-                mpi::Aint disp = ( iLocalOffset + ( jLocalOffset+t ) * YLDim ) * sizeof( T );
-                mpi::Racc( &sendBuffer[t*localHeight], localHeight,
-                           destination, disp, localHeight, window,
-                           matrices_[matrix_index].requests_[destination][index] );
             }
+	    // acc
+	    mpi::Aint disp = (iMapped + jMapped * remoteHeight) * sizeof( T );
+	    mpi::Racc( sendBuffer, numEntries, destination, 
+		    disp, numEntries, window, matrices_[matrix_index].requests_[destination][index] );
         }
 
         receivingRow = ( receivingRow + 1 ) % r;
@@ -536,6 +556,7 @@ void RmaInterface<T>::Put( const Matrix<T>& Z, Int i, Int j )
 		iMapped = ( i / r ); 
 		jMapped = ( j / c );
 	    }
+
             for( Int t=0; t<localWidth; ++t )
             {
                 T* thisSendCol = &sendBuffer[t*localHeight];
