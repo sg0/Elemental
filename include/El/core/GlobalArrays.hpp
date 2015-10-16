@@ -35,7 +35,7 @@ class GlobalArrays
 
 		void NGA_Distribution(Int g_a, Int iproc, Int lo[], Int hi[]);
 		void NGA_Inquire(Int g_a, Int * ndim, Int dims[]);
-		void NGA_Access(Int g_a, Int lo[], Int hi[], void **ptr, Int ld[]);
+		void NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[]);
 		
 		void NGA_Acc(Int g_a, Int lo[], Int hi[],void* buf,Int ld[],void* alpha);
 		void NGA_Get(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]); 

@@ -71,8 +71,8 @@ extern "C" {
   /* void GlobalArrays<T>::GA_Transpose(int g_a, int g_b) */ \
   ElError ElGlobalArraysTranspose_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt g_b ) \
   { EL_TRY( CReflect(A)->GA_Transpose(g_a, g_b) ) } \
-  /* void GlobalArrays<T>::NGA_Access(int g_a, int lo[], int hi[], T **ptr, int ld[]) */ \
-  ElError ElGlobalArraysAccess_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], ElInt hi[], void** ptr, ElInt ld[] ) \
+  /* void GlobalArrays<T>::NGA_Access(int g_a, int lo[], int hi[], T ** ptr, int ld[]) */ \
+  ElError ElGlobalArraysAccess_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], ElInt hi[], CREFLECT(T)** ptr, ElInt ld[] ) \
   { EL_TRY( CReflect(A)->NGA_Access(g_a, lo, hi, ptr, ld) ) } \
   /* void GlobalArrays<T>::NGA_Distribution(int g_a, int iproc, int lo[], int hi[]) */ \
   ElError ElGlobalArraysDistribution_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt iproc, ElInt lo[], ElInt hi[] ) \

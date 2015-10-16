@@ -958,7 +958,7 @@ void RmaInterface<T>::LocalFlush()
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::LocalFlush" ) )
 
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-        LogicError( "Must initiate transfer before flushing." );
+	LogicError( "Must initiate transfer before flushing." );
 
     mpi::FlushLocal( window );
 }
@@ -971,7 +971,7 @@ void RmaInterface<T>::LocalFlush( Matrix<T>& Z )
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::LocalFlush" ) )
 
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-        LogicError( "Must initiate transfer before flushing." );
+	LogicError( "Must initiate transfer before flushing." );
 
     // if there are no request based RMA pending
     // for Z, then this functions acts like Flush
@@ -992,7 +992,7 @@ void RmaInterface<T>::Flush( Matrix<T>& Z )
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Flush" ) )
 
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-        LogicError( "Must initiate transfer before flushing." );
+	LogicError( "Must initiate transfer before flushing." );
 
     mpi::Flush( window );
 }
@@ -1003,7 +1003,7 @@ void RmaInterface<T>::Flush()
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Flush" ) )
 
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-        LogicError( "Must initiate transfer before flushing." );
+	LogicError( "Must initiate transfer before flushing." );
 
     mpi::Flush( window );
 }
@@ -1099,7 +1099,7 @@ void RmaInterface<T>::Wait( Matrix<T>& Z )
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Wait" ) )
 
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-        LogicError( "Must initiate transfer at first." );
+	LogicError( "Must initiate transfer at first." );
 
     const Grid& g = ( toBeAttachedForPut_ ?
                       GlobalArrayPut_->Grid() :
@@ -1147,7 +1147,7 @@ void RmaInterface<T>::Waitall()
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Waitall" ) )
 
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-        LogicError( "Must initiate transfer at first." );
+	LogicError( "Must initiate transfer at first." );
 
     const Grid& g = ( toBeAttachedForPut_ ?
                       GlobalArrayPut_->Grid() :

@@ -626,8 +626,8 @@ void GlobalArrays< T >::NGA_Distribution( Int g_a, Int iproc, Int lo[], Int hi[]
     }
     else
     {
-	hi[0] = local_height;
-	hi[1] = local_width;
+	hi[0] = local_height - 1;
+	hi[1] = local_width - 1;
 	lo[0] = 0;
 	lo[1] = 0;
     }
@@ -653,7 +653,7 @@ void GlobalArrays< T >::NGA_Inquire( Int g_a, Int * ndim, Int dims[] )
 
 // accesses data locally allocated for a global array    
 template<typename T>
-void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void** ptr, Int ld[])
+void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Access" ) )
     if (!ga_initialized)
@@ -666,9 +666,9 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], void** ptr, Int 
 	LogicError("Invalid coordinate axes");
 
     DistMatrix< T >&Y = *(ga_handles[g_a].DM);
-    T ** buffer = reinterpret_cast<T **>( ptr );
+    *ld = Max( Y.LocalHeight(), 1 );
     // pointer to local portion of DM
-    *buffer = Y.Buffer();
+    *ptr = Y.Buffer();
 }
 
 // transfers
