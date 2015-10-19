@@ -789,6 +789,7 @@ void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]
     for (Int i = 0; i < width; i++)
 	for (Int j = 0; j < height; j++)
 	    buffer[i + j*ldim] = inbuf[i + j*ldim];
+    ga_handles[g_a].pending_rma_op = false;
 }
  
 template<typename T>
