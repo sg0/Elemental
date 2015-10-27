@@ -1398,10 +1398,6 @@ void RmaInterface<T>::Detach()
     // data window
     mpi::WindowUnlock( window );
     mpi::WindowFree( window );
-    
-    // fop window
-    mpi::WindowUnlock( fop_window );
-    mpi::WindowFree( fop_window );
 }
 
 #define PROTO(T) template class RmaInterface<T>;
