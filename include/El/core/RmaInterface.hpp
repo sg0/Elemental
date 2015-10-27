@@ -56,6 +56,10 @@ public:
 
     // atomic routines
 
+    // element-wise atomic increment, returns
+    // previous value held in (i, j)
+    T AtomicIncrement( Int i, Int j, T incr );
+
     // Synchronization routines
     void Flush(            Matrix<T>& Z );
     void Flush(      const Matrix<T>& Z );
@@ -79,8 +83,9 @@ public:
     void Detach();
 
 private:
+    // window for data
     mpi::Window window;
-    
+
     // struct for passing data
     // for request based rma
     struct matrix_params_
@@ -99,7 +104,7 @@ private:
     // buffers for rma 
     std::vector<std::deque<std::vector<T>>>
         getVector_, putVector_;
-
+    
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     const DistMatrix<T,MC,MR>* GlobalArrayGet_;
     

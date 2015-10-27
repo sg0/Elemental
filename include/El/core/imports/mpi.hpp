@@ -87,27 +87,7 @@ typedef enum
 	NO_ACC_ORDERING 	= 4
 } acc_order_t;
 #endif
-// for ddt
-#ifdef EL_USE_DERIVED_DATATYPE
-typedef struct El_strided_s
-{
-    unsigned num;
-    size_t* sizes;
-    MPI_Aint* offsets;
-} El_strided_t;
-typedef struct El_iov_s
-{
-    unsigned count;
-    size_t* sizes;
-    MPI_Aint* offsets;
-} El_iov_t;
-typedef enum
-{
-	FIXED_BLOCK_FIXED_STRIDE	= 1,
-	FIXED_BLOCK_VAR_STRIDE		= 2,
-	UNKNOWN_BLOCK_STRIDE		= 4
-} vector_pattern_t;
-#endif
+
 typedef MPI_Info Info;
 // Standard constants
 const int ANY_SOURCE = MPI_ANY_SOURCE;
@@ -211,30 +191,10 @@ void Translate
 ( Comm origComm, int size, const int* origRanks, 
   Comm newComm,                  int* newRanks );
 
-// Derived datatype
-// ================
-#ifdef EL_USE_DERIVED_DATATYPE
-// strided/vector to datatype
-void StridedDatatype (El_strided_t* stride_descr,
-	mpi::Datatype old_type, mpi::Datatype* new_type,
-	size_t* source_dims);
-void VectorDatatype (El_iov_t * vect_descr,
-	mpi::Datatype old_type, mpi::Datatype * new_type,
-	vector_pattern_t data_pattern);
-#endif // EL_USE_DERIVED_DATATYPE
 // MPI-3 one-sided
 // ===============
 #if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
-// Utilities
-// ---------
-void SetWindowProp ( Window& window, int prop );
-void CheckBounds ( Window & window, mpi::Datatype win_type, mpi::Datatype type, 
-size_t count, ptrdiff_t target_offset );
-#ifdef EL_EXPLICIT_PROGRESS
-void Progress ( Comm comm );
-#endif
-long ReadInc (Window & win, Aint offset, 
-	long inc, int fop_root = 0);
+
 // Window creation/update/delete
 // -----------------------------
 void WindowLock( int rank, Window & window );
@@ -245,6 +205,16 @@ void WindowCreate( void * baseptr, int size, Comm comm, Window & window );
 void WindowAllocate( int count, Comm comm, Window & window );    
 void * GetWindowBase( Window & window );
 void WindowFree (Window& window);
+
+// Atomic operations
+// -----------------
+template<typename R>
+R ReadInc (Window & win, Aint offset, 
+	R inc, int fop_root = 0);
+template<typename R>
+Complex<R> ReadInc (Window & win, Aint offset, 
+	Complex<R> inc, int fop_root = 0);
+
 // One-sided operations
 // --------------------
 // put

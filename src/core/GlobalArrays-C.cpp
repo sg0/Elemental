@@ -112,8 +112,8 @@ extern "C" {
   { EL_TRY( CReflect(A)->NGA_Put(g_a, lo, hi, CReflect(ptr), ld) ) } \
   /* long GlobalArrays<T>::NGA_Read_inc(int g_a, int ndim, int subscript[], long inc) */ \
   ElError ElGlobalArraysReadIncrement_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, \
-	  ElInt subscript[], ElInt inc, ElInt* prev ) \
-  { EL_TRY( *prev = CReflect(A)->NGA_Read_inc(g_a, subscript, inc) ) } \
+	  ElInt subscript[], CREFLECT(T) inc, CREFLECT(T)* prev ) \
+  { EL_TRY( *prev = CReflect(A)->NGA_Read_inc( g_a, subscript, CReflect(inc) ) ) } \
 
 #define C_PROTO(SIG,SIGBASE,T) \
   GA_BASE(SIG,SIGBASE,T) \

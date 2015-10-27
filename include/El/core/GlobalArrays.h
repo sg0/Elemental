@@ -214,9 +214,9 @@ EL_EXPORT ElError ElGlobalArraysPut_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[]
 EL_EXPORT ElError ElGlobalArraysReadIncrement_i( ElGlobalArrays_i A, ElInt g_a, 
 	ElInt subscript[], ElInt inc, ElInt* prev );
 EL_EXPORT ElError ElGlobalArraysReadIncrement_s( ElGlobalArrays_s A, ElInt g_a, 
-	ElInt subscript[], ElInt inc, ElInt* prev );
+	ElInt subscript[], float inc, float* prev );
 EL_EXPORT ElError ElGlobalArraysReadIncrement_d( ElGlobalArrays_d A, ElInt g_a,
-	ElInt subscript[], ElInt inc, ElInt* prev );
+	ElInt subscript[], double inc, double* prev );
 
 #ifdef __cplusplus
 } // extern "C"

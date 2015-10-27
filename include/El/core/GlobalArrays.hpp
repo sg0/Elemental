@@ -45,7 +45,8 @@ class GlobalArrays
 		Int  NGA_NbTest(ga_nbhdl_t* nbhandle);
 		void NGA_NbWait(ga_nbhdl_t* nbhandle);
 		void NGA_Put(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]); 
-		long NGA_Read_inc(Int g_a, Int subscript[], long inc);
+		
+		T NGA_Read_inc(Int g_a, Int subscript[], T inc);
 
 		void GA_Symmetrize(Int g_a);
 		void GA_Transpose(Int g_a, Int g_b);
@@ -55,7 +56,7 @@ class GlobalArrays
 	private:
 		bool ga_initialized;
 	
-		typedef struct GA_t
+		struct GA
 		{
 		    // distmatrix_mc_mr instance
 		    DistMatrix   < T >* DM;     
@@ -70,12 +71,24 @@ class GlobalArrays
 		    // this is the case with fetch-and-op
 		    Int ndim;
 		    Int length;
-		} GA;
+		    // MPI_Window for fetch-and-op/read-inc
+		    // for 1D GA
+		    mpi::Window fop_win;
+		};
+
+		GA init_GA = {
+		      nullptr,      // DM
+		      nullptr,      // RMA interface
+	              nullptr,      // local height
+		      nullptr,      // local width
+		      false,        // pending_rma_op
+		      -1,           // ndim
+		      -1,           // length
+		      mpi::WIN_NULL // fop_win
+		};
 		
 		// vector of GA handles
 		std::vector < GA > ga_handles;
-		// MPI_Window for fetch-and-op/read-inc
-		mpi::Window fop_win;
 };
 #endif // EL_ENABLE_RMA_GLOBAL_ARRAYS
 } // namespace El

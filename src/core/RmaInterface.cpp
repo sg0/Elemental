@@ -23,7 +23,7 @@ template<typename T>
 RmaInterface<T>::RmaInterface()
     : GlobalArrayPut_( 0 ), GlobalArrayGet_( 0 ),
       matrices_( 0 ), 
-      window( MPI_WIN_NULL ),
+      window( mpi::WIN_NULL ),
       putVector_( 0 ), getVector_( 0 ),
       toBeAttachedForPut_( false ), toBeAttachedForGet_( false ),
       attached_( false ), detached_( true )
@@ -39,7 +39,7 @@ RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
     toBeAttachedForPut_ 	= false;
     GlobalArrayPut_ 		= 0;
     GlobalArrayGet_ 		= 0;
-    window 		        = MPI_WIN_NULL;
+    window 		        = mpi::WIN_NULL;
 }
 
 // until attach, I am not setting anything
@@ -55,7 +55,7 @@ RmaInterface<T>::RmaInterface( const DistMatrix<T>& X )
     toBeAttachedForPut_ 	= false;
     GlobalArrayPut_ 		= 0;
     GlobalArrayGet_ 		= 0;
-    window 	    		= MPI_WIN_NULL;
+    window 	    		= mpi::WIN_NULL;
 }
 
 template<typename T>
@@ -138,12 +138,13 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
         const Int bufferSize = numEntries * sizeof( T );
 	
 	mpi::WindowAllocate( bufferSize, g.VCComm(), window );
-        T * baseptr = reinterpret_cast< T *>( mpi::GetWindowBase( window ) );
+       
+	T * baseptr = reinterpret_cast< T *>( mpi::GetWindowBase( window ) );
 	Z.SetWindowBase( baseptr );
 
 	mpi::WindowLock( window );
 #endif
-    mpi::Barrier( g.VCComm() );
+	mpi::Barrier( g.VCComm() );
     }
 }
 
@@ -1320,6 +1321,48 @@ bool RmaInterface<T>::Testall()
     return true;
 }
 
+// atomic operations
+template<typename T>
+T RmaInterface<T>::AtomicIncrement( Int i, Int j, T incr )
+{
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::AtomicIncrement" ) )
+
+    if( i < 0 || j < 0 )
+        LogicError( "Submatrix offsets must be non-negative" );
+
+    if( !toBeAttachedForPut_ )
+        LogicError( "Global matrix cannot be updated" );
+
+    DistMatrix<T>& Y = *GlobalArrayPut_;
+    const Grid& g = Y.Grid();
+    const Int r = g.Height();
+    const Int c = g.Width();
+    const Int dm_height = Y.Height();
+    // owner of the cell
+    const Int owner = Y.Owner (i, j);
+    // calculate height of owner to calculate remote 
+    // displacement for RMA
+    const Int remoteHeight = Length( dm_height, Y.RowOwner( i ), Y.ColAlign(), r );
+    Int iMapped, jMapped;
+    if (remoteHeight == dm_height) // 1-D process grid, each PE gets a column strip
+    {
+	iMapped = i; 
+	jMapped = ( j / c );
+    }
+    else // 2-D process grid 
+    {
+	iMapped = ( i / r ); 
+	jMapped = ( j / c );
+    }
+
+    // displacement
+    mpi::Aint disp = (iMapped + jMapped * remoteHeight) * sizeof( T );
+    // fetch from owner and increment using MPI-3 fetch-and-op
+    T value = mpi::ReadInc( window, disp, incr, owner );
+
+    return value;
+}
+
 template<typename T>
 void RmaInterface<T>::Detach()
 {
@@ -1352,8 +1395,13 @@ void RmaInterface<T>::Detach()
     
     matrices_.clear();
     
+    // data window
     mpi::WindowUnlock( window );
     mpi::WindowFree( window );
+    
+    // fop window
+    mpi::WindowUnlock( fop_window );
+    mpi::WindowFree( fop_window );
 }
 
 #define PROTO(T) template class RmaInterface<T>;
