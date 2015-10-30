@@ -27,7 +27,7 @@ class GlobalArrays
 		/* Check if Detach was called already on rmainterface objects, and erase ga_handles */
 		void GA_Terminate();	
 
-		void GA_Fill(Int g_a, void *value);
+		void GA_Fill(Int g_a, T *value);
 		void GA_Copy(Int g_a, Int g_b); 
 		void GA_Sync();
 		void GA_Gop(T x[], Int n, char op);
@@ -37,20 +37,20 @@ class GlobalArrays
 		void NGA_Inquire(Int g_a, Int * ndim, Int dims[]);
 		void NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[]);
 		
-		void NGA_Acc(Int g_a, Int lo[], Int hi[],void* buf,Int ld[],void* alpha);
-		void NGA_Get(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]); 
-		void NGA_NbAcc(Int g_a,Int lo[], Int hi[],void* buf,Int ld[],void* alpha, ga_nbhdl_t* nbhandle);
-		void NGA_NbGet(Int g_a, Int lo[], Int hi[], void* buf, Int ld[], ga_nbhdl_t* nbhandle);
-		void NGA_NbPut(Int g_a, Int lo[], Int hi[], void* buf, Int ld[], ga_nbhdl_t* nbhandle);
+		void NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], T* alpha);
+		void NGA_Get(Int g_a, Int lo[], Int hi[], T* buf, Int ld[]); 
+		void NGA_NbAcc(Int g_a,Int lo[], Int hi[], T* buf, Int ld[], T* alpha, ga_nbhdl_t* nbhandle);
+		void NGA_NbGet(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], ga_nbhdl_t* nbhandle);
+		void NGA_NbPut(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], ga_nbhdl_t* nbhandle);
 		Int  NGA_NbTest(ga_nbhdl_t* nbhandle);
 		void NGA_NbWait(ga_nbhdl_t* nbhandle);
-		void NGA_Put(Int g_a, Int lo[], Int hi[], void* buf, Int ld[]); 
+		void NGA_Put(Int g_a, Int lo[], Int hi[], T* buf, Int ld[]); 
 		
 		T NGA_Read_inc(Int g_a, Int subscript[], T inc);
 
 		void GA_Symmetrize(Int g_a);
 		void GA_Transpose(Int g_a, Int g_b);
-		void GA_Add(void *alpha, Int g_a, void* beta, Int g_b, Int g_c); 
+		void GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c); 
 		void GA_Dgemm(char ta, char tb, Int m, Int n, Int k, double alpha, Int g_a, Int g_b, double beta, Int g_c );
 
 	private:

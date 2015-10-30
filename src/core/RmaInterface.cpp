@@ -201,6 +201,8 @@ Int RmaInterface<T>::NextIndex
     const Int numCreated = dataVectors.size();
     dataVectors.resize( numCreated + 1 );
     dataVectors[numCreated].resize( dataSize );
+    // fill with 0s
+    std::fill(dataVectors[numCreated].begin(), dataVectors[numCreated].end(), 0);
     return numCreated;
 }
 
@@ -590,6 +592,95 @@ template<typename T>
 void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Acc" ) )
+    if( i < 0 || j < 0 )
+        LogicError( "Submatrix offsets must be non-negative" );
+
+    if( !toBeAttachedForPut_ )
+        LogicError( "Global matrix cannot be updated" );
+
+    DistMatrix<T>& Y = *GlobalArrayPut_;
+
+    //do rma related checks
+    if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
+        LogicError( "Submatrix out of bounds of global matrix" );
+
+    const Grid& g = Y.Grid();
+    const Int r = g.Height();
+    const Int c = g.Width();
+    const Int p = g.Size();
+    const Int myProcessRow = g.Row();
+    const Int myProcessCol = g.Col();
+    const Int colAlign = ( Y.ColAlign() + i ) % r;
+    const Int rowAlign = ( Y.RowAlign() + j ) % c;
+    const Int ZLDim = Z.LDim();
+    // local matrix width and height
+    const Int dm_height = Y.Height();
+    const Int height = Z.Height();
+    const Int width = Z.Width();
+    Int receivingRow = myProcessRow;
+    Int receivingCol = myProcessCol;
+    const Int YLDim = Y.LDim();
+    const T* XBuffer = Z.LockedBuffer();
+
+    for( Int step=0; step<p; ++step )
+    {
+        const Int colShift = Shift( receivingRow, colAlign, r );
+        const Int rowShift = Shift( receivingCol, rowAlign, c );
+        // number of entries in my PE
+        const Int localHeight = Length( height, colShift, r );
+        const Int localWidth = Length( width, rowShift, c );
+        const Int numEntries = localHeight * localWidth;
+
+        if( numEntries != 0 )
+        {
+            const Int destination = receivingRow + r*receivingCol;
+            const Int index =
+                NextIndex( numEntries,
+                           putVector_[destination] );
+            T* sendBuffer = putVector_[destination][index].data();
+	    //const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
+	    const Int remoteHeight = Length( dm_height, receivingRow, colAlign, r );
+
+	    Int iMapped, jMapped;
+	    if (remoteHeight == dm_height) // 1-D process grid, each PE gets a column strip
+	    {
+		iMapped = i; 
+		jMapped = ( j / c );
+	    }
+	    else // 2-D process grid 
+	    {
+		iMapped = ( i / r ); 
+		jMapped = ( j / c );
+	    }
+	    
+            for( Int t = 0; t < localWidth; ++t )
+            {
+                T* thisSendCol = &sendBuffer[t * localHeight];
+                const T* thisXCol = &XBuffer[( rowShift + t * c ) * ZLDim];
+
+                for( Int s = 0; s < localHeight; ++s )
+                    thisSendCol[s] = thisXCol[colShift + s * r];
+            }
+	    
+	    // acc
+	    mpi::Aint disp = (iMapped + jMapped * remoteHeight) * sizeof( T );
+	    mpi::Iacc( sendBuffer, numEntries, destination, disp, numEntries, window );
+	    mpi::FlushLocal( destination, window );
+        }
+            
+        receivingRow = ( receivingRow + 1 ) % r;
+
+        if( receivingRow == 0 )
+            receivingCol = ( receivingCol + 1 ) % c;
+    }
+}
+
+
+#if 0
+template<typename T>
+void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
+{
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Acc" ) )
 
     if( !toBeAttachedForPut_ )
         LogicError( "Global matrix cannot be updated." );
@@ -652,14 +743,15 @@ void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
 		jMapped = ( j / c );
 	    }
 
-	    for( Int t = 0; t < localWidth; ++t )
-	    {
-		T* thisSendCol = &sendBuffer[t*localHeight];
-		const T* thisXCol = &XBuffer[( rowShift+t*c )*XLDim];
+	    for( Int t=0; t<localWidth; ++t )
+            {
+                T* thisSendCol = &sendBuffer[t*localHeight];
+                const T* thisXCol = &XBuffer[( rowShift+t*c )*XLDim];
 
-		for( Int s = 0; s < localHeight; ++s )
-		    thisSendCol[s] = thisXCol[colShift+s*r];	    	    
+                for( Int s=0; s<localHeight; ++s )
+                    thisSendCol[s] = thisXCol[colShift+s*r];
 	    }
+	    
 	    // acc
 	    mpi::Aint disp = (iMapped + jMapped * remoteHeight) * sizeof( T );
 	    mpi::Iacc( sendBuffer, numEntries, destination, disp, numEntries, window );
@@ -672,6 +764,7 @@ void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
             receivingCol = ( receivingCol + 1 ) % c;
     }
 }
+#endif
 
 template<typename T>
 void RmaInterface<T>::Acc( Matrix<T>& Z, Int i, Int j )

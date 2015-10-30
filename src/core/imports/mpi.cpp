@@ -408,6 +408,9 @@ void Translate
 #if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
 // Window management
 // -----------------
+#ifndef EL_NO_ACC_ORDERING
+#define EL_NO_ACC_ORDERING
+#endif
 void SetWindowProp (Window & window, int prop)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::SetWindowProp"))
@@ -478,6 +481,12 @@ void WindowCreate (void *baseptr, int size, Comm comm, Window & window)
 void WindowFree (Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::WindowFree"))
+    // free any associated info objects
+#ifdef EL_NO_ACC_ORDERING
+    Info info;
+    SafeMpi (MPI_Win_get_info(window, &info));
+    SafeMpi (MPI_Info_free(&info));
+#endif
     SafeMpi (MPI_Win_free (&window));
 }
 
@@ -1001,7 +1010,7 @@ void Iacc (const R* source, int origin_count, int target_rank,
            Aint disp, int target_count, Op op, Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
-	
+
     SafeMpi (MPI_Accumulate
              (source, origin_count,
               TypeMap<R>(), target_rank, disp,
@@ -1117,7 +1126,7 @@ template<typename R>
 void Iacc (const R* source, int origin_count, int target_rank,
            Aint disp, int target_count, Window & window)
 {
-    Iacc ( source, origin_count, target_rank, disp, target_count, SUM, window );
+    Iacc ( source, origin_count, target_rank, disp, target_count, mpi::SUM, window );
 }
 
 template<typename R>
@@ -1125,7 +1134,7 @@ void Racc (const R* source, int origin_count, int target_rank,
            Aint disp, int target_count, Window & window,
            Request & request)
 {
-    Racc ( source, origin_count, target_rank, disp, target_count, SUM, window, request );
+    Racc ( source, origin_count, target_rank, disp, target_count, mpi::SUM, window, request );
 }
 
 template void Iacc (const byte* source, int origin_count, int target_rank,

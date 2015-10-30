@@ -59,9 +59,9 @@ EL_EXPORT ElError ElGlobalArraysDestroy_d( ElGlobalArrays_d A, ElInt g_a );
 
 /* void GlobalArrays<T>::GA_Add(void *alpha, int g_a, void* beta, int g_b, int g_c); 
    ---------------------------------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysAdd_i( ElGlobalArrays_i A, void* alpha, ElInt g_a, void* beta, ElInt g_b, ElInt g_c );
-EL_EXPORT ElError ElGlobalArraysAdd_s( ElGlobalArrays_s A, void* alpha, ElInt g_a, void* beta, ElInt g_b, ElInt g_c );
-EL_EXPORT ElError ElGlobalArraysAdd_d( ElGlobalArrays_d A, void* alpha, ElInt g_a, void* beta, ElInt g_b, ElInt g_c );
+EL_EXPORT ElError ElGlobalArraysAdd_i( ElGlobalArrays_i A, ElInt* alpha, ElInt g_a, ElInt* beta, ElInt g_b, ElInt g_c );
+EL_EXPORT ElError ElGlobalArraysAdd_s( ElGlobalArrays_s A, float* alpha, ElInt g_a, float* beta, ElInt g_b, ElInt g_c );
+EL_EXPORT ElError ElGlobalArraysAdd_d( ElGlobalArrays_d A, double* alpha, ElInt g_a, double* beta, ElInt g_b, ElInt g_c );
 
 /* T GlobalArrays<T>::GA_Dot(int g_a, int g_b); 
    ---------------------------------------------------------------- */
@@ -97,9 +97,9 @@ EL_EXPORT ElError ElGlobalArraysOp_d( ElGlobalArrays_d A, double x[], ElInt n,  
 
 /* void GlobalArrays<T>::GA_Fill(int g_a, void *value);
  -------------------------------------- */
-EL_EXPORT ElError ElGlobalArraysFill_i( ElGlobalArrays_i A, ElInt g_a, void* value );
-EL_EXPORT ElError ElGlobalArraysFill_s( ElGlobalArrays_s A, ElInt g_a, void* value );
-EL_EXPORT ElError ElGlobalArraysFill_d( ElGlobalArrays_d A, ElInt g_a, void* value );
+EL_EXPORT ElError ElGlobalArraysFill_i( ElGlobalArrays_i A, ElInt g_a, ElInt* value );
+EL_EXPORT ElError ElGlobalArraysFill_s( ElGlobalArrays_s A, ElInt g_a, float* value );
+EL_EXPORT ElError ElGlobalArraysFill_d( ElGlobalArrays_d A, ElInt g_a, double* value );
 
 /* void GlobalArrays<T>::GA_Initialize();
  ------------------------------------- */
@@ -146,11 +146,11 @@ EL_EXPORT ElError ElGlobalArraysInquire_d( ElGlobalArrays_d A, ElInt g_a, ElInt 
 /* void GlobalArrays<T>::NGA_Acc(int g_a, int lo[], int hi[],void* buf,int ld[],void* alpha);
  ---------------------------------------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysAccumulate_i( ElGlobalArrays_i A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], ElInt* ptr, ElInt ld[], void* alpha );
+	ElInt hi[], ElInt* ptr, ElInt ld[], ElInt* alpha );
 EL_EXPORT ElError ElGlobalArraysAccumulate_s( ElGlobalArrays_s A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], float* ptr, ElInt ld[], void* alpha );
+	ElInt hi[], float* ptr, ElInt ld[], float* alpha );
 EL_EXPORT ElError ElGlobalArraysAccumulate_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], double* ptr, ElInt ld[], void* alpha );
+	ElInt hi[], double* ptr, ElInt ld[], double* alpha );
 
 /* void GlobalArrays<T>::NGA_Get(int g_a, int lo[], int hi[], void* buf, int ld[]); 
  ------------------------------------------------------------------------------- */
@@ -164,11 +164,11 @@ EL_EXPORT ElError ElGlobalArraysGet_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[]
 /* void GlobalArrays<T>::NGA_NbAcc(int g_a,int lo[], int hi[],void* buf,int ld[],void* alpha, ga_nbhdl_t* nbhandle);
  ----------------------------------------------------------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysNBAccumulate_i( ElGlobalArrays_i A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], ElInt* ptr, ElInt ld[], void* alpha, ElInt* nbhandle );
+	ElInt hi[], ElInt* ptr, ElInt ld[], ElInt* alpha, ElInt* nbhandle );
 EL_EXPORT ElError ElGlobalArraysNBAccumulate_s( ElGlobalArrays_s A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], float* ptr, ElInt ld[], void* alpha, ElInt* nbhandle );
+	ElInt hi[], float* ptr, ElInt ld[], float* alpha, ElInt* nbhandle );
 EL_EXPORT ElError ElGlobalArraysNBAccumulate_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[], 
-	ElInt hi[], double* ptr, ElInt ld[], void* alpha, ElInt* nbhandle );
+	ElInt hi[], double* ptr, ElInt ld[], double* alpha, ElInt* nbhandle );
 
 /* void GlobalArrays<T>::NGA_NbGet(int g_a, int lo[], int hi[], void* buf, int ld[], ga_nbhdl_t* nbhandle);
  --------------------------------------------------------------------------------------------- */
