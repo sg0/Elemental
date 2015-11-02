@@ -203,6 +203,10 @@ endif()
 # Get the Git revision
 get_git_head_revision(GIT_REFSPEC GIT_SHA1)
 
+# Whether or not to attempt to use OpenMP within hot-spots in Elemental
+# (NOTE: This option is not actively maintained)
+option(EL_HYBRID "Make use of OpenMP within MPI packing/unpacking" OFF)
+
 # Extract a few booleans from the build type and default to PureRelease
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "Build mode not specified, defaulting to PureRelease build.")

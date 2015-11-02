@@ -198,11 +198,16 @@ Int RmaInterface<T>::NextIndex
   std::deque <std::vector<T>>& dataVectors )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::NextIndex" ) )
+    
+    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
+        LogicError( "No DistMatrix attached" );
+    if (dataSize < 0)
+	LogicError ("Resize factor cannot be negative");
+    
     const Int numCreated = dataVectors.size();
     dataVectors.resize( numCreated + 1 );
     dataVectors[numCreated].resize( dataSize );
-    // fill with 0s
-    std::fill(dataVectors[numCreated].begin(), dataVectors[numCreated].end(), 0);
+
     return numCreated;
 }
 
@@ -215,7 +220,13 @@ Int RmaInterface<T>::NextIndex(
     Int* mindex )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::NextIndex" ) )
-    assert( base_address != NULL );
+    if ( base_address == NULL )
+        LogicError( "Base address is NULL" );
+    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
+        LogicError( "No DistMatrix attached" );
+    if (dataSize < 0)
+	LogicError ("Resize factor cannot be negative");
+
     Int matrixIndex = 0;
     const Grid& g = ( toBeAttachedForPut_ ?
                       GlobalArrayPut_->Grid() :
@@ -288,6 +299,7 @@ Int RmaInterface<T>::NextIndex(
     matrices_[matrixIndex].requests_[target].push_back( mpi::REQUEST_NULL );
     matrices_[matrixIndex].statuses_[target].push_back( true );
     *mindex = matrixIndex;
+    
     return numCreated;
 }
 
@@ -638,8 +650,7 @@ void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
                 NextIndex( numEntries,
                            putVector_[destination] );
             T* sendBuffer = putVector_[destination][index].data();
-	    //const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
-	    const Int remoteHeight = Length( dm_height, receivingRow, colAlign, r );
+	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
 
 	    Int iMapped, jMapped;
 	    if (remoteHeight == dm_height) // 1-D process grid, each PE gets a column strip
@@ -674,97 +685,6 @@ void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
             receivingCol = ( receivingCol + 1 ) % c;
     }
 }
-
-
-#if 0
-template<typename T>
-void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
-{
-    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Acc" ) )
-
-    if( !toBeAttachedForPut_ )
-        LogicError( "Global matrix cannot be updated." );
-
-    if( i < 0 || j < 0 )
-        LogicError( "Submatrix offsets must be non-negative." );
-
-    DistMatrix<T>& Y = *GlobalArrayPut_;
-
-    if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
-        LogicError( "Submatrix out of bounds of global matrix." );
-
-    //do rma related checks
-    const Grid& g = Y.Grid();
-    const Int r = g.Height();
-    const Int c = g.Width();
-    const Int p = g.Size();
-    const Int myProcessRow = g.Row();
-    const Int myProcessCol = g.Col();
-    const Int colAlign = ( Y.ColAlign() + i ) % r;
-    const Int rowAlign = ( Y.RowAlign() + j ) % c;
-    const Int XLDim = Z.LDim();
-    const Int YLDim = Y.LDim();
-    // local matrix width and height
-    const Int height = Z.Height();
-    const Int width = Z.Width();
-    const Int dm_height = Y.Height();
-    Int receivingRow = myProcessRow;
-    Int receivingCol = myProcessCol;
-    const T* XBuffer = Z.LockedBuffer();
-
-    for( Int step=0; step<p; ++step )
-    {
-        const Int colShift = Shift( receivingRow, colAlign, r );
-        const Int rowShift = Shift( receivingCol, rowAlign, c );
-        // number of entries in my PE
-        const Int localHeight = Length( height, colShift, r );
-        const Int localWidth = Length( width, rowShift, c );
-        const Int numEntries = localHeight * localWidth;
-
-        if( numEntries != 0 )
-        {
-            const Int destination = receivingRow + r*receivingCol;
-            const Int index = 
-		NextIndex( numEntries,
-			putVector_[destination] );
-
-	    T* sendBuffer = putVector_[destination][index].data();
-	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
-
-	    Int iMapped, jMapped;
-	    if (remoteHeight == dm_height) // 1-D process grid, each PE gets a column strip
-	    {
-		iMapped = i; 
-		jMapped = ( j / c );
-	    }
-	    else // 2-D process grid 
-	    {
-		iMapped = ( i / r ); 
-		jMapped = ( j / c );
-	    }
-
-	    for( Int t=0; t<localWidth; ++t )
-            {
-                T* thisSendCol = &sendBuffer[t*localHeight];
-                const T* thisXCol = &XBuffer[( rowShift+t*c )*XLDim];
-
-                for( Int s=0; s<localHeight; ++s )
-                    thisSendCol[s] = thisXCol[colShift+s*r];
-	    }
-	    
-	    // acc
-	    mpi::Aint disp = (iMapped + jMapped * remoteHeight) * sizeof( T );
-	    mpi::Iacc( sendBuffer, numEntries, destination, disp, numEntries, window );
-	    mpi::FlushLocal( destination, window );
-	}
-
-        receivingRow = ( receivingRow + 1 ) % r;
-
-        if( receivingRow == 0 )
-            receivingCol = ( receivingCol + 1 ) % c;
-    }
-}
-#endif
 
 template<typename T>
 void RmaInterface<T>::Acc( Matrix<T>& Z, Int i, Int j )
@@ -817,10 +737,11 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
         if( numEntries != 0 )
         {
             const Int destination = receivingRow + r*receivingCol;
-            const Int index = RmaInterface<T>::NextIndex( numEntries,
+            const Int index = NextIndex( numEntries,
                               getVector_[destination] );
             T* getBuffer = getVector_[destination][index].data();
 	    const Int remoteHeight = Length( dm_height, receivingRow, X.ColAlign(), r );
+	    //const Int remoteHeight = Length( dm_height, receivingRow, colAlign, r );
 
 	    Int iMapped, jMapped;
 	    if (remoteHeight == dm_height) // 1-D process grid, each PE gets a column strip

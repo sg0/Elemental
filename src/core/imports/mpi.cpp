@@ -408,10 +408,12 @@ void Translate
 #if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
 // Window management
 // -----------------
+/*
 #ifndef EL_NO_ACC_ORDERING
 #define EL_NO_ACC_ORDERING
 #endif
-void SetWindowProp (Window & window, int prop)
+*/
+void SetWindowProp (Window & window, acc_order_t prop)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::SetWindowProp"))
     Info info;

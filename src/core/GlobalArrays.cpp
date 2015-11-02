@@ -82,7 +82,8 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name)
 	// create distmatrix over default grid, i.e mpi::COMM_WORLD
 	// using MC x MR distribution
 	// this won't be allocated until RmaInterface->Attach
-	DistMatrix< T > * DM = new DistMatrix< T  >( dims[0], dims[1] );
+	// dim[1] = height, dim[0] = width
+	DistMatrix< T > * DM = new DistMatrix< T  >( dims[1], dims[0] );
 	DistMatrix< T > &D = *DM;
 
 	const Grid& grid = D.Grid();
@@ -350,8 +351,6 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
 	// detach RmaInterface
 	// will end access epoch
 	ga_handles[g_a].rmaint->Detach();
-	// set matrix size to 0 and free mem
-	ga_handles[g_a].DM->EmptyData();
 	// clear vectors that holds local dims
 	ga_handles[g_a].ga_local_height->clear();
 	ga_handles[g_a].ga_local_width->clear();
@@ -392,8 +391,8 @@ void GlobalArrays< T >::GA_Symmetrize (Int g_a)
 
     // create intermediate GAs using g_a parameters
     Int dims[2];
-    dims[0] = height;
-    dims[1] = width;
+    dims[1] = height;
+    dims[0] = width;
     Int g_at = GA_Create( 2, dims, "transpose array" );
     Int g_c = GA_Create( 2, dims, "final array" );
 
@@ -635,8 +634,8 @@ void GlobalArrays< T >::NGA_Distribution( Int g_a, Int iproc, Int lo[], Int hi[]
     }
     else
     {
-	hi[0] = local_height - 1;
-	hi[1] = local_width - 1;
+	hi[0] = local_width - 1;
+	hi[1] = local_height - 1;
 	lo[0] = 0;
 	lo[1] = 0;
     }
@@ -661,8 +660,8 @@ void GlobalArrays< T >::NGA_Inquire( Int g_a, Int * ndim, Int dims[] )
     {
 	DistMatrix< T >&Y = *(ga_handles[g_a].DM);
 	*ndim = 2; // number of dims is always 2
-	dims[0] = Y.Height();
-	dims[1] = Y.Width();
+	dims[1] = Y.Height();
+	dims[0] = Y.Width();
     }
 }
 
@@ -722,11 +721,9 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[
 	{ \
 	    case 'A': \
 		ga_handles[g_a].rmaint->Acc (M, i, j); \
-	        ga_handles[g_a].rmaint->Flush (M); \
 	        break; \
 	    case 'P': \
 		ga_handles[g_a].rmaint->Put (M, i, j); \
-	        ga_handles[g_a].rmaint->Flush (M); \
 	        break; \
 	    case 'G': \
 		ga_handles[g_a].rmaint->Get (M, i, j); \
@@ -734,6 +731,7 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[
 	    default: \
 		LogicError ("Unsupported blocking transfer type"); \
 	} \
+	ga_handles[g_a].rmaint->Flush (M); \
         ga_handles[g_a].pending_rma_op = false; \
     } while (0)
 
@@ -776,8 +774,8 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
     T a = *alpha;
     
     // calculate local height and width
-    const Int width = hi[1] - lo[1] + 1;
-    const Int height = hi[0] - lo[0] + 1;
+    const Int width = hi[0] - lo[0] + 1;
+    const Int height = hi[1] - lo[1] + 1;
     const Int ldim = *ld;
 
     // create a matrix
@@ -786,13 +784,13 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
 
     if (a != one)
     {
-	for (Int i = 0; i < height; i++)
-	    for (Int j = 0; j < width; j++)
-		buf[i*ldim + j] *= a;
+	for (Int j = 0; j < width; j++)
+	    for (Int i = 0; i < height; i++)
+		buf[i + j*ldim] *= a;
     }
 
-    const Int i = lo[0];
-    const Int j = lo[1];
+    const Int i = lo[1];
+    const Int j = lo[0];
 
     // Acc - blocking transfer
     BXFER ('A', g_a, A, i, j);	
@@ -801,9 +799,9 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
     // locally blocking transfer
     if (a != one)
     {
-	for (Int i = 0; i < height; i++)
-	    for (Int j = 0; j < width; j++)
-		buf[i*ldim + j] /= a;
+	for (Int j = 0; j < width; j++)
+	    for (Int i = 0; i < height; i++)
+		buf[i + j*ldim] /= a;
     }
 }
 
@@ -821,12 +819,12 @@ void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], T* buf, Int ld[])
        LogicError ("A 1D GA is not allowed for this operation");
 
     // calculate height and width from lo and hi
-    const Int width = hi[1] - lo[1] + 1;
-    const Int height = hi[0] - lo[0] + 1;
+    const Int width = hi[0] - lo[0] + 1;
+    const Int height = hi[1] - lo[1] + 1;
     const Int ldim = *ld;
    
-    const Int i = lo[0];
-    const Int j = lo[1];
+    const Int i = lo[1];
+    const Int j = lo[0];
 
     // create Matrix<T> for get
     Matrix< T > A; 
@@ -853,8 +851,8 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     T a = *alpha;
 
     // calculate local height and width
-    const Int width = hi[1] - lo[1] + 1;
-    const Int height = hi[0] - lo[0] + 1;
+    const Int width = hi[0] - lo[0] + 1;
+    const Int height = hi[1] - lo[1] + 1;
     const Int ldim = *ld;
 
     // create a matrix
@@ -863,13 +861,13 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
 
     if (a != one)
     {
-	for (Int i = 0; i < height; i++)
-	    for (Int j = 0; j < width; j++)
-		buf[i*ldim + j] *= a;
+	for (Int j = 0; j < width; j++)
+	    for (Int i = 0; i < height; i++)
+		buf[i + j*ldim] *= a;
     }
 
-    const Int i = lo[0];
-    const Int j = lo[1];
+    const Int i = lo[1];
+    const Int j = lo[0];
     
     // Acc - (locally) nonblocking transfer
     NBXFER ('A', g_a, A, i, j);
@@ -879,9 +877,9 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     // locally blocking transfer
     if (a != one)
     {
-	for (Int i = 0; i < height; i++)
-	    for (Int j = 0; j < width; j++)
-		buf[i*ldim + j] /= a;
+	for (Int j = 0; j < width; j++)
+	    for (Int i = 0; i < height; i++)
+		buf[i + j*ldim] *= a;
     }
 }
 
@@ -906,16 +904,16 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
        LogicError ("A 1D GA is not allowed for this operation");
 
     // calculate local height and width
-    const Int width = hi[1] - lo[1] + 1;
-    const Int height = hi[0] - lo[0] + 1;
+    const Int width = hi[0] - lo[0] + 1;
+    const Int height = hi[1] - lo[1] + 1;
     const Int ldim = *ld;
 
     // create a matrix
     Matrix< T > A;
     A.Attach( height, width, buf, ldim );
 
-    const Int i = lo[0];
-    const Int j = lo[1];
+    const Int i = lo[1];
+    const Int j = lo[0];
     
     // Put - (locally) nonblocking transfer
     NBXFER ('P', g_a, A, i, j);
@@ -977,16 +975,16 @@ void GlobalArrays< T >::NGA_Put(Int g_a, Int lo[], Int hi[], T* buf, Int ld[])
        LogicError ("A 1D GA is not allowed for this operation");
 
     // calculate local height and width
-    const Int width = hi[1] - lo[1] + 1;
-    const Int height = hi[0] - lo[0] + 1;
+    const Int width = hi[0] - lo[0] + 1;
+    const Int height = hi[1] - lo[1] + 1;
     const Int ldim = *ld;
 
     // create a matrix
     Matrix< T > A;
     A.Attach( height, width, buf, ldim );
 
-    const Int i = lo[0];
-    const Int j = lo[1];
+    const Int i = lo[1];
+    const Int j = lo[0];
 
     // Put - (locally) nonblocking transfer
     BXFER('P', g_a, A, i, j);

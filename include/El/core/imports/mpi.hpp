@@ -205,6 +205,7 @@ void WindowCreate( void * baseptr, int size, Comm comm, Window & window );
 void WindowAllocate( int count, Comm comm, Window & window );    
 void * GetWindowBase( Window & window );
 void WindowFree (Window& window);
+void SetWindowProp (Window & window, acc_order_t prop);
 
 // Atomic operations
 // -----------------
