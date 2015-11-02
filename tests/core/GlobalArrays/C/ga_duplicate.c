@@ -27,7 +27,7 @@ int main(int argc, char **argv)
 #if defined(USE_ELEMENTAL)
   int g_C;
 #endif
-  int dims[DIM]={5,5}, dims2[DIM], ndim2, type2, dims3[DIM], ndim3, type3;
+  int dims[DIM]={61,114}, dims2[DIM], ndim2, type2, dims3[DIM], ndim3, type3;
   double value=5, val2=4;
 
 #if defined(USE_ELEMENTAL)
@@ -70,7 +70,10 @@ int main(int argc, char **argv)
   // create multiple duplicates
   int g[MAXDUP];
   for (int i = 0; i < MAXDUP; i++)
+  {
       ElGlobalArraysDuplicate_d( eldga, g_C,  "C Dup arrays", &g[i] );
+      ElGlobalArraysFill_d( eldga, g[i], &val2 );
+  }
 #else
   g_A = NGA_Create(C_DBL, DIM, dims, "array_A", NULL);
   GA_Fill(g_A, &value);
