@@ -755,8 +755,11 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[
 	} \
     } while (0)
 
-// NOTE: the input buffer should not be updated, previously, this code
-// was performing a * buf[], which changed buf[], which had side effects
+// NOTE: the input buffer should not be updated, hence we do a * buf[], and
+// then buf[] / a to ensure input buffer is intact, but this affects performance
+// at the cost of saving memory for a new buffer
+// but for DP cases this might still cause some bugs
+// TODO fix this
 template<typename T>
 void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], T* alpha)
 {
@@ -771,6 +774,7 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
        LogicError ("A 1D GA is not allowed for this operation");
 
     T one = static_cast<T> (1.0);
+    T zero = static_cast<T> (0.0);
     T a = *alpha;
     
     // calculate local height and width
@@ -780,9 +784,12 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
 
     // create a matrix
     Matrix< T > A;
-    A.Attach( height, width, buf, ldim );
+    if (a == zero)
+	Zeros (A, height, width);
+    else
+	A.Attach( height, width, buf, ldim );
 
-    if (a != one)
+    if (a != one && a != zero)
     {
 	for (Int j = 0; j < width; j++)
 	    for (Int i = 0; i < height; i++)
@@ -797,7 +804,7 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
 
     // safe to update local buffer after
     // locally blocking transfer
-    if (a != one)
+    if (a != one && a != zero)
     {
 	for (Int j = 0; j < width; j++)
 	    for (Int i = 0; i < height; i++)
@@ -847,6 +854,7 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     if ( ga_handles[g_a].ndim == 1 )
        LogicError ("A 1D GA is not allowed for this operation");
 
+    T zero = static_cast<T> (0.0);
     T one = static_cast<T> (1.0);
     T a = *alpha;
 
@@ -856,10 +864,13 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     const Int ldim = *ld;
 
     // create a matrix
-    Matrix< T > A (height, width, ldim);
-    A.Attach( height, width, buf, ldim );
+    Matrix< T > A;
+    if (a == zero)
+	Zeros (A, height, width);
+    else
+	A.Attach( height, width, buf, ldim );
 
-    if (a != one)
+    if (a != one && a != zero)
     {
 	for (Int j = 0; j < width; j++)
 	    for (Int i = 0; i < height; i++)
@@ -875,11 +886,11 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
 
     // safe to update local buffer after
     // locally blocking transfer
-    if (a != one)
+    if (a != one && a != zero)
     {
 	for (Int j = 0; j < width; j++)
 	    for (Int i = 0; i < height; i++)
-		buf[i + j*ldim] *= a;
+		buf[i + j*ldim] /= a;
     }
 }
 
