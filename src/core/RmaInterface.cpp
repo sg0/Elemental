@@ -13,7 +13,6 @@ which can be found in the LICENSE file in the root directory, or at
 http://opensource.org/licenses/BSD-2-Clause
 */
 #include "El.hpp"
-#include <cassert>
 
 #if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)  
 namespace El
@@ -33,9 +32,12 @@ template<typename T>
 RmaInterface<T>::RmaInterface( DistMatrix<T>& X )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::RmaInterface" ) )
-    
+   
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
     if( !X.ForRMA() )
 	LogicError("Attempting to attach a DistMatrix without the RMA flag, check constructor");
+#endif
 
     attached_ 			= false;
     detached_ 			= true;
@@ -54,8 +56,11 @@ RmaInterface<T>::RmaInterface( const DistMatrix<T>& X )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::RmaInterface" ) )
 	    
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
     if( !X.ForRMA() )
 	LogicError("Attempting to attach a DistMatrix without the RMA flag, check constructor");
+#endif
 
     attached_ 			= false;
     detached_ 			= true;
@@ -92,8 +97,11 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Attach" ) )
 	    
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
     if( !Z.ForRMA() )
 	LogicError("Attempting to attach a DistMatrix without the RMA flag, check constructor");
+#endif
 
     // attached_ will be only set in Attach
     // and only unset in Detach
@@ -165,8 +173,11 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Attach" ) )
 
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
     if( !X.ForRMA() )
 	LogicError("Attempting to attach a DistMatrix without the RMA flag, check constructor");
+#endif
 
     if( !attached_ && detached_ )
     {
