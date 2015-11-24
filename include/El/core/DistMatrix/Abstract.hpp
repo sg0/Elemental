@@ -48,8 +48,9 @@ public:
     void Resize( Int height, Int width, Int ldim );
     void MakeConsistent( bool includingViewers=false );
     void MakeSizeConsistent( bool includingViewers=false );
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
     void SetDim( Int height, Int width );
     void SetWindowBase( T * ptr );
 #endif
@@ -105,6 +106,11 @@ public:
     Int  DiagonalLength( Int offset=0 ) const;
     bool Viewing()                      const;
     bool Locked()                       const;
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+    bool ForRMA()                       const;
+#endif
 
     // Local matrix information
     // ------------------------
@@ -263,10 +269,23 @@ protected:
     int root_;
     const El::Grid* grid_;
 
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+    // RMA related
+    // -----------
+    bool forRMA_;
+#endif
+
     // Private constructors
     // ====================
     // Create a 0 x 0 distributed matrix
-    AbstractDistMatrix( const El::Grid& g=DefaultGrid(), int root=0 );
+    AbstractDistMatrix( const El::Grid& g=DefaultGrid(), int root=0 );   
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+    AbstractDistMatrix( bool forRMA, const El::Grid& g=DefaultGrid(), int root=0 );  
+#endif
 
     // Exchange metadata with another matrix
     // =====================================

@@ -30,9 +30,13 @@ RmaInterface<T>::RmaInterface()
 {}
 
 template<typename T>
-RmaInterface<T>::RmaInterface( DistMatrix<T>& Z )
+RmaInterface<T>::RmaInterface( DistMatrix<T>& X )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::RmaInterface" ) )
+    
+    if( !X.ForRMA() )
+	LogicError("Attempting to attach a DistMatrix without the RMA flag, check constructor");
+
     attached_ 			= false;
     detached_ 			= true;
     toBeAttachedForGet_ 	= false;
@@ -49,6 +53,10 @@ template<typename T>
 RmaInterface<T>::RmaInterface( const DistMatrix<T>& X )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::RmaInterface" ) )
+	    
+    if( !X.ForRMA() )
+	LogicError("Attempting to attach a DistMatrix without the RMA flag, check constructor");
+
     attached_ 			= false;
     detached_ 			= true;
     toBeAttachedForGet_ 	= false;
@@ -83,6 +91,9 @@ template<typename T>
 void RmaInterface<T>::Attach( DistMatrix<T>& Z )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Attach" ) )
+	    
+    if( !Z.ForRMA() )
+	LogicError("Attempting to attach a DistMatrix without the RMA flag, check constructor");
 
     // attached_ will be only set in Attach
     // and only unset in Detach
@@ -122,29 +133,29 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
             getVector_.resize( p );
             putVector_.resize( p );
         }
+        // TODO rma related checks
 #if defined(EL_USE_WIN_CREATE_FOR_RMA) && \
 	!defined(EL_USE_WIN_ALLOC_FOR_RMA)
-        // TODO rma related checks
         // creation of window
         const Int numEntries = Z.LocalHeight() * Z.LocalWidth();
         const Int bufferSize = numEntries * sizeof( T );
         void * baseptr = reinterpret_cast<void *>( Z.Buffer() );
-        mpi::WindowCreate( baseptr, bufferSize, g.VCComm(), window );
+        mpi::WindowCreate( baseptr, bufferSize, Z.DistComm(), window );
         mpi::WindowLock( window );
 #endif
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
         const Int numEntries = Z.LocalHeight() * Z.LocalWidth();
         const Int bufferSize = numEntries * sizeof( T );
-	
-	mpi::WindowAllocate( bufferSize, g.VCComm(), window );
+
+	mpi::WindowAllocate( bufferSize, Z.DistComm(), window );
        
 	T * baseptr = reinterpret_cast< T *>( mpi::GetWindowBase( window ) );
 	Z.SetWindowBase( baseptr );
 
 	mpi::WindowLock( window );
 #endif
-	mpi::Barrier( g.VCComm() );
+	mpi::Barrier( Z.DistComm() );
     }
 }
 
@@ -153,6 +164,9 @@ template<typename T>
 void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Attach" ) )
+
+    if( !X.ForRMA() )
+	LogicError("Attempting to attach a DistMatrix without the RMA flag, check constructor");
 
     if( !attached_ && detached_ )
     {
@@ -180,14 +194,14 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
         const Int numEntries = X.LocalHeight() * X.LocalWidth();
         const Int bufferSize = numEntries * sizeof( T );
         void * baseptr = static_cast<void *>( const_cast<T *>( X.LockedBuffer() ) );
-        mpi::WindowCreate( baseptr, bufferSize, g.VCComm(), window );
+        mpi::WindowCreate( baseptr, bufferSize, X.DistComm(), window );
         mpi::WindowLock( window );
 #endif
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)       
 	LogicError ("Const DistMatrix cannot be modified, select EL_USE_WIN_CREATE_FOR_RMA");
 #endif
-	mpi::Barrier( g.VCComm() );
+	mpi::Barrier( X.DistComm() );
     }
 }
 
@@ -741,7 +755,6 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
                               getVector_[destination] );
             T* getBuffer = getVector_[destination][index].data();
 	    const Int remoteHeight = Length( dm_height, receivingRow, X.ColAlign(), r );
-	    //const Int remoteHeight = Length( dm_height, receivingRow, colAlign, r );
 
 	    Int iMapped, jMapped;
 	    if (remoteHeight == dm_height) // 1-D process grid, each PE gets a column strip
@@ -1389,11 +1402,11 @@ void RmaInterface<T>::Detach()
     if( !attached_ )
         LogicError( "Must attach before detaching." );
 
-    const Grid& g = ( toBeAttachedForPut_ ?
-                      GlobalArrayPut_->Grid() :
-                      GlobalArrayGet_->Grid() );
+    const mpi::Comm& comm = ( toBeAttachedForPut_ ?
+                              GlobalArrayPut_->DistComm() :
+                              GlobalArrayGet_->DistComm() );
 
-    mpi::Barrier( g.VCComm() );
+    mpi::Barrier( comm );
     
     attached_ 		= false;
     detached_ 		= true;
@@ -1412,6 +1425,7 @@ void RmaInterface<T>::Detach()
     // data window
     mpi::WindowUnlock( window );
     mpi::WindowFree( window );
+    window = mpi::WIN_NULL;
 }
 
 #define PROTO(T) template class RmaInterface<T>;

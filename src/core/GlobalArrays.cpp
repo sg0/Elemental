@@ -61,65 +61,166 @@ GlobalArrays< T >::~GlobalArrays()
 // and in that case, RMAInterface object is instantiated
 // to nullptr, so is the DistMatrix object -- in other
 // words, no DistMatrix is created for a 1D GA
+// chunk -- minimum blocking size for each dimension
 template<typename T>
-Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name)
+Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name, Int chunk[] = nullptr)
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Create" ) )
     if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array"); 
 	
-    Int handle = ga_handles.size();
-    // call GA constructor
+    const Int handle = ga_handles.size();
+
+    // create a GA instance and push
+    // it into the ga_handles vector
     ga_handles.push_back( GA() );
-    
+
+    // default grid
+    const Grid& grid = DefaultGrid();	
+    const Int p = grid.Size();
+    const Int rank = grid.Rank();
+
     // 2-D array, create DistMatrix
     if (ndim == 2)
     {
 	ga_handles[handle].ndim = 2;
 	ga_handles[handle].length = (dims[0] * dims[1]);
-	// call rmainterface/dm constructor
-	RmaInterface< T > * rmaint = new RmaInterface< T >();
+	
 	// create distmatrix over default grid, i.e mpi::COMM_WORLD
 	// using MC x MR distribution
 	// this won't be allocated until RmaInterface->Attach
-	// dim[1] = height, dim[0] = width
-	DistMatrix< T > * DM = new DistMatrix< T  >( dims[1], dims[0] );
-	DistMatrix< T > &D = *DM;
-
-	const Grid& grid = D.Grid();
-
-	const Int p = grid.Size();
-	const Int my_rank = grid.VCRank();
-	// create Int vectors for storing local heights and widths
-	std::vector< Int > * hvect = new std::vector< Int >();
-	std::vector< Int > * wvect = new std::vector< Int >();
-
-	// copy objects 
-	ga_handles[handle].DM = DM;
-	ga_handles[handle].ga_local_height = hvect;
-	ga_handles[handle].ga_local_width = wvect;
-	ga_handles[handle].ga_local_height->resize( p );
-	ga_handles[handle].ga_local_width->resize( p );
+	// dim[0] = width, dim[1] = height
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+	ga_handles[handle].DM = new DistMatrix< T, MC, MR  >( dims[1], dims[0], true, grid );
+#else
+	ga_handles[handle].DM = new DistMatrix< T, MC, MR  >( dims[1], dims[0], grid );
+#endif
+	DistMatrix< T, MC, MR > &D = *(ga_handles[handle].DM);
 	
-	// store local heights and widths
-	ga_handles[handle].ga_local_height->at( my_rank ) = DM->LocalHeight();
-	ga_handles[handle].ga_local_width->at( my_rank ) = DM->LocalWidth();
-	// FIXME mpi allgather in el mpi does not have 
-	// MPI_IN_PLACE port
-	const Int local_height = ga_handles[handle].ga_local_height->at( my_rank );
-	const Int local_width = ga_handles[handle].ga_local_width->at( my_rank );
-	mpi::AllGather <Int>( &local_height, 1, ga_handles[handle].ga_local_height->data(), 1, grid.VCComm() );
-	mpi::AllGather <Int>( &local_width, 1, ga_handles[handle].ga_local_width->data(), 1, grid.VCComm() );
+	//FIXME minimize metadata size
+	// resize Int vectors for storing local heights and widths
+	ga_handles[handle].ga_local_height.resize( p );
+	ga_handles[handle].ga_local_width.resize( p );
+	// resize Int vectors for storing local lo/hi
+	ga_handles[handle].ga_hi.resize( 2*p );
+	ga_handles[handle].ga_lo.resize( 2*p );
 
-	// attach DM for RMA ops
+	const Int localHeight = D.LocalHeight();
+	const Int localWidth = D.LocalWidth();
+	
+        const Int my_rank = D.DistRank();  
+	Int lo[2];
+	Int hi[2];
+	
+	// GA is distributed evenly
+	// vertical strips
+	if (chunk == nullptr)
+	{ 
+	    Int strips = (dims[0] / p);
+	    const Int rem = (dims[0] % p);
+	    if ( rank == (p - 1) )
+		strips += rem;
+
+	    ga_handles[handle].patchHeight = dims[1];
+	    ga_handles[handle].patchWidth = strips;
+	}
+	else if (chunk[0] == dims[0]) // vertical strips
+	{
+	    ga_handles[handle].patchHeight = dims[1];
+	    ga_handles[handle].patchWidth = chunk[0];
+
+	    Int strips = (dims[0] / p);
+	    const Int rem = (dims[0] % p);
+
+	    if ( rank == (p - 1) )
+		strips += rem;
+
+	    if (strips != chunk[0])
+		ga_handles[handle].patchWidth = strips;
+	}
+	else if (chunk[1] == dims[1]) // horizontal strips
+	{
+	    ga_handles[handle].patchHeight = chunk[1];
+	    ga_handles[handle].patchWidth = dims[0];
+
+	    Int strips = (dims[1] / p);
+	    const Int rem = (dims[1] % p);
+
+	    if ( rank == (p - 1) )
+		strips += rem;
+
+	    if (strips != chunk[1])
+		ga_handles[handle].patchHeight = strips;
+	}
+	else
+	{
+	    ga_handles[handle].patchHeight = chunk[1];
+	    ga_handles[handle].patchWidth = chunk[0];
+
+	    Int strips_h = (dims[1] / p);
+	    Int strips_w = (dims[0] / p);
+
+	    const Int rem_h = (dims[1] % p);
+	    const Int rem_w = (dims[0] % p);
+
+	    if ( rank == (p - 1) )
+	    {
+		strips_h += rem_h;
+		strips_w += rem_w;
+	    }
+
+	    if (chunk[1] != strips_h)
+		ga_handles[handle].patchHeight = strips_h;
+
+	    if (chunk[0] != strips_w)
+		ga_handles[handle].patchWidth = strips_w;
+	}
+
+	// allocate access buf
+	ga_handles[handle].AM = 
+	    new Matrix< T > (ga_handles[handle].patchHeight, ga_handles[handle].patchWidth);
+
+	// lo/hi
+	// Note: Use defaultgrid rank (usually VCRank or VRRank)
+	// when defining hi/lo for ideal GA distribution. We won't
+	// be using this for actual data distribution anyway, but
+	// usage of ranks associated with El distribution might
+	// affect these, so we are staying clear of it.
+	lo[0] = 0;
+	lo[1] = rank * ga_handles[handle].patchWidth;
+	hi[0] = lo[0] + (ga_handles[handle].patchHeight - 1);
+	hi[1] = lo[1] + (ga_handles[handle].patchWidth - 1);
+	const Int pos = rank * 2;
+	ga_handles[handle].ga_lo[pos]     = lo[0];
+	ga_handles[handle].ga_lo[pos + 1] = lo[1];	
+	ga_handles[handle].ga_hi[pos]     = hi[0];
+	ga_handles[handle].ga_hi[pos + 1] = hi[1];
+	// gather every PE's lo/hi
+	Int *vlo = ga_handles[handle].ga_lo.data();
+	Int *vhi = ga_handles[handle].ga_hi.data();
+	mpi::AllGather <Int>( vlo, 2, grid.Comm() );
+	mpi::AllGather <Int>( vhi, 2, grid.Comm() );
+
+	// store local heights and widths
+	ga_handles[handle].ga_local_height[my_rank] = localHeight;
+	ga_handles[handle].ga_local_width[my_rank] = localWidth;
+	// NOTE: for MC, MR distribution, DistComm() == VCComm()
+	// In GAInterface, this is alright as we only deal
+	// with MC, MR distribution
+	Int *vheight = ga_handles[handle].ga_local_height.data();
+	Int *vwidth = ga_handles[handle].ga_local_width.data();
+	mpi::AllGather <Int>( vheight, 1, D.DistComm() );
+	mpi::AllGather <Int>( vwidth, 1, D.DistComm() );
+
+	// call rmainterface constructor
+	RmaInterface< T > * rmaint = new RmaInterface< T >();
 	ga_handles[handle].rmaint = rmaint;
+	// attach DM to RMAInterface
 	ga_handles[handle].rmaint->Attach( D );
-	// zero out allocated DM
-	//Zeros (D, dims[0], dims[1]);
     }
     else if (ndim == 1) // fetch-and-op
     {
-	const Grid& grid = DefaultGrid();	
 	ga_handles[handle].ndim = 1;
 	// length of GA
 	ga_handles[handle].length = *(dims);
@@ -131,13 +232,198 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name)
     else
 	LogicError ("Up to 2 dimensions supported presently");
 	
-    const Grid& grid = DefaultGrid();
     mpi::Barrier( grid.VCComm() );
 
     return handle;
 }
 
-// DM might be resized here
+// mimic GA irregular distribution
+template<typename T>
+Int GlobalArrays< T >::GA_Create_irreg(Int ndim, Int dims[], const char *array_name, Int block[], Int map[])
+{
+    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Create_irreg" ) )
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array"); 
+	
+    const Int handle = ga_handles.size();
+
+    // create a GA instance and push
+    // it into the ga_handles vector
+    ga_handles.push_back( GA() );
+
+    // default grid
+    const Grid& grid = DefaultGrid();	
+    const Int p = grid.Size();
+
+    // 2-D array, create DistMatrix
+    if (ndim == 2)
+    {
+	const Int nprow = block[1];
+	const Int npcol = block[0];
+
+	if (p != (nprow * npcol))
+	    LogicError( "Incorrect block parameter specified for irregular GA distribution" );
+	
+	ga_handles[handle].ndim = 2;
+	ga_handles[handle].length = (dims[0] * dims[1]);
+	
+	// create distmatrix over default grid, i.e mpi::COMM_WORLD
+	// using MC x MR distribution
+	// this won't be allocated until RmaInterface->Attach
+	// dim[0] = width, dim[1] = height
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+	ga_handles[handle].DM = new DistMatrix< T, MC, MR  >( dims[1], dims[0], true, grid );
+#else
+	ga_handles[handle].DM = new DistMatrix< T, MC, MR  >( dims[1], dims[0], grid );
+#endif
+	DistMatrix< T, MC, MR > &D = *(ga_handles[handle].DM);
+	
+	// resize Int vectors for storing local heights and widths
+	ga_handles[handle].ga_local_height.resize( p );
+	ga_handles[handle].ga_local_width.resize( p );
+	// resize Int vectors for storing local lo/hi
+	ga_handles[handle].ga_hi.resize( 2*p );
+	ga_handles[handle].ga_lo.resize( 2*p );
+
+	const Int localHeight = D.LocalHeight();
+	const Int localWidth = D.LocalWidth();
+	
+        const Int my_rank = D.DistRank(); 
+
+	Int hi[2]        = { -1, -2 };
+	Int lo[2]        = { -1, -1 };
+	// To calculate dimensions of blocks,
+	// for each block, we need the start
+	// indices of the bottom neighbor 
+	// and the right neighbor of a 
+	// particular block
+	Int right_lo[2]  = { -1, -1 };
+	Int bottom_lo[2] = { -1, -1 };
+  
+	// FIXME remove this, and use El::Grid instead,
+	// not sure if there is a function that returns
+	// a process id when supplied with (i, j)
+	// 2d process grid
+	Int * grid2D = new Int[p];
+	for (Int i = 0; i < nprow; i++)
+	    for (Int j = 0; j < npcol; j++)
+		grid2D[i * npcol + j] = i + j * nprow;
+
+	// rank in the default grid
+	Int rank = grid.Rank();
+
+	// calculate hi/lo
+	bool isbreak = false;
+	for (int i = 0; i < npcol; i++)
+	{
+	    for (int j = npcol; j < (nprow + npcol); j++)
+	    {
+		int jj = j - npcol;
+		int crank = grid2D[i * nprow + jj];
+
+		if (crank == rank)
+		{
+		    // lo     
+		    lo[0] = map[i];
+		    lo[1] = map[j];
+		    // bottom neighbor
+		    if (j < ((npcol + nprow) - 1))
+		    {
+			bottom_lo[0] = map[i];
+			bottom_lo[1] = map[j + 1];
+		    }
+		    // right neighbor
+		    if (i < (npcol - 1))
+		    {
+			right_lo[0] = map[i + 1];
+			right_lo[1] = map[j];
+		    }
+		    // hi           
+		    // get width -- hi[0] from right neighbor
+		    if (right_lo[0] == -1 && right_lo[1] == -1)
+			hi[0] = dims[0] - 1;
+		    else
+		    {
+			if (npcol == 1)
+			    hi[0] = right_lo[0];
+			else
+			    hi[0] = right_lo[0] - 1;
+		    }
+		    // get height from bottom neighbor
+		    if (bottom_lo[0] == -1 && bottom_lo[1] == -1)
+			hi[1] = dims[1] - 1;
+		    else
+		    {
+			if (nprow == 1)
+			    hi[1] = bottom_lo[1];
+			else
+			    hi[1] = bottom_lo[1] - 1;
+		    }
+		    isbreak = true;
+		    break;
+		}
+	    }
+	    if (isbreak)
+		break;
+	}
+
+	ga_handles[handle].patchHeight = hi[1] - lo[1] + 1;
+	ga_handles[handle].patchWidth  = hi[0] - lo[0] + 1;
+
+	// lo/hi
+	const Int pos = rank * 2;
+	ga_handles[handle].ga_lo[pos]     = lo[0];
+	ga_handles[handle].ga_lo[pos + 1] = lo[1];	
+	ga_handles[handle].ga_hi[pos]     = hi[0];
+	ga_handles[handle].ga_hi[pos + 1] = hi[1];
+	// gather every PE's lo/hi
+	Int *vlo = ga_handles[handle].ga_lo.data();
+	Int *vhi = ga_handles[handle].ga_hi.data();
+	mpi::AllGather <Int>( vlo, 2, grid.Comm() );
+	mpi::AllGather <Int>( vhi, 2, grid.Comm() );		
+	
+	// allocate access buf
+	ga_handles[handle].AM = 
+	    new Matrix< T > (ga_handles[handle].patchHeight, ga_handles[handle].patchWidth);
+
+	// store local heights and widths
+	ga_handles[handle].ga_local_height[my_rank] = localHeight;
+	ga_handles[handle].ga_local_width[my_rank] = localWidth;
+	// NOTE: for MC, MR distribution, DistComm() == VCComm()
+	// In GAInterface, this is alright as we only deal
+	// with MC, MR distribution
+	Int *vheight = ga_handles[handle].ga_local_height.data();
+	Int *vwidth = ga_handles[handle].ga_local_width.data();
+	mpi::AllGather <Int>( vheight, 1, D.DistComm() );
+	mpi::AllGather <Int>( vwidth, 1, D.DistComm() );
+
+	// call rmainterface constructor
+	RmaInterface< T > * rmaint = new RmaInterface< T >();
+	ga_handles[handle].rmaint = rmaint;
+	// attach DM to RMAInterface
+	ga_handles[handle].rmaint->Attach( D );
+	
+	delete[] grid2D;
+    }
+    else if (ndim == 1) // fetch-and-op
+    {
+	ga_handles[handle].ndim = 1;
+	// length of GA
+	ga_handles[handle].length = *(dims);
+	const Int bufferSize = ga_handles[handle].length * sizeof(T);
+	// start access epoch on FOP window
+	mpi::WindowAllocate( bufferSize, grid.VCComm(), ga_handles[handle].fop_win );
+	mpi::WindowLock( ga_handles[handle].fop_win );
+    }
+    else
+	LogicError ("Up to 2 dimensions supported presently");
+	
+    mpi::Barrier( grid.Comm() );
+
+    return handle;
+}
+
 template<typename T>
 Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 {
@@ -147,72 +433,96 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
     if (g_a < 0 || g_a >= ga_handles.size())
 	LogicError ("Invalid GA handle");
 
+    const Int handle = ga_handles.size();
+	
     const Grid& grid = DefaultGrid();
-    Int handle = ga_handles.size();
-
-    // call GA constructor
+    
+    // create a GA instance and push
+    // it into the ga_handles vector
     ga_handles.push_back( GA() );
+    
     const Int ndim = ga_handles[g_a].ndim;
-
+    
     if (ndim == 2)
     {
 	ga_handles[handle].ndim = 2;
 	ga_handles[handle].length = ga_handles[g_a].length;
 	
-	DistMatrix< T >& GADM = *(ga_handles[g_a].DM);
+	DistMatrix< T, MC, MR >& GADM = *(ga_handles[g_a].DM);
+	
+	// dimensions
 	Int dim[2];
 	dim[0] = GADM.Height();
 	dim[1] = GADM.Width();
+
+	// grid
 	const Grid& grid = GADM.Grid();
-
-	// call rmainterface/dm constructor
-	RmaInterface< T > * rmaint = new RmaInterface< T >();
-	DistMatrix< T > * DM = new DistMatrix< T >( dim[0], dim[1], grid );
 	const Int p = grid.Size();
-	const Int my_rank = grid.VCRank();
-	// create Int vectors for storing local heights and widths
-	std::vector< Int > * hvect = new std::vector< Int >();
-	std::vector< Int > * wvect = new std::vector< Int >();
 
-	// copy objects 
-	ga_handles[handle].DM = DM;
-	ga_handles[handle].ga_local_height = hvect;
-	ga_handles[handle].ga_local_width = wvect;
-	ga_handles[handle].ga_local_height->resize( p );
-	ga_handles[handle].ga_local_width->resize( p );
+	// copy objects
+#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+	ga_handles[handle].DM = new DistMatrix< T, MC, MR >( dim[0], dim[1], true, grid );
+#else
+	ga_handles[handle].DM = new DistMatrix< T, MC, MR >( dim[0], dim[1], grid );
+#endif
+	DistMatrix< T, MC, MR > &D = *(ga_handles[handle].DM);
 	
-	// store local heights and widths
-	ga_handles[handle].ga_local_height->at( my_rank ) = DM->LocalHeight();
-	ga_handles[handle].ga_local_width->at( my_rank ) = DM->LocalWidth();
-	// FIXME mpi allgather in el mpi does not have 
-	// MPI_IN_PLACE port
-	const Int local_height = ga_handles[handle].ga_local_height->at( my_rank );
-	const Int local_width = ga_handles[handle].ga_local_width->at( my_rank );
-	mpi::AllGather <Int>( &local_height, 1, ga_handles[handle].ga_local_height->data(), 1, grid.VCComm() );
-	mpi::AllGather <Int>( &local_width, 1, ga_handles[handle].ga_local_width->data(), 1, grid.VCComm() );
+	// ideal patch width and height
+	ga_handles[handle].patchHeight = ga_handles[g_a].patchHeight;
+	ga_handles[handle].patchWidth = ga_handles[g_a].patchWidth;
 
-	// attach DM for RMA ops
-	DistMatrix< T > &D = *DM;
+	// allocate access buf
+	ga_handles[handle].AM = 
+	    new Matrix< T > (ga_handles[handle].patchHeight, ga_handles[handle].patchWidth);
+
+	// resize Int vectors for storing local heights and widths
+	ga_handles[handle].ga_local_height.resize( p );
+	ga_handles[handle].ga_local_width.resize( p );		
+	// resize Int vectors for storing local lo/hi
+	ga_handles[handle].ga_hi.resize( 2*p );
+	ga_handles[handle].ga_lo.resize( 2*p );
+
+	// locally copy 
+	MemCopy<Int> (ga_handles[handle].ga_local_height.data(),
+		ga_handles[g_a].ga_local_height.data(),
+		p);
+
+	MemCopy<Int> (ga_handles[handle].ga_local_width.data(), 
+		ga_handles[g_a].ga_local_width.data(), 
+		p);
+	
+	MemCopy<Int> (ga_handles[handle].ga_lo.data(), 
+		ga_handles[g_a].ga_lo.data(), 
+		2 * p);
+
+	MemCopy<Int> (ga_handles[handle].ga_hi.data(), 
+		ga_handles[g_a].ga_hi.data(),
+		2 * p);
+
+	// call rmainterface constructor
+	RmaInterface< T > * rmaint = new RmaInterface< T >();
 	ga_handles[handle].rmaint = rmaint;
-	ga_handles[handle].rmaint->Attach( D );  
-	// zero out allocated DM
-	//Zeros (D, dim[0], dim[1]);
+	// attach DM to RMAInterface
+	ga_handles[handle].rmaint->Attach( D );
     }
     else if (ndim == 1)// fetch-and-op
     {
 	ga_handles[handle].ndim = 1;
+	
 	// length of GA
 	ga_handles[handle].length = ga_handles[g_a].length;
 	const Int bufferSize = ga_handles[handle].length * sizeof(T);
+
 	// start access epoch on FOP window
 	mpi::WindowAllocate( bufferSize, grid.VCComm(), ga_handles[handle].fop_win );
-	mpi::WindowLock( ga_handles[handle].fop_win );
+	mpi::WindowLock( ga_handles[handle].fop_win );    
     }
     else
 	LogicError ("Up to 2 dimensions supported presently");
-    
+	
     mpi::Barrier( grid.VCComm() );
-
+    
     return handle;
 }
 
@@ -234,9 +544,9 @@ void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
 	    || ga_handles[g_c].ndim == 1 )
 	LogicError ("A 1D GA is not allowed for this operation");
 
-    DistMatrix<T>& GA = *(ga_handles[g_a].DM);
-    DistMatrix<T>& GB = *(ga_handles[g_b].DM);
-    DistMatrix<T>& GC = *(ga_handles[g_c].DM);
+    DistMatrix< T, MC, MR >& GA = *(ga_handles[g_a].DM);
+    DistMatrix< T, MC, MR >& GB = *(ga_handles[g_b].DM);
+    DistMatrix< T, MC, MR >& GC = *(ga_handles[g_c].DM);
 
     const Int g_a_height = GA.Height();
     const Int g_a_width = GA.Width();
@@ -244,6 +554,8 @@ void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
     const Int g_b_width = GB.Width();   
     const Int g_c_height = GC.Height();
     const Int g_c_width = GC.Width();
+   
+    const Grid& grid = GA.Grid();
     
     T a = *alpha;
     T b = *beta;
@@ -258,10 +570,8 @@ void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
 	    || (g_b_height != g_c_height))
 	LogicError ("Global Arrays of different heights cannot be added. ");
 
-    DistMatrix< T, MC, MR > Bd;
-    Bd.Resize( g_a_height, g_a_width );
+    DistMatrix< T, MC, MR > Bd( g_a_height, g_a_width, grid );
     Identity( Bd, g_a_height, g_a_width );
-
     // add
     // FIXME dont hardcode
     // algorithmic blocksize
@@ -276,6 +586,9 @@ void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
     Gemm( orientA, orientB, a, GA, Bd, b, GB, alg);
     // GC = GB
     Copy( GB, GC );
+
+    // clear intermediate DM
+    Bd.Empty();    
 }
 
 // copies g_a into g_b, must be of same shape
@@ -293,8 +606,8 @@ void GlobalArrays< T >::GA_Copy(Int g_a, Int g_b)
 	    || ga_handles[g_b].ndim == 1 )
 	LogicError ("A 1D GA is not allowed for this operation");
 
-    DistMatrix<T>& GA = *(ga_handles[g_a].DM);
-    DistMatrix<T>& GB = *(ga_handles[g_b].DM);
+    DistMatrix< T, MC, MR >& GA = *(ga_handles[g_a].DM);
+    DistMatrix< T, MC, MR >& GB = *(ga_handles[g_b].DM);
 
     const Int g_a_height = GA.Height();
     const Int g_a_width = GA.Width();
@@ -324,8 +637,20 @@ void GlobalArrays< T >::GA_Print(Int g_a)
     if ( ga_handles[g_a].ndim == 1 )
 	LogicError ("A 1D GA is not allowed for this operation");
 
-    DistMatrix<T>& DM = *(ga_handles[g_a].DM);
+    DistMatrix< T, MC, MR >& DM = *(ga_handles[g_a].DM);
+    // TODO should be printed in following format:
+    /*
+    global array: array_A[1:4,1:2],  handle: -1000
+                  1           2  
+	      ----------- -----------
+	1       2.00000     2.00000
+	2       2.00000     2.00000
+	3       2.00000     2.00000
+	4       2.00000     2.00000
+    */
+
     Print( DM );
+    mpi::Barrier( DM.DistComm() );
 }
 
 // deallocates ga and frees associated resources
@@ -339,6 +664,8 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
     if (g_a < 0 || g_a >= ga_handles.size())
 	LogicError ("Invalid GA handle");
+    if (ga_handles[g_a].is_destroyed)
+	return;
 
     if (ga_handles[g_a].ndim == 1)
     {
@@ -346,31 +673,42 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
 	mpi::WindowUnlock( ga_handles[g_a].fop_win );
 	mpi::WindowFree ( ga_handles[g_a].fop_win );
     }
-    else if (ga_handles[g_a].ndim == 2)
+    
+    if (ga_handles[g_a].ndim == 2)
     {
+	// clear vectors that holds local dims
+	ga_handles[g_a].ga_local_height.clear();
+	ga_handles[g_a].ga_local_width.clear();
+	ga_handles[g_a].ga_lo.clear();
+	ga_handles[g_a].ga_hi.clear();
+
 	// detach RmaInterface
 	// will end access epoch
 	ga_handles[g_a].rmaint->Detach();
-	// clear vectors that holds local dims
-	ga_handles[g_a].ga_local_height->clear();
-	ga_handles[g_a].ga_local_width->clear();
+
+	delete (ga_handles[g_a].rmaint);
+	delete (ga_handles[g_a].DM);
+	
+	ga_handles[g_a].AM->Empty();
+
 	// erase ga entry from global ga_handles vector
 	// FIXME erasing would mess up g_a handle values, 
 	// as GAs could be destroyed at different times
 	// so at present vector is cleared only on terminate
 	// ga_handles.erase( ga_handles.begin() + g_a );
     }
-    else
-	LogicError ("GA was already destroyed");
 
     // nullify pointers
-    ga_handles[g_a].ndim = -1;
-    ga_handles[g_a].length = -1;
-    ga_handles[g_a].pending_rma_op = false;		
-    ga_handles[g_a].rmaint = nullptr;
-    ga_handles[g_a].DM = nullptr;
-    ga_handles[g_a].ga_local_height = nullptr;
-    ga_handles[g_a].ga_local_width = nullptr;
+    ga_handles[g_a].ndim 		= -1;
+    ga_handles[g_a].length 		= -1;
+    ga_handles[g_a].patchHeight		= -1;
+    ga_handles[g_a].patchWidth		= -1;
+    ga_handles[g_a].pending_rma_op 	= false;
+    ga_handles[g_a].is_destroyed        = true;
+    ga_handles[g_a].fop_win 		= mpi::WIN_NULL;
+    ga_handles[g_a].rmaint 		= nullptr;
+    ga_handles[g_a].DM 			= nullptr;
+    ga_handles[g_a].AM 		        = nullptr;
 }
 
 // A := 0.5 * ( A + A' )
@@ -385,16 +723,17 @@ void GlobalArrays< T >::GA_Symmetrize (Int g_a)
     if ( ga_handles[g_a].ndim == 1 )
 	LogicError ("A 1D GA is not allowed for this operation");
 
-    DistMatrix<T>& GA = *(ga_handles[g_a].DM);
+    DistMatrix< T, MC, MR >& GA = *(ga_handles[g_a].DM);
     Int width = GA.Width();
     Int height = GA.Height();
 
     // create intermediate GAs using g_a parameters
     Int dims[2];
-    dims[1] = height;
     dims[0] = width;
+    dims[1] = height;
+    
     Int g_at = GA_Create( 2, dims, "transpose array" );
-    Int g_c = GA_Create( 2, dims, "final array" );
+    Int g_c = GA_Duplicate( g_at, "final array" );
 
     // transpose
     GA_Transpose( g_a, g_at );
@@ -403,6 +742,7 @@ void GlobalArrays< T >::GA_Symmetrize (Int g_a)
     // g_c = alpha * g_a  +  beta * g_at;
     T scale = static_cast<T>( 0.5 );
     GA_Add( &scale, g_a, &scale, g_at, g_c );
+    
     // copy g_c into g_a
     GA_Copy( g_c, g_a );
     
@@ -415,7 +755,7 @@ void GlobalArrays< T >::GA_Symmetrize (Int g_a)
 // where op( X ) = X or X' (transpose)
 // A = m x k -- B = k x n -- C = m x n
 template<typename T>
-void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, double alpha, Int g_a, Int g_b, double beta, Int g_c )
+void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, T alpha, Int g_a, Int g_b, T beta, Int g_c )
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Dgemm" ) )
     if (!ga_initialized)
@@ -431,11 +771,12 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, double a
 	    || ga_handles[g_c].ndim == 1 )
 	LogicError ("A 1D GA is not allowed for this operation");
 
-    DistMatrix<T>& ADM = *(ga_handles[g_a].DM);
-    DistMatrix<T>& BDM = *(ga_handles[g_b].DM);
-    DistMatrix<T>& CDM = *(ga_handles[g_c].DM);
+    DistMatrix< T, MC, MR >& ADM = *(ga_handles[g_a].DM);
+    DistMatrix< T, MC, MR >& BDM = *(ga_handles[g_b].DM);
+    DistMatrix< T, MC, MR >& CDM = *(ga_handles[g_c].DM);
 
-    // set algorithmic block size	
+    // set algorithmic block size
+    // multiple of 16 (cache-line-size)
     Int nb = 96;
     GemmAlgorithm alg = GEMM_SUMMA_B;
     
@@ -443,10 +784,7 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, double a
     const Orientation orientB = CharToOrientation( ((tb == 'T' || tb == 't') ? 'T' : 'N') );
     SetBlocksize( nb );
 
-    T a = static_cast<T>( alpha );
-    T b = static_cast<T>( beta );
-
-    Gemm( orientA, orientB, a, ADM, BDM, b, CDM, alg);
+    Gemm( orientA, orientB, alpha, ADM, BDM, beta, CDM, alg);
 }
 
 // FIXME GA struct should have a grid pointer,
@@ -472,14 +810,13 @@ void GlobalArrays< T >::GA_Fill(Int g_a, T* value)
 	for (Int i = 0; i < ga_handles[g_a].length; i++) fop_base[i] = a;
 	// default grid
 	const Grid &grid = DefaultGrid();
-	mpi::Barrier( grid.VCComm() );
+	mpi::Barrier( grid.Comm() );
     }
     else // fill DM with alpha
     {
-	DistMatrix<T>& DM = *(ga_handles[g_a].DM);
-	const Grid &grid = DM.Grid();
+	DistMatrix< T, MC, MR >& DM = *(ga_handles[g_a].DM);
 	Fill( DM, a );
-	mpi::Barrier( grid.VCComm() );
+	mpi::Barrier( DM.DistComm() );
     }
 }
 
@@ -500,16 +837,16 @@ void GlobalArrays< T >::GA_Initialize()
 	switch (op) \
 	{ \
 	    case '+': \
-		mpi::AllReduce( x, n, mpi::SUM, grid.VCComm() ); \
+		mpi::AllReduce( x, n, mpi::SUM, grid.Comm() ); \
 	        break; \
 	    case '*': \
-		mpi::AllReduce( x, n, mpi::PROD, grid.VCComm() ); \
+		mpi::AllReduce( x, n, mpi::PROD, grid.Comm() ); \
 	        break; \
 	    case 'X': \
-		mpi::AllReduce( x, n, mpi::MAX, grid.VCComm() ); \
+		mpi::AllReduce( x, n, mpi::MAX, grid.Comm() ); \
 	    	break; \
 	    case 'N': \
-		mpi::AllReduce( x, n, mpi::MIN, grid.VCComm() ); \
+		mpi::AllReduce( x, n, mpi::MIN, grid.Comm() ); \
 	    	break; \
 	    default: \
 		LogicError ("Unsupported global operation specified"); \
@@ -542,8 +879,8 @@ T GlobalArrays< T >::GA_Dot(Int g_a, Int g_b)
 	   || ga_handles[g_b].ndim == 1 )
        LogicError ("A 1D GA is not allowed for this operation");
 
-   const DistMatrix<T>& A = *(ga_handles[g_a].DM);
-   const DistMatrix<T>& B = *(ga_handles[g_b].DM);
+   const DistMatrix< T, MC, MR >& A = *(ga_handles[g_a].DM);
+   const DistMatrix< T, MC, MR >& B = *(ga_handles[g_b].DM);
 
    T result = Dot( A, B );
 
@@ -568,7 +905,7 @@ void GlobalArrays< T >::GA_Sync()
     }
 
     const Grid &grid = DefaultGrid();
-    mpi::Barrier( grid.VCComm() );
+    mpi::Barrier( grid.Comm() );
 }
 
 // delete all active arrays and destroy internal data structures.
@@ -580,11 +917,15 @@ void GlobalArrays< T >::GA_Terminate()
     if (!ga_initialized) // already terminated
 	return;
 
+    // destroy GAs as applicable
+    for (Int i = 0; i < ga_handles.size(); i++)
+    	GA_Destroy( i );
+
     ga_initialized = false;
     ga_handles.clear();
     
     const Grid &grid = DefaultGrid();
-    mpi::Barrier( grid.VCComm() );
+    mpi::Barrier( grid.Comm() );
 }
 
 // B = A'
@@ -602,16 +943,12 @@ void GlobalArrays< T >::GA_Transpose(Int g_a, Int g_b)
 	   || ga_handles[g_b].ndim == 1 )
        LogicError ("A 1D GA is not allowed for this operation");
 
-    DistMatrix<T>& ADM = *(ga_handles[g_a].DM);
-    DistMatrix<T>& BDM = *(ga_handles[g_b].DM);
+    DistMatrix< T, MC, MR >& ADM = *(ga_handles[g_a].DM);
+    DistMatrix< T, MC, MR >& BDM = *(ga_handles[g_b].DM);
     
     Transpose( ADM, BDM );
 }
 
-// returns a data range to my PE from iproc
-// assuming GA contiguous default distribution
-// Note: El data distribution is not contiguous
-// TODO
 template<typename T>
 void GlobalArrays< T >::NGA_Distribution( Int g_a, Int iproc, Int lo[], Int hi[] )
 {
@@ -623,21 +960,22 @@ void GlobalArrays< T >::NGA_Distribution( Int g_a, Int iproc, Int lo[], Int hi[]
     if ( ga_handles[g_a].ndim == 1 )
        LogicError ("A 1D GA is not allowed for this operation");
 
-    const Int local_height = ga_handles[g_a].ga_local_height->at( iproc );
-    const Int local_width = ga_handles[g_a].ga_local_width->at( iproc );
-
+    const Int patchHeight = ga_handles[g_a].patchHeight;
+    const Int patchWidth = ga_handles[g_a].patchWidth;
+    
     // lo, hi
-    if (local_height == 0 || local_width == 0)
+    if (patchHeight == 0 || patchWidth == 0)
     {
 	lo[0] = -1; lo[1] = -1;
 	hi[0] = -2; hi[1] = -2;
     }
     else
     {
-	hi[0] = local_width - 1;
-	hi[1] = local_height - 1;
-	lo[0] = 0;
-	lo[1] = 0;
+	const Int pos = iproc * 2;
+	hi[0] = ga_handles[g_a].ga_hi[pos];
+	hi[1] = ga_handles[g_a].ga_hi[pos + 1];
+	lo[0] = ga_handles[g_a].ga_lo[pos];
+	lo[1] = ga_handles[g_a].ga_lo[pos + 1];
     }
 }
 
@@ -658,14 +996,19 @@ void GlobalArrays< T >::NGA_Inquire( Int g_a, Int * ndim, Int dims[] )
     }
     else
     {
-	DistMatrix< T >&Y = *(ga_handles[g_a].DM);
+	DistMatrix< T, MC, MR >&Y = *(ga_handles[g_a].DM);
 	*ndim = 2; // number of dims is always 2
 	dims[1] = Y.Height();
 	dims[0] = Y.Width();
     }
 }
 
-// accesses data locally allocated for a global array    
+// accesses data locally allocated for a global array   
+// NOTE The returned leading dimension will be width,
+// because in GA, ldim is width of a matrix. Unlike,
+// Elemental, where ldim is height. Therefore, in NGA_
+// communication functions, we need to perform a transpose
+// to correctly put values in the output buffer
 template<typename T>
 void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[])
 {
@@ -679,10 +1022,40 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[
     if (lo[0] == -1 && hi[0] == -2)
 	LogicError("Invalid coordinate axes");
 
-    DistMatrix< T >&Y = *(ga_handles[g_a].DM);
-    *ld = Max( Y.LocalHeight(), 1 );
-    // pointer to local portion of DM
-    *ptr = Y.Buffer();
+    // check lo/hi
+    const Int localHeight = ga_handles[g_a].patchHeight;
+    const Int localWidth = ga_handles[g_a].patchWidth;
+    const Int patchHeight = hi[1] - lo[1] + 1;
+    const Int patchWidth = hi[0] - lo[0] + 1;
+
+    if (patchHeight < 0 || patchHeight > localHeight)
+	LogicError ("Incorrect coordinates in hi[1],lo[1] supplied");
+    if (patchWidth < 0 || patchWidth > localWidth)
+	LogicError ("Incorrect coordinates in hi[0],lo[0] supplied");
+
+    *ld = localHeight;
+    *ptr = ga_handles[g_a].AM->Buffer();
+    
+    NGA_Get( g_a, lo, hi, *ptr, ld );
+}
+
+template<typename T>
+void GlobalArrays< T >::NGA_Release(Int g_a, Int lo[], Int hi[])
+{
+    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Release" ) )
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a >= ga_handles.size())
+	LogicError ("Invalid GA handle");
+    if ( ga_handles[g_a].ndim == 1 )
+       LogicError ("A 1D GA is not allowed for this operation");
+    if (lo[0] == -1 && hi[0] == -2)
+	LogicError("Invalid coordinate axes");
+
+    T * buf = ga_handles[g_a].AM->Buffer();
+    Int ld = ga_handles[g_a].patchHeight;
+    
+    NGA_Put( g_a, lo, hi, buf, &ld );
 }
 
 // NOTE: transfers -- both BXFER and NBXFER are locally
@@ -755,11 +1128,6 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[
 	} \
     } while (0)
 
-// NOTE: the input buffer should not be updated, hence we do a * buf[], and
-// then buf[] / a to ensure input buffer is intact, but this affects performance
-// at the cost of saving memory for a new buffer
-// but for DP cases this might still cause some bugs
-// TODO fix this
 template<typename T>
 void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], T* alpha)
 {
@@ -773,43 +1141,27 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
     if ( ga_handles[g_a].ndim == 1 )
        LogicError ("A 1D GA is not allowed for this operation");
 
-    T one = static_cast<T> (1.0);
-    T zero = static_cast<T> (0.0);
     T a = *alpha;
     
     // calculate local height and width
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
-    const Int ldim = *ld;
+    const Int ldim = *ld; // ldim for GA buffer
+    const Int eldim = Max (height, 1);    // ldim for El buffer
 
     // create a matrix
-    Matrix< T > A;
-    if (a == zero)
-	Zeros (A, height, width);
-    else
-	A.Attach( height, width, buf, ldim );
+    Matrix< T > A(height, width, eldim);
+    T * inbuf = A.Buffer();
 
-    if (a != one && a != zero)
-    {
-	for (Int j = 0; j < width; j++)
-	    for (Int i = 0; i < height; i++)
-		buf[i + j*ldim] *= a;
-    }
+    for (Int j = 0; j < width; j++)
+	for (Int i = 0; i < height; i++)
+	    inbuf[i + j*eldim] = a * buf[j*ldim + i];
 
     const Int i = lo[1];
     const Int j = lo[0];
 
     // Acc - blocking transfer
     BXFER ('A', g_a, A, i, j);	
-
-    // safe to update local buffer after
-    // locally blocking transfer
-    if (a != one && a != zero)
-    {
-	for (Int j = 0; j < width; j++)
-	    for (Int i = 0; i < height; i++)
-		buf[i + j*ldim] /= a;
-    }
 }
 
 template<typename T>
@@ -828,17 +1180,21 @@ void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], T* buf, Int ld[])
     // calculate height and width from lo and hi
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
-    const Int ldim = *ld;
+    const Int eldim = Max (height, 1);    // ldim for El buffer
+    const Int ldim = *ld; // ldim for GA buffer
    
     const Int i = lo[1];
     const Int j = lo[0];
-
-    // create Matrix<T> for get
-    Matrix< T > A; 
-    A.Attach( height, width, buf, ldim );
-
+	
+    Matrix< T > A(height, width, eldim);
+        
     // get
     BXFER ('G', g_a, A, i, j);
+
+    T * outbuf = A.Buffer();
+    for (Int j = 0; j < width; j++)
+	for (Int i = 0; i < height; i++)
+	    buf[j*ldim + i] = outbuf[j*eldim + i];
 }
  
 template<typename T>
@@ -854,28 +1210,21 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     if ( ga_handles[g_a].ndim == 1 )
        LogicError ("A 1D GA is not allowed for this operation");
 
-    T zero = static_cast<T> (0.0);
-    T one = static_cast<T> (1.0);
     T a = *alpha;
 
     // calculate local height and width
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
-    const Int ldim = *ld;
+    const Int eldim = Max (height, 1);    // ldim for El buffer
+    const Int ldim = *ld; // ldim for GA Buffer
 
     // create a matrix
-    Matrix< T > A;
-    if (a == zero)
-	Zeros (A, height, width);
-    else
-	A.Attach( height, width, buf, ldim );
+    Matrix< T > A (height, width, eldim);
+    T *inbuf = A.Buffer();
 
-    if (a != one && a != zero)
-    {
-	for (Int j = 0; j < width; j++)
-	    for (Int i = 0; i < height; i++)
-		buf[i + j*ldim] *= a;
-    }
+    for (Int j = 0; j < width; j++)
+	for (Int i = 0; i < height; i++)
+	    inbuf[i + j*eldim] = a * buf[j*ldim + i];
 
     const Int i = lo[1];
     const Int j = lo[0];
@@ -883,15 +1232,6 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     // Acc - (locally) nonblocking transfer
     NBXFER ('A', g_a, A, i, j);
     *nbhandle = g_a;
-
-    // safe to update local buffer after
-    // locally blocking transfer
-    if (a != one && a != zero)
-    {
-	for (Int j = 0; j < width; j++)
-	    for (Int i = 0; i < height; i++)
-		buf[i + j*ldim] /= a;
-    }
 }
 
 template<typename T>
@@ -917,11 +1257,16 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     // calculate local height and width
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
-    const Int ldim = *ld;
+    const Int ldim = *ld; // ldim for GA buffer
+    const Int eldim = Max (height, 1);    // ldim for El buffer
 
     // create a matrix
-    Matrix< T > A;
-    A.Attach( height, width, buf, ldim );
+    Matrix< T > A( height, width, eldim );
+    T *inbuf = A.Buffer();
+
+    for (Int j = 0; j < width; j++)
+	for (Int i = 0; i < height; i++)
+	    inbuf[i + j*eldim] = buf[j*ldim + i];
 
     const Int i = lo[1];
     const Int j = lo[0];
@@ -988,11 +1333,16 @@ void GlobalArrays< T >::NGA_Put(Int g_a, Int lo[], Int hi[], T* buf, Int ld[])
     // calculate local height and width
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
-    const Int ldim = *ld;
+    const Int ldim = *ld; // ldim for GA buffer
+    const Int eldim = Max (height, 1); // ldim for El buffer
 
     // create a matrix
-    Matrix< T > A;
-    A.Attach( height, width, buf, ldim );
+    Matrix< T > A( height, width, eldim );
+    T *inbuf = A.Buffer();
+    
+    for (Int j = 0; j < width; j++)
+	for (Int i = 0; i < height; i++)
+	    inbuf[i + j*eldim] = buf[i + j*ldim];
 
     const Int i = lo[1];
     const Int j = lo[0];
@@ -1015,8 +1365,8 @@ T GlobalArrays< T >::NGA_Read_inc(Int g_a, Int subscript[], T inc)
 
     if (ga_handles[g_a].ndim == 2) // use RMAInterface atomic function
     {
-	const Int i = subscript[0];
-	const Int j = subscript[1];
+	const Int i = subscript[1];
+	const Int j = subscript[0];
 	prev = ga_handles[g_a].rmaint->AtomicIncrement( i, j, inc );
     }
     else // rank 0 is default FOP root for 1-D FOP GA, use mpi function directly

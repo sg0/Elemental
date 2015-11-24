@@ -14,16 +14,31 @@ namespace El {
 template<typename G>
 Memory<G>::Memory()
 : size_(0), buffer_(nullptr)
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+  ,rma_(false)  
+#endif
 { }
 
 template<typename G>
 Memory<G>::Memory( size_t size )
 : size_(0), buffer_(nullptr)
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+  ,rma_(false)  
+#endif
 { Require( size ); }
 
 template<typename G>
 Memory<G>::Memory( Memory<G>&& mem )
 : size_(mem.size_), buffer_(nullptr)
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+  ,rma_(false)  
+#endif
 { ShallowSwap(mem); }
 
 template<typename G>
@@ -35,17 +50,34 @@ void Memory<G>::ShallowSwap( Memory<G>& mem )
 {
     std::swap(size_,mem.size_);
     std::swap(buffer_,mem.buffer_);
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+    std::swap(rma_,mem.rma_);
+#endif
 }
 
 template<typename G>
 Memory<G>::~Memory() 
 {
+// MPI_Win_free will deallocate window buffer    
 #if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-#else
-    delete[] buffer_; 
+    if( !rma_ )
 #endif
+    delete[] buffer_; 
 }
+
+// rma set/get
+#if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+template<typename G>
+bool Memory<G>::GetRMA() const { return rma_; }
+
+template<typename G>
+void Memory<G>::SetRMA() { rma_ = true; }
+#endif
+
 
 template<typename G>
 G* Memory<G>::Buffer() const { return buffer_; }
@@ -86,7 +118,7 @@ G* Memory<G>::Require( size_t size )
     return buffer_;
 }
 
-
+// baseptr is MPI Window base pointer
 #if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
 template<typename G>
@@ -94,8 +126,6 @@ void Memory<G>::Preallocated( size_t size, G * baseptr )
 {
     if( size > size_ )
     {
-	delete[] buffer_;
-	
 	buffer_ = baseptr;
         size_ = size;
 
@@ -118,9 +148,10 @@ void Memory<G>::Empty()
 {
 #if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-#else
-    delete[] buffer_;
+    if( !rma_ )
 #endif
+    delete[] buffer_;
+    
     size_ = 0;
     buffer_ = nullptr;
 }

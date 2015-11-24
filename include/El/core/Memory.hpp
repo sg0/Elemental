@@ -17,6 +17,10 @@ class Memory
 {
     size_t size_;
     G* buffer_;
+#if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    bool rma_;
+#endif
 public:
     Memory();
     Memory( size_t size );
@@ -32,6 +36,10 @@ public:
     size_t Size()   const;
 #if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+    // rma get/set
+    bool GetRMA() const;
+    void SetRMA();
+    // assign window baseptr to buffer_
     void Preallocated( size_t size, G * baseptr);
 #endif
     G* Require( size_t size );

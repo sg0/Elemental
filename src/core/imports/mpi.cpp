@@ -497,10 +497,12 @@ void * GetWindowBase (Window & window)
     DEBUG_ONLY( CallStackEntry cse ("mpi::GetWindowBase") )
 
     int flag = 0;
-    // TODO check flag
     void * attribute_val = NULL;
     SafeMpi( MPI_Win_get_attr
-             ( window, MPI_WIN_BASE, &attribute_val, &flag) );
+             ( window, MPI_WIN_BASE, (void *)&attribute_val, &flag) );
+    if (!flag)
+	LogicError("No attribute associated with MPI window");
+
     return attribute_val;
 }
 
@@ -512,8 +514,6 @@ void WindowAllocate (int size, Comm comm, Window & window)
     SafeMpi( MPI_Win_allocate
              ( (MPI_Aint) size, 1, MPI_INFO_NULL,
               comm.comm, &base, &window) );
-    // zero out memory
-    memset (base, 0, size);
 
 #ifdef EL_NO_ACC_ORDERING
     SetWindowProp( window, NO_ACC_ORDERING );
@@ -1278,6 +1278,74 @@ void FlushLocal (Window & window)
     DEBUG_ONLY (CallStackEntry cse ("mpi::FlushLocal"))
     SafeMpi (MPI_Win_flush_local_all (window));
 }
+
+// Collectives
+// -----------
+
+// AllGather - MPI_IN_PLACE
+// TODO employ USE_EL_HAVE_MPI_IN_PLACE
+// macro, like in Scatter/Reduce
+template < typename R >
+void AllGather
+(R * rbuf, int rc, Comm comm)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::AllGather"))
+#ifdef EL_USE_BYTE_ALLGATHERS
+    SafeMpi
+    (MPI_Allgather
+     (MPI_IN_PLACE, NULL,
+      MPI_UNSIGNED_CHAR, (UCP) rbuf, sizeof (R) * rc,
+      MPI_UNSIGNED_CHAR, comm.comm));
+#else
+    SafeMpi
+    (MPI_Allgather
+     (MPI_IN_PLACE, NULL, TypeMap < R > (),
+      rbuf, rc, TypeMap < R > (), comm.comm));
+#endif
+}
+
+template < typename R >
+void AllGather
+(Complex < R > *rbuf, int rc, Comm comm)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::AllGather"))
+#ifdef EL_USE_BYTE_ALLGATHERS
+    SafeMpi
+    (MPI_Allgather
+     (MPI_IN_PLACE, NULL, MPI_UNSIGNED_CHAR,
+      (UCP) rbuf, 2 * sizeof (R) * rc,
+      MPI_UNSIGNED_CHAR, comm.comm));
+#else
+#ifdef EL_AVOID_COMPLEX_MPI
+    SafeMpi
+    (MPI_Allgather
+     (MPI_IN_PLACE, NULL,
+      TypeMap < R > (), rbuf, 2 * rc,
+      TypeMap < R > (), comm.comm));
+#else
+    SafeMpi
+    (MPI_Allgather
+     (MPI_IN_PLACE, NULL,
+      TypeMap < Complex < R >> (), rbuf, rc,
+      TypeMap < Complex < R >> (), comm.comm));
+#endif
+#endif
+}
+
+template void AllGather (byte * rbuf, int rc, Comm comm);
+template void AllGather (int *rbuf, int rc, Comm comm);
+template void AllGather (unsigned *rbuf, int rc, Comm comm);
+template void AllGather (long int *rbuf, int rc, Comm comm);
+template void AllGather (unsigned long *rbuf, int rc, Comm comm);
+#ifdef EL_HAVE_MPI_LONG_LONG
+template void AllGather (long long int *rbuf, int rc, Comm comm);
+template void AllGather (unsigned long long *rbuf, int rc, Comm comm);
+#endif
+template void AllGather (float *rbuf, int rc, Comm comm);
+template void AllGather (double *rbuf, int rc, Comm comm);
+template void AllGather (Complex < float >*rbuf, int rc, Comm comm);
+template void AllGather (Complex < double >*rbuf, int rc, Comm comm);
+
 #endif // EL_ENABLE_RMA_AXPY
 
 // Various utilities

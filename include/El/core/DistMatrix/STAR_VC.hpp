@@ -33,7 +33,14 @@ public:
     DistMatrix( const El::Grid& g=DefaultGrid(), int root=0 );
     // Create a height x width distributed matrix
     DistMatrix
-    ( Int height, Int width, const El::Grid& g=DefaultGrid(), int root=0 );
+    ( Int height, Int width, const El::Grid& g=DefaultGrid(), int root=0 );    
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+    // Create a height x width distributed matrix w rma flag
+    DistMatrix
+    	( Int height, Int width, bool forRMA, const El::Grid& g=DefaultGrid(), int root=0 );
+#endif
     // Create a copy of distributed matrix A
     DistMatrix( const type& A );
     DistMatrix( const absType& A );

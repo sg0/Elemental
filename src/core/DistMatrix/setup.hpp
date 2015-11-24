@@ -39,17 +39,34 @@ DM::DistMatrix( Int height, Int width, const El::Grid& grid, int root )
     if( COLDIST == CIRC && ROWDIST == CIRC )
         this->matrix_.viewType_ = OWNER;
     
+    this->SetShifts(); 
+    this->Resize(height,width);
+}
+
+// Constructor to create a DM that could be
+// passed to RMAInterface functions
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+template<typename T>
+DM::DistMatrix( Int height, Int width, bool forRMA, const El::Grid& grid, int root )
+: ADM(forRMA,grid,root)
+{ 
+    if( COLDIST == CIRC && ROWDIST == CIRC )
+        this->matrix_.viewType_ = OWNER;
+    
+    this->SetShifts(); 
     // allocate MPI window in RmaInterface,
     // do not allocate memory now, just the
     // dimensions
-    this->SetShifts(); 
-#if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    this->SetDim(height, width);
-#else
-    this->Resize(height,width);
-#endif    
+    // Memory will get allocated in Win_allocate
+    // in RMAInterface::Attach
+    if( forRMA )
+	this->SetDim(height, width);
+    else
+	this->Resize(height,width);
 }
+#endif    
 
 template<typename T>
 DM::DistMatrix( const DM& A )

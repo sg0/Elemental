@@ -550,19 +550,33 @@ void Matrix<T>::Resize_( Int height, Int width )
     if( reallocate )
     {
         ldim_ = Max( height, 1 );
-        memory_.Require( ldim_ * width );
-        data_ = memory_.Buffer();
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+	if( !memory_.GetRMA() )
+	{
+#endif
+	    memory_.Require( ldim_ * width );
+	    data_ = memory_.Buffer();
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+	}
+#endif
     }
 }
 
-#if MPI_VERSION>=3 && defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
 template<typename T>
 void Matrix<T>::SetDim_( Int height, Int width )
 {
     bool reallocate = height > ldim_ || width > width_;
     height_ = height;
     width_ = width;
+    // turns on the RMA flag bit
+    memory_.SetRMA();
     
     if( reallocate )
     {
@@ -571,16 +585,36 @@ void Matrix<T>::SetDim_( Int height, Int width )
     }
 }
 
-// SetDim_ must be called before this
-// function gets called
 template<typename T>
 void Matrix<T>::SetWindowBase_( T* ptr )
 {
+    // NOTE: This condition will fail if a window of 0 bytes
+    // is allocated, which is a valid use case, happens
+    // when current process does not store any elements.
+    // This could arise when distribution is <MC, MR>
+    // and we pass a DM of height = 1, width = m, so in
+    // a 2D grid distribution, only half of the PEs will
+    // store elements.
+    /*
     if( ptr == NULL )
     	LogicError("Cannot assign matrix base with NULL pointer" );
-    memory_.Preallocated((height_*width_), ptr );
+	*/
+
+    // SetDim_ must be called before this
+    // function gets called
+    if( !memory_.GetRMA() )
+    	LogicError("Memory not configured for RMA" );
+
+    size_t buffSize = (height_ * width_ * sizeof(T));
+    // Although 0 sized windows are valid according
+    // to MPI spec, but this may break things, so 
+    // make sure at least size(T) bytes are allocated
+    /*
+    if( !buffSize )
+	buffSize = sizeof(T);
+	*/
+    memory_.Preallocated( buffSize, ptr );
     data_ = memory_.Buffer();
-    //data_ = ptr;
 }
 #endif
 
@@ -590,11 +624,23 @@ void Matrix<T>::Resize_( Int height, Int width, Int ldim )
     bool reallocate = height > ldim_ || width > width_ || ldim != ldim_;
     height_ = height;
     width_ = width;
+    
     if( reallocate )
     {
         ldim_ = ldim;
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+	if( !memory_.GetRMA() )
+	{
+#endif
         memory_.Require(ldim*width);
         data_ = memory_.Buffer();
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+	}
+#endif
     }
 }
 

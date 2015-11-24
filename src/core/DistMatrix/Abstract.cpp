@@ -24,7 +24,27 @@ AbstractDistMatrix<T>::AbstractDistMatrix( const El::Grid& grid, int root )
   colConstrained_(false), rowConstrained_(false), rootConstrained_(false),
   colAlign_(0), rowAlign_(0),
   root_(root), grid_(&grid)
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+  ,forRMA_(false)  
+#endif
 { }
+
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+template<typename T>
+AbstractDistMatrix<T>::AbstractDistMatrix( bool forRMA, const El::Grid& grid, int root )
+: viewType_(OWNER),
+  height_(0), width_(0),
+  matrix_(0,0,true),
+  colConstrained_(false), rowConstrained_(false), rootConstrained_(false),
+  colAlign_(0), rowAlign_(0),
+  root_(root), grid_(&grid),
+  forRMA_(forRMA)  
+{ }
+#endif
 
 template<typename T>
 AbstractDistMatrix<T>::AbstractDistMatrix( AbstractDistMatrix<T>&& A ) 
@@ -37,6 +57,11 @@ EL_NOEXCEPT
   colShift_(A.colShift_), rowShift_(A.rowShift_), 
   root_(A.root_),
   grid_(A.grid_)
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+  ,forRMA_(A.forRMA_)
+#endif
 { matrix_.ShallowSwap( A.matrix_ ); }
 
 // Optional to override
@@ -71,6 +96,11 @@ AbstractDistMatrix<T>::operator=( AbstractDistMatrix<T>&& A )
         rowShift_ = A.rowShift_;
         root_ = A.root_;
         grid_ = A.grid_;
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+	forRMA_ = A.forRMA_;
+#endif
     }
     return *this;
 }
@@ -97,6 +127,8 @@ AbstractDistMatrix<T>::Empty()
     colConstrained_ = false;
     rowConstrained_ = false;
     rootConstrained_ = false;
+    forRMA_ = false;
+
     SetShifts();
 }
 
@@ -121,8 +153,9 @@ AbstractDistMatrix<T>::SetGrid( const El::Grid& grid )
     }
 }
 
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
 template<typename T>
 void
 AbstractDistMatrix<T>::SetDim( Int height, Int width )
@@ -133,6 +166,9 @@ AbstractDistMatrix<T>::SetDim( Int height, Int width )
         if( Viewing() && (height > height_ || width > width_) )
             LogicError("Tried to increase the size of a view");
     )
+	
+    if( !forRMA_ )
+	LogicError("This matrix is not set to be an RMA participant, call the appropriate constructor");
 
     height_ = height; 
     width_ = width;    
@@ -141,11 +177,19 @@ AbstractDistMatrix<T>::SetDim( Int height, Int width )
     	              Length(width,RowShift(),RowStride()) );
 }
 
+// to be called after setdim_
 template<typename T>
 void
 AbstractDistMatrix<T>::SetWindowBase( T* baseptr )
 {
-    DEBUG_ONLY( CallStackEntry cse("ADM::SetWindowBase"); )
+    DEBUG_ONLY( CallStackEntry cse("ADM::SetWindowBase") )
+
+    if( height_ == 0 || width_ == 0 )
+	LogicError ("Dimensions are still 0, Setdim_ needs to be called prior to this");
+    if( !forRMA_ )
+	LogicError("This matrix is not set to be an RMA participant, call the appropriate constructor");
+    
+    // set window base
     matrix_.SetWindowBase_( baseptr );
 }
 #endif
@@ -192,8 +236,13 @@ void
 AbstractDistMatrix<T>::MakeConsistent( bool includingViewers )
 {
     DEBUG_ONLY(CallStackEntry cse("ADM::MakeConsistent"))
-
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+    const Int msgLength = 10;
+#else
     const Int msgLength = 9;
+#endif
     Int message[msgLength];
     if( CrossRank() == Root() )
     {
@@ -206,6 +255,11 @@ AbstractDistMatrix<T>::MakeConsistent( bool includingViewers )
         message[6] = colAlign_;
         message[7] = rowAlign_;
         message[8] = root_;
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+	message[9] = forRMA_;
+#endif
     }
 
     const El::Grid& g = *grid_;
@@ -230,6 +284,11 @@ AbstractDistMatrix<T>::MakeConsistent( bool includingViewers )
     const Int newColAlign         = message[6];
     const Int newRowAlign         = message[7];
     const int root                = message[8];
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+    const bool newForRMA          = message[9];
+#endif
 
     root_            = root;
     viewType_        = newViewType;
@@ -238,6 +297,11 @@ AbstractDistMatrix<T>::MakeConsistent( bool includingViewers )
     rootConstrained_ = newConstrainedRoot;
     colAlign_        = newColAlign;
     rowAlign_        = newRowAlign;
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+    forRMA_	     = newForRMA;
+#endif
 
     SetShifts();
     Resize( newHeight, newWidth );
@@ -279,7 +343,8 @@ template<typename T>
 void
 AbstractDistMatrix<T>::Align( int colAlign, int rowAlign, bool constrain )
 { 
-    DEBUG_ONLY(CallStackEntry cse("ADM::Align"))
+    DEBUG_ONLY( CallStackEntry cse("ADM::Align") )
+
     const bool requireChange = colAlign_ != colAlign || rowAlign_ != rowAlign;
     DEBUG_ONLY(
         if( Viewing() && requireChange )
@@ -334,7 +399,7 @@ AbstractDistMatrix<T>::AlignRows( int rowAlign, bool constrain )
 template<typename T>
 void
 AbstractDistMatrix<T>::FreeAlignments() 
-{ 
+{
     if( !Viewing() )
     {
         colConstrained_ = false;
@@ -489,7 +554,14 @@ AbstractDistMatrix<T>::Attach
 ( Int height, Int width, const El::Grid& g, 
   int colAlign, int rowAlign, T* buffer, Int ldim, int root )
 {
-    DEBUG_ONLY(CallStackEntry cse("ADM::Attach"))
+    DEBUG_ONLY( CallStackEntry cse("ADM::Attach") )
+
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+    if( forRMA_ )
+	LogicError("Matrix associated with RMAInterface cannot be reconfigured");
+#endif
     Empty();
 
     grid_ = &g;
@@ -502,6 +574,7 @@ AbstractDistMatrix<T>::Attach
     rowConstrained_ = true;
     rootConstrained_ = true;
     viewType_ = VIEW;
+
     SetShifts();
     if( Participating() )
     {
@@ -537,7 +610,15 @@ AbstractDistMatrix<T>::LockedAttach
 ( Int height, Int width, const El::Grid& g, 
   int colAlign, int rowAlign, const T* buffer, Int ldim, int root )
 {
-    DEBUG_ONLY(CallStackEntry cse("ADM::LockedAttach"))
+    DEBUG_ONLY( CallStackEntry cse("ADM::LockedAttach") )
+
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+    if( forRMA_ )
+	LogicError("Matrix associated with RMAInterface cannot be reconfigured");
+#endif   
+
     Empty();
 
     grid_ = &g;
@@ -550,6 +631,7 @@ AbstractDistMatrix<T>::LockedAttach
     rowConstrained_ = true;
     rootConstrained_ = true;
     viewType_ = LOCKED_VIEW;
+
     SetShifts();
     if( Participating() )
     {
@@ -599,6 +681,13 @@ template<typename T>
 bool AbstractDistMatrix<T>::Viewing() const { return IsViewing( viewType_ ); }
 template<typename T>
 bool AbstractDistMatrix<T>::Locked() const { return IsLocked( viewType_ ); }
+
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+template<typename T>
+bool AbstractDistMatrix<T>::ForRMA() const { return forRMA_; }
+#endif
 
 // Local matrix information
 // ------------------------
@@ -1197,6 +1286,11 @@ AbstractDistMatrix<T>::ShallowSwap( AbstractDistMatrix<T>& A )
     std::swap( rowShift_, A.rowShift_ );
     std::swap( root_, A.root_ );
     std::swap( grid_, A.grid_ );
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
+    std::swap( forRMA_, A.forRMA_ );
+#endif
 }
 
 // Modify the distribution metadata

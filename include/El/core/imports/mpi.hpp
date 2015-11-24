@@ -294,6 +294,18 @@ void Flush( int target_rank, Window& window );
 void Flush( Window & window );
 void FlushLocal( int target_rank, Window& window );
 void FlushLocal( Window & window );
+
+// Collectives
+// -----------
+// In-place AllGather
+// ------------------
+template<typename R>
+void AllGather
+( R* rbuf, int rc, Comm comm );
+template<typename R>
+void AllGather
+( Complex<R>* rbuf, int rc, Comm comm );
+
 #endif // EL_ENABLE_RMA_AXPY
 
 // Utilities
