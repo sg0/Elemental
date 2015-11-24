@@ -127,8 +127,11 @@ AbstractDistMatrix<T>::Empty()
     colConstrained_ = false;
     rowConstrained_ = false;
     rootConstrained_ = false;
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && \
+		 defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
+	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
     forRMA_ = false;
-
+#endif
     SetShifts();
 }
 
