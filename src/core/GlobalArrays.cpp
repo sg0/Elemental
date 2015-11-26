@@ -559,6 +559,7 @@ void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
     
     T a = *alpha;
     T b = *beta;
+    T one = T( 1 );
     
     // arrays must have the same shape
     if ((g_a_width != g_b_width) 
@@ -570,25 +571,22 @@ void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
 	    || (g_b_height != g_c_height))
 	LogicError ("Global Arrays of different heights cannot be added. ");
 
-    DistMatrix< T, MC, MR > Bd( g_a_height, g_a_width, grid );
-    Identity( Bd, g_a_height, g_a_width );
-    // add
-    // FIXME dont hardcode
-    // algorithmic blocksize
-    Int nb = 96;
-    GemmAlgorithm alg = GEMM_SUMMA_A;
+    // Entrywise map for b * GB
+    if (b != one)
+    {
+	auto valMap = [b]( T val ) { return (val * b); }; 
+        EntrywiseMap( GB, function<T(T)>(valMap) );
+    }
     
-    const Orientation orientA = CharToOrientation( 'N' );
-    const Orientation orientB = CharToOrientation( 'N' );
-    SetBlocksize( nb );
+    // Add a*GA into GB(0,0)
+    vector<Int> I(g_b_width), J(g_b_height);
+    for( Int j=0; j<g_b_width; ++j ) I[j] = j;
+    for( Int i=0; i<g_b_height; ++i ) J[i] = i;
 
-    // GB = a*GA*Bd + b*GB
-    Gemm( orientA, orientB, a, GA, Bd, b, GB, alg);
+    UpdateSubmatrix( GB, I, J, a, GA );
+
     // GC = GB
     Copy( GB, GC );
-
-    // clear intermediate DM
-    Bd.Empty();    
 }
 
 // copies g_a into g_b, must be of same shape
@@ -731,8 +729,10 @@ void GlobalArrays< T >::GA_Symmetrize (Int g_a)
     Int dims[2];
     dims[0] = width;
     dims[1] = height;
-    
-    Int g_at = GA_Create( 2, dims, "transpose array" );
+   
+    // NOTE: Intel 15.0.3 emits a compile error if the optional
+    // parameter to GA_Create is not qualified with a nullptr
+    Int g_at = GA_Create( 2, dims, "transpose array", nullptr );
     Int g_c = GA_Duplicate( g_at, "final array" );
 
     // transpose
@@ -740,7 +740,7 @@ void GlobalArrays< T >::GA_Symmetrize (Int g_a)
 
     // add: scale * ( g_a + g_at )
     // g_c = alpha * g_a  +  beta * g_at;
-    T scale = static_cast<T>( 0.5 );
+    T scale = T( 0.5 );
     GA_Add( &scale, g_a, &scale, g_at, g_c );
     
     // copy g_c into g_a
@@ -770,15 +770,20 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, T alpha,
 	    || ga_handles[g_b].ndim == 1 
 	    || ga_handles[g_c].ndim == 1 )
 	LogicError ("A 1D GA is not allowed for this operation");
-
+    
     DistMatrix< T, MC, MR >& ADM = *(ga_handles[g_a].DM);
     DistMatrix< T, MC, MR >& BDM = *(ga_handles[g_b].DM);
     DistMatrix< T, MC, MR >& CDM = *(ga_handles[g_c].DM);
-
+    
     // set algorithmic block size
     // multiple of 16 (cache-line-size)
-    Int nb = 96;
-    GemmAlgorithm alg = GEMM_SUMMA_B;
+    Int nb = 128;
+    // NOTE: For some reason, both summa_A/B
+    // threw a hard to track memory corruption
+    // error (for both win_create and win_alloc)
+    // with OpenMP/EL_HYBRID builds
+    // Keep C stationary
+    GemmAlgorithm alg = GEMM_SUMMA_C;
     
     const Orientation orientA = CharToOrientation( ((ta == 'T' || ta == 't') ? 'T' : 'N') );
     const Orientation orientB = CharToOrientation( ((tb == 'T' || tb == 't') ? 'T' : 'N') );
@@ -1034,9 +1039,10 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[
 	LogicError ("Incorrect coordinates in hi[0],lo[0] supplied");
 
     *ld = localHeight;
-    *ptr = ga_handles[g_a].AM->Buffer();
+    T * buf = ga_handles[g_a].AM->Buffer();
     
-    NGA_Get( g_a, lo, hi, *ptr, ld );
+    NGA_Get( g_a, lo, hi, buf, ld );
+    *ptr = buf;
 }
 
 template<typename T>

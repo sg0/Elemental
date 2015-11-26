@@ -78,7 +78,6 @@ template<typename G>
 void Memory<G>::SetRMA() { rma_ = true; }
 #endif
 
-
 template<typename G>
 G* Memory<G>::Buffer() const { return buffer_; }
 

@@ -33,12 +33,6 @@ RmaInterface<T>::RmaInterface( DistMatrix<T>& X )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::RmaInterface" ) )
    
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    if( !X.ForRMA() )
-	LogicError("Attempting to attach a DistMatrix without the RMA flag, check constructor");
-#endif
-
     attached_ 			= false;
     detached_ 			= true;
     toBeAttachedForGet_ 	= false;
@@ -56,12 +50,6 @@ RmaInterface<T>::RmaInterface( const DistMatrix<T>& X )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::RmaInterface" ) )
 	    
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    if( !X.ForRMA() )
-	LogicError("Attempting to attach a DistMatrix without the RMA flag, check constructor");
-#endif
-
     attached_ 			= false;
     detached_ 			= true;
     toBeAttachedForGet_ 	= false;
@@ -97,12 +85,6 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Attach" ) )
 	    
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    if( !Z.ForRMA() )
-	LogicError("Attempting to attach a DistMatrix without the RMA flag, check constructor");
-#endif
-
     // attached_ will be only set in Attach
     // and only unset in Detach
     if( !attached_ && detached_ )
@@ -153,13 +135,19 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
 #endif
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-        const Int numEntries = Z.LocalHeight() * Z.LocalWidth();
-        const Int bufferSize = numEntries * sizeof( T );
-
-	mpi::WindowAllocate( bufferSize, Z.DistComm(), window );
-       
-	T * baseptr = reinterpret_cast< T *>( mpi::GetWindowBase( window ) );
-	Z.SetWindowBase( baseptr );
+	const Int numEntries = Z.LocalHeight() * Z.LocalWidth();
+	const Int bufferSize = numEntries * sizeof( T );
+	if( !Z.ForRMA() ) // fall back to win create
+	{
+	    void * baseptr = reinterpret_cast<void *>( Z.Buffer() );
+	    mpi::WindowCreate( baseptr, bufferSize, Z.DistComm(), window );
+	}
+	else // DM constructor with RMA flag set
+	{
+	    mpi::WindowAllocate( bufferSize, Z.DistComm(), window );
+	    T * baseptr = reinterpret_cast< T *>( mpi::GetWindowBase( window ) );
+	    Z.SetWindowBase( baseptr );
+	}
 
 	mpi::WindowLock( window );
 #endif
@@ -172,12 +160,6 @@ template<typename T>
 void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Attach" ) )
-
-#if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
-	!defined(EL_USE_WIN_CREATE_FOR_RMA)
-    if( !X.ForRMA() )
-	LogicError("Attempting to attach a DistMatrix without the RMA flag, check constructor");
-#endif
 
     if( !attached_ && detached_ )
     {
@@ -210,7 +192,24 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 #endif
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)       
-	LogicError ("Const DistMatrix cannot be modified, select EL_USE_WIN_CREATE_FOR_RMA");
+	const Int numEntries = X.LocalHeight() * X.LocalWidth();
+	const Int bufferSize = numEntries * sizeof( T );
+	if( !X.ForRMA() )
+	{
+	    void * baseptr = static_cast<void *>( const_cast<T *>( X.LockedBuffer() ) );
+	    mpi::WindowCreate( baseptr, bufferSize, X.DistComm(), window );
+	    mpi::WindowLock( window );
+	}
+	else
+	    LogicError ("Const DistMatrix cannot be modified, select EL_USE_WIN_CREATE_FOR_RMA");
+	/*
+	{
+	    mpi::WindowAllocate( bufferSize, X.DistComm(), window );
+	    T * baseptr = reinterpret_cast< T *>( mpi::GetWindowBase( window ) );
+	    X.SetWindowBase( baseptr );
+	    mpi::WindowLock( window );
+	}
+	*/
 #endif
 	mpi::Barrier( X.DistComm() );
     }
