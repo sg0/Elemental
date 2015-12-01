@@ -1346,16 +1346,8 @@ Int GlobalArrays< T >::NGA_NbTest(ga_nbhdl_t* nbhandle)
     if (*nbhandle >= ga_handles.size())
 	return -1;
 
-    if (*nbhandle != -1)
-    {
-	bool status = ga_handles[*nbhandle].rmaint->Testall ();
-	if (status) // release handle
-	{
-            ga_handles[*nbhandle].pending_rma_op = false;
-	    *nbhandle = -1;
-	    return 1;
-	}
-    }
+    ga_handles[*nbhandle].pending_rma_op = false;
+    *nbhandle = -1;
 
     return 0;
 }
@@ -1371,7 +1363,7 @@ void GlobalArrays< T >::NGA_NbWait(ga_nbhdl_t* nbhandle)
     
     if (*nbhandle != -1)
     {
-	ga_handles[*nbhandle].rmaint->Waitall ();
+	ga_handles[*nbhandle].rmaint->Flush ();
         ga_handles[*nbhandle].pending_rma_op = false;
 	// release handle
 	*nbhandle = -1;
