@@ -514,6 +514,8 @@ void WindowAllocate (int size, Comm comm, Window & window)
     SafeMpi( MPI_Win_allocate
              ( (MPI_Aint) size, 1, MPI_INFO_NULL,
               comm.comm, &base, &window) );
+    // set zero
+    memset (base, 0, size);
 
 #ifdef EL_NO_ACC_ORDERING
     SetWindowProp( window, NO_ACC_ORDERING );

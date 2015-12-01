@@ -100,7 +100,7 @@ class GlobalArrays
 			ga_lo(),                      // lo
 			ga_hi(),                      // hi
 		        pending_rma_op( false ),      // pending_rma_op
-			is_destroyed( false ),        // is_destroyed
+			is_destroyed( true ),         // is_destroyed
 		        length( -1 ),                 // length
 		        ndim( -1 ),                   // ndim
 			patchWidth( -1 ),             // patchWidth

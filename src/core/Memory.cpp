@@ -29,7 +29,9 @@ Memory<G>::Memory( size_t size )
 	         !defined(EL_USE_WIN_CREATE_FOR_RMA)
   ,rma_(false)  
 #endif
-{ Require( size ); }
+{ 
+    Require( size ); 
+}
 
 template<typename G>
 Memory<G>::Memory( Memory<G>&& mem )

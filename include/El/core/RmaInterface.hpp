@@ -47,13 +47,6 @@ public:
     void Iacc(       Matrix<T>& Z, Int i, Int j );
     void Iacc( const Matrix<T>& Z, Int i, Int j );
 
-    // Request based RMA
-    void Rput( Matrix<T>& Z, Int i, Int j );
-    void Rput( const Matrix<T>& Z, Int i, Int j );
-
-    void Racc(       Matrix<T>& Z, Int i, Int j );
-    void Racc( const Matrix<T>& Z, Int i, Int j );
-
     // atomic routines
 
     // element-wise atomic increment, returns
@@ -68,38 +61,11 @@ public:
     void LocalFlush();
     void Flush();
    
-    bool Testall();
-    bool Test(          Matrix<T>& Z );
-    bool Test(    const Matrix<T>& Z );  
-    bool TestAny(       Matrix<T>& Z );
-    bool TestAny( const Matrix<T>& Z ); 
-
-    void Waitall();
-    void Wait(          Matrix<T>& Z );
-    void Wait(    const Matrix<T>& Z );    
-    void WaitAny(       Matrix<T>& Z );
-    void WaitAny( const Matrix<T>& Z ); 
-
     void Detach();
 
 private:
     // window for data
     mpi::Window window;
-
-    // struct for passing data
-    // for request based rma
-    struct matrix_params_
-    {
-	const void *base_;
-	std::vector<std::deque<std::vector<T>>>
-	    data_;
-	std::vector<std::deque<mpi::Request>> 
-	    requests_;
-	std::vector<std::deque<bool>> 
-	    statuses_;
-    };
-        	
-    std::vector<struct matrix_params_> matrices_;
 
     // buffers for rma 
     std::vector<std::deque<std::vector<T>>>
@@ -115,17 +81,6 @@ private:
     Int NextIndex ( 
 	    Int dataSize, 
 	    std::deque <std::vector<T>> &dataVectors );
-
-    Int NextIndex (
-	Int target,
-	Int dataSize, 
-	const void* base_address,
-	Int* mindex);
-
-    // only relevant for request-based
-    // passive RMA
-    bool anyPendingXfers (       Matrix<T>& Z );
-    bool anyPendingXfers ( const Matrix<T>& Z ); 
 };
 #endif // EL_ENABLE_RMA_AXPY
 } // namespace El
