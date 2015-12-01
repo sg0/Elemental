@@ -1336,7 +1336,9 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     // is locally complete
     A.Empty();
 }
- 
+
+// Note: This is essentially a no-op, hence it doesn't 
+// ever release the handle
 template<typename T>
 Int GlobalArrays< T >::NGA_NbTest(ga_nbhdl_t* nbhandle)
 {
@@ -1346,8 +1348,7 @@ Int GlobalArrays< T >::NGA_NbTest(ga_nbhdl_t* nbhandle)
     if (*nbhandle >= ga_handles.size())
 	return -1;
 
-    ga_handles[*nbhandle].pending_rma_op = false;
-    *nbhandle = -1;
+    ga_handles[*nbhandle].pending_rma_op = true;
 
     return 0;
 }
