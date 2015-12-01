@@ -308,7 +308,7 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
             const Int destination = receivingRow + r*receivingCol;
             const Int index =
                 NextIndex( numEntries,
-                           putVector_[destination] );
+                           getVector_[destination] );
             T* getBuffer = getVector_[destination][index].data();
 	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
 	    const Int remoteWidth = Length( dm_width, receivingCol, Y.RowAlign(), c );
