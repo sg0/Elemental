@@ -579,22 +579,22 @@ void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
 	    || (g_b_height != g_c_height))
 	LogicError ("Global Arrays of different heights cannot be added. ");
 
+    // GC = GB
+    Copy( GB, GC );
+    
     // Entrywise map for b * GB
     if (b != one)
     {
 	auto valMap = [b]( T val ) { return (val * b); }; 
-        EntrywiseMap( GB, function<T(T)>(valMap) );
+        EntrywiseMap( GC, function<T(T)>(valMap) );
     }
     
-    // Add a*GA into GB(0,0)
-    vector<Int> J(g_b_height), I(g_b_width);
-    for( Int i=0; i<g_b_height; ++i ) J[i] = i;
-    for( Int j=0; j<g_b_width; ++j ) I[j] = j;
+    // Add a*GA into GC(0,0)
+    vector<Int> I(g_b_height), J(g_b_width);
+    for( Int i=0; i<g_b_height; ++i ) I[i] = i;
+    for( Int j=0; j<g_b_width; ++j ) J[j] = j;
 
-    UpdateSubmatrix( GB, J, I, a, GA );
-
-    // GC = GB
-    Copy( GB, GC );
+    UpdateSubmatrix( GC, I, J, a, GA );
 }
 
 // copies g_a into g_b, must be of same shape
@@ -803,7 +803,7 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, T alpha,
     // error (for both win_create and win_alloc)
     // with OpenMP/EL_HYBRID builds
     // Keep C stationary
-    GemmAlgorithm alg = GEMM_SUMMA_C;
+    GemmAlgorithm alg = GEMM_SUMMA_A;
     
     const Orientation orientA = CharToOrientation( ((ta == 'T' || ta == 't') ? 'T' : 'N') );
     const Orientation orientB = CharToOrientation( ((tb == 'T' || tb == 't') ? 'T' : 'N') );
