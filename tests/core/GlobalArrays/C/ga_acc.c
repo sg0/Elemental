@@ -90,7 +90,7 @@ int main(int argc, char **argv)
 #endif
 
 #if defined(USE_ELEMENTAL)
-  ElGlobalArraysCreate_i( eliga, DIM, dims, "array_A", &g_A );
+  ElGlobalArraysCreate_i( eliga, DIM, dims, "array_A", NULL, &g_A );
   ElGlobalArraysPrint_i( eliga, g_A );
   // acc data
   ElGlobalArraysAccumulate_i( eliga, g_A, lo, hi, local_A, &ld, &value );

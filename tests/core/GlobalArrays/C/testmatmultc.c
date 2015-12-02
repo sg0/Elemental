@@ -134,28 +134,41 @@ int main(int argc, char **argv)
 #ifndef BLOCK_CYCLIC
         ndim = 2;
 
+	/*
         dims[0] = num_m;
         dims[1] = num_n;
+	*/
+        dims[1] = num_m;
+        dims[0] = num_n;
+
 #if defined(USE_ELEMENTAL)
-        ElGlobalArraysCreate_d( eldga, ndim, dims, "g_c", &g_c );
+        ElGlobalArraysCreate_d( eldga, ndim, dims, "g_c", NULL, &g_c );
 #else
         if (!((g_c = NGA_Create(MT_DBL,ndim,dims,"g_c",NULL)))) {
             GA_Error("failed: create g_c",20);
         }
 #endif
+	/*
         dims[0] = num_k;
         dims[1] = num_n;
+	*/
+        dims[1] = num_k;
+        dims[0] = num_n;
 #if defined(USE_ELEMENTAL)
-        ElGlobalArraysCreate_d( eldga, ndim, dims, "g_b", &g_b );
+        ElGlobalArraysCreate_d( eldga, ndim, dims, "g_b", NULL, &g_b );
 #else
         if (!((g_b = NGA_Create(MT_DBL,ndim,dims,"g_b",NULL)))) {
             GA_Error("failed: create g_b",30);
         }
 #endif
+	/*
         dims[0] = num_m;
         dims[1] = num_k;
+	*/
+        dims[1] = num_m;
+        dims[0] = num_k;
 #if defined(USE_ELEMENTAL)
-        ElGlobalArraysCreate_d( eldga, ndim, dims, "g_a", &g_a );
+        ElGlobalArraysCreate_d( eldga, ndim, dims, "g_a", NULL, &g_a );
 #else
         if (!((g_a = NGA_Create(MT_DBL,ndim,dims,"g_a",NULL)))) {
             GA_Error("failed: create g_a",40);
@@ -315,8 +328,8 @@ int main(int argc, char **argv)
     free(tmpb);
     free(tmpc);
 #if defined(USE_ELEMENTAL)
-    ElGlobalArraysTerminate_d( eldga );
     // call el::global arrays destructor
+    ElGlobalArraysTerminate_d( eldga );
     ElGlobalArraysDestruct_d( eldga );
     ElFinalize();
 #else

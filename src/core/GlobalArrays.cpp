@@ -63,7 +63,7 @@ GlobalArrays< T >::~GlobalArrays()
 // words, no DistMatrix is created for a 1D GA
 // chunk -- minimum blocking size for each dimension
 template<typename T>
-Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name, Int chunk[] = nullptr)
+Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name, Int chunk[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Create" ) )
     if (!ga_initialized)
@@ -89,7 +89,7 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name, I
 	// create distmatrix over default grid, i.e mpi::COMM_WORLD
 	// using MC x MR distribution
 	// this won't be allocated until RmaInterface->Attach
-	// dim[0] = width, dim[1] = height
+	// dim[0] = height, dim[1] = width
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
 	ga_handles[handle].DM = new DistMatrix< T, MC, MR  >( dims[1], dims[0], true, grid );
@@ -117,17 +117,19 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name, I
 	// vertical strips
 	if (chunk == nullptr)
 	{ 
+	    ga_handles[handle].patchHeight = dims[1];
+
 	    Int strips = (dims[0] / p);
 	    const Int rem = (dims[0] % p);
 	    if ( rank == (p - 1) )
 		strips += rem;
-
-	    ga_handles[handle].patchHeight = dims[1];
+	
 	    ga_handles[handle].patchWidth = strips;
+	    ga_handles[handle].patchWidth = dims[0];
 	}
-	else if (chunk[0] == dims[0]) // vertical strips
+	else if (chunk[0] == dims[0]) // horizontal strips
 	{
-	    ga_handles[handle].patchWidth = chunk[0];
+	    ga_handles[handle].patchWidth = dims[0];
 
 	    Int strips = (dims[1] / p);
 	    const Int rem = (dims[1] % p);
@@ -136,7 +138,7 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name, I
 
 	    ga_handles[handle].patchHeight = strips;
 	}
-	else if (chunk[1] == dims[1]) // horizontal strips
+	else if (chunk[1] == dims[1]) // vertical strips
 	{
 	    ga_handles[handle].patchHeight = dims[1];
 
@@ -149,8 +151,8 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name, I
 	}
 	else
 	{
-	    ga_handles[handle].patchHeight = chunk[1];
 	    ga_handles[handle].patchWidth = chunk[0];
+	    ga_handles[handle].patchHeight = chunk[1];
 
 	    Int strips_h = (dims[1] / p);
 	    Int strips_w = (dims[0] / p);
@@ -181,10 +183,13 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name, I
 	// be using this for actual data distribution anyway, but
 	// usage of ranks associated with El distribution might
 	// affect these, so we are staying clear of it.
-	lo[0] = 0;
-	lo[1] = rank * ga_handles[handle].patchHeight;
-	hi[0] = lo[0] + (ga_handles[handle].patchHeight - 1);
-	hi[1] = lo[1] + (ga_handles[handle].patchWidth - 1);
+	lo[1] = 0; 
+	lo[0] = rank * ga_handles[handle].patchHeight;
+	hi[0] = lo[0] + ga_handles[handle].patchWidth;
+	hi[1] = lo[1] + ga_handles[handle].patchHeight;
+	hi[0] -= 1;
+	hi[1] -= 1;
+
 	const Int pos = rank * 2;
 	ga_handles[handle].ga_lo[pos]     = lo[0];
 	ga_handles[handle].ga_lo[pos + 1] = lo[1];	
@@ -738,8 +743,8 @@ void GlobalArrays< T >::GA_Symmetrize (Int g_a)
     
     // create intermediate GAs using g_a parameters
     Int dims[2];
-    dims[0] = GA.Width();
-    dims[1] = GA.Height();
+    dims[1] = GA.Width();
+    dims[0] = GA.Height();
    
     // NOTE: Intel 15.0.3 emits a compile error if the optional
     // parameter to GA_Create is not qualified with a nullptr
@@ -1187,28 +1192,43 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
        LogicError ("Operation not possible as Global Arrays has been destroyed");
 
     T a = *alpha;
+    T one = T( 1 );
+    T zero = T( 0 );
     
     // calculate local height and width
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
     const Int ldim = *ld; // ldim for GA buffer
-    const Int eldim = Max (height, 1);    // ldim for El buffer
 
-    // create a matrix
-    Matrix< T > A( height, width, eldim );
-    T * inbuf = A.Buffer();
-
-    for (Int j = 0; j < width; j++)
-	for (Int i = 0; i < height; i++)
-	    inbuf[i + j*eldim] = a * buf[j*ldim + i];
+    if (a != one && a != zero)
+    {
+	for (Int j = 0; j < width; j++)
+	    for (Int i = 0; i < height; i++)
+		buf[j*ldim + i] *= a;
+    }
+   	
+    Matrix< T > A;
+    if (a != zero)
+    {
+	// attach the input buffer to a matrix
+	A.Attach( height, width, buf, ldim );
+    }
+    else
+	Zeros( A, height, width );
 
     const Int i = lo[1];
     const Int j = lo[0];
 
     // Acc - blocking transfer
     BXFER ('A', g_a, A, i, j);	
-    
-    A.Empty();
+
+    // restore original buf
+    if (a != one && a != zero)
+    {
+	for (Int j = 0; j < width; j++)
+	    for (Int i = 0; i < height; i++)
+		buf[j*ldim + i] /= a;
+    }   
 }
 
 template<typename T>
@@ -1229,23 +1249,16 @@ void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], T* buf, Int ld[])
     // calculate height and width from lo and hi
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
-    const Int eldim = Max (height, 1);    // ldim for El buffer
     const Int ldim = *ld; // ldim for GA buffer
    
     const Int i = lo[1];
     const Int j = lo[0];
 	
-    Matrix< T > A(height, width, eldim);
-    T * outbuf = A.Buffer();
+    Matrix< T > A;
+    A.Attach( height, width, buf, ldim );
         
     // get
     BXFER ('G', g_a, A, i, j);
-
-    for (Int j = 0; j < width; j++)
-	for (Int i = 0; i < height; i++)
-	    buf[j*ldim + i] = outbuf[j*eldim + i];
-    
-    A.Empty();
 }
  
 template<typename T>
@@ -1264,20 +1277,29 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
        LogicError ("Operation not possible as Global Arrays has been destroyed");
 
     T a = *alpha;
+    T one = T( 1 );
+    T zero = T( 0 );
 
     // calculate local height and width
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
-    const Int eldim = Max (height, 1);    // ldim for El buffer
     const Int ldim = *ld; // ldim for GA Buffer
+	
+    Matrix< T > A;
+    if (a != zero)
+    {
+	// create a matrix by attaching buffer
+	A.Attach( height, width, buf, ldim );
+    }
+    else
+	Zeros( A, height, width );
 
-    // create a matrix
-    Matrix< T > A (height, width, eldim);
-    T *inbuf = A.Buffer();
-
-    for (Int j = 0; j < width; j++)
-	for (Int i = 0; i < height; i++)
-	    inbuf[i + j*eldim] = a * buf[j*ldim + i];
+    if (a != zero && a != one)
+    {
+	for (Int j = 0; j < width; j++)
+	    for (Int i = 0; i < height; i++)
+		buf[j*ldim + i] *= a;
+    }
 
     const Int i = lo[1];
     const Int j = lo[0];
@@ -1286,7 +1308,14 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     NBXFER ('A', g_a, A, i, j);
     
     *nbhandle = g_a;
-    A.Empty();
+  
+    // restore original buf
+    if (a != zero && a != one)
+    {
+	for (Int j = 0; j < width; j++)
+	    for (Int i = 0; i < height; i++)
+		buf[j*ldim + i] /= a;
+    }
 }
 
 template<typename T>
@@ -1315,15 +1344,10 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
     const Int ldim = *ld; // ldim for GA buffer
-    const Int eldim = Max (height, 1);    // ldim for El buffer
 
-    // create a matrix
-    Matrix< T > A( height, width, eldim );
-    T *inbuf = A.Buffer();
-
-    for (Int j = 0; j < width; j++)
-	for (Int i = 0; i < height; i++)
-	    inbuf[i + j*eldim] = buf[j*ldim + i];
+    // create a matrix by attaching buffer
+    Matrix< T > A;
+    A.Attach( height, width, buf, ldim );
 
     const Int i = lo[1];
     const Int j = lo[0];
@@ -1332,12 +1356,9 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     NBXFER ('P', g_a, A, i, j);
     
     *nbhandle = g_a;
-    // when NBXFER returns, the operation
-    // is locally complete
-    A.Empty();
 }
 
-// Note: This is essentially a no-op, hence it doesn't 
+// Note: This is essentially a no-op, hence it won't 
 // ever release the handle
 template<typename T>
 Int GlobalArrays< T >::NGA_NbTest(ga_nbhdl_t* nbhandle)
@@ -1390,23 +1411,16 @@ void GlobalArrays< T >::NGA_Put(Int g_a, Int lo[], Int hi[], T* buf, Int ld[])
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
     const Int ldim = *ld; // ldim for GA buffer
-    const Int eldim = Max (height, 1); // ldim for El buffer
 
-    // create a matrix
-    Matrix< T > A( height, width, eldim );
-    T *inbuf = A.Buffer();
-
-    for (Int j = 0; j < width; j++)
-	for (Int i = 0; i < height; i++)
-	    inbuf[i + j*eldim] = buf[i + j*ldim];
+    // create a matrix by attaching buffer
+    Matrix< T > A;
+    A.Attach( height, width, buf, ldim );
 
     const Int i = lo[1];
     const Int j = lo[0];
 
-    // Put - (locally) nonblocking transfer
+    // Put -  (local/remote) blocking transfer
     BXFER('P', g_a, A, i, j);
-
-    A.Empty();
 }
 
 // ensures remote completion

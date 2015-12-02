@@ -55,7 +55,7 @@ int lo[2], hi[2];
 double buf[N], err, alpha, beta;
 
 #if defined(USE_ELEMENTAL)
-     ElGlobalArraysCreate_d( eldga, 2, dims, "A", &g_a );
+     ElGlobalArraysCreate_d( eldga, 2, dims, "A", NULL, &g_a );
      if(me==0)printf("Creating matrix A\n");
 #else
      if(me==0)printf("Creating matrix A\n");

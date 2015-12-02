@@ -51,7 +51,7 @@ int main(int argc, char **argv)
 #endif
 
 #if defined(USE_ELEMENTAL)
-  ElGlobalArraysCreate_d( eldga, DIM, dims, "array_A", &g_A );
+  ElGlobalArraysCreate_d( eldga, DIM, dims, "array_A", NULL, &g_A );
   ElGlobalArraysFill_d( eldga, g_A, &value );
    
   ElGlobalArraysDuplicate_d( eldga, g_A, "array_B", &g_B );
@@ -65,7 +65,7 @@ int main(int argc, char **argv)
   int dims4[2];
   dims4[0] = 1;
   dims4[1] = dims[1];
-  ElGlobalArraysCreate_d( eldga, DIM, dims4, "array_C", &g_C );
+  ElGlobalArraysCreate_d( eldga, DIM, dims4, "array_C", NULL, &g_C );
   ElGlobalArraysFill_d( eldga, g_C, &value );
   // create multiple duplicates
   int g[MAXDUP];
