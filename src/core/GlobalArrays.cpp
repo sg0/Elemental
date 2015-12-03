@@ -930,7 +930,8 @@ void GlobalArrays< T >::GA_Initialize()
         ga_handles[g_a].pending_rma_op = false; \
     } while (0)
 
-// locally blocking transfer
+// locally blocking transfer -- blocks the calling process
+// till transfer is initiated (locally completes)
 #define NBXFER(type, g_a, M, i, j) \
     do { \
         ga_handles[g_a].pending_rma_op = true; \
@@ -1227,7 +1228,7 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
     {
 	for (Int j = 0; j < width; j++)
 	    for (Int i = 0; i < height; i++)
-		buf[j*ldim + i] /= a;
+		buf[j*ldim + i] = T( buf[j*ldim + i] / a );
     }   
 }
 
@@ -1314,7 +1315,7 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     {
 	for (Int j = 0; j < width; j++)
 	    for (Int i = 0; i < height; i++)
-		buf[j*ldim + i] /= a;
+		buf[j*ldim + i] = T( buf[j*ldim + i] / a );
     }
 }
 

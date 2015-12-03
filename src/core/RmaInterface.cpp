@@ -341,7 +341,7 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
             
 		// update local matrix
                 T* YCol = Z.Buffer( 0,rowShift+t*c );
-                const T* XCol = &getBuffer[t * localHeight];
+                const T* XCol = getCol;
 
                 for( Int s = 0; s < localHeight; ++s )
                     YCol[colShift+s*r] = XCol[s];

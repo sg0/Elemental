@@ -1,11 +1,11 @@
 /*
  * Test Program for GA
- * This is to test GA_Put (is a collective operation)
- * GA_Create -- used to create a global array using handles like 'g_A' 
+ * This is to test GA_Acc/Put
  */
 
 #include<stdio.h>
 #include<stdlib.h>
+#include<string.h>
 
 #if defined(USE_ELEMENTAL)
 #include "El.h"
@@ -14,7 +14,6 @@ ElGlobalArrays_i eliga;
 #include"mpi.h"
 #include"ga.h"
 #include"macdecls.h"
-#include"ga_unit.h"
 #endif
 
 #define DIM 2
@@ -24,21 +23,18 @@ ElGlobalArrays_i eliga;
 void GA_Error (const char *str, int item)
 {
     printf ("%s: %d\n", str, item);
-    exit(-1);
+    MPI_Abort( MPI_COMM_WORLD, item );
 }
 #endif
 
 int main(int argc, char **argv)
 {
-  int rank, nprocs, i, j;
+  int rank, nprocs;
   int g_A;
-#if defined(USE_ELEMENTAL)
-  // el::ga supports pointer to buffer
-  int *local_A=NULL, *local_B=NULL;
-#else
-  int **local_A=NULL, **local_B=NULL;
-#endif
-  int dims[DIM]={SIZE,SIZE}, dims2[DIM], lo[DIM]={SIZE-SIZE,SIZE-SIZE}, hi[DIM]={SIZE-1,SIZE-1}, ld=5, value=5;
+  int *local_A=NULL, *local_B=NULL, *output_A=NULL;
+  int dims[DIM]={SIZE,SIZE}, dims2[DIM], lo[DIM]={SIZE-SIZE,SIZE-SIZE}, hi[DIM]={SIZE-1,SIZE-1}, ld=SIZE;
+  int value=SIZE;
+  //int value=0;
 
 #if defined(USE_ELEMENTAL)
   // initialize Elemental (which will initialize MPI)
@@ -60,148 +56,85 @@ int main(int argc, char **argv)
   GA_Initialize();
 #endif
 
-#if defined(USE_ELEMENTAL)
   local_A=(int*)malloc(SIZE*SIZE*sizeof(int));
-  for(i=0; i<SIZE; i++)
-      for(j=0; j<SIZE; j++) local_A[i*SIZE+j]=rand()%10;
+  output_A=(int*)malloc(SIZE*SIZE*sizeof(int));
+  memset (output_A, 0, SIZE*SIZE*sizeof(int));
+  for(int j=0; j<SIZE; j++)
+      for(int i=0; i<SIZE; i++) local_A[i+j*ld]=(i + j);
 
   local_B=(int*)malloc(SIZE*SIZE*sizeof(int));
-  for(i=0; i<SIZE; i++)
-      for(j=0; j<SIZE; j++) local_B[i*SIZE+j]=0;
-#else
-  local_A=(int**)malloc(SIZE*sizeof(int*));
-  for(i=0; i<SIZE; i++)
-    {
-      local_A[i]=(int*)malloc(SIZE*sizeof(int));
-      for(j=0; j<SIZE; j++) local_A[i][j]=rand()%10;
-    }
-
-  local_B=(int**)malloc(SIZE*sizeof(int*));
-  for(i=0; i<SIZE; i++)
-    {
-      local_B[i]=(int*)malloc(SIZE*sizeof(int));
-      for(j=0; j<SIZE; j++) local_B[i][j]=rand()%10;
-    }
-#endif
+  memset (local_B, 0, SIZE*SIZE*sizeof(int));
 
 #if defined(USE_ELEMENTAL)
-  ElGlobalArraysCreate_i( eliga, DIM, dims, "array_A", &g_A );
+  ElGlobalArraysCreate_i( eliga, DIM, dims, "array_A", NULL, &g_A );
+  ElGlobalArraysFill_i( eliga, g_A, &value );
   ElGlobalArraysPrint_i( eliga, g_A );
-  // put data
+  // acc data
   ElGlobalArraysPut_i( eliga, g_A, lo, hi, local_A, &ld );
-  // sync is required because El::GA::Put enforces local
-  // completion, not remote
   ElGlobalArraysSync_i( eliga );
-  // get -- does not require a sync when get returns,
-  // data transfer to local buffer is complete
+  // get
   ElGlobalArraysGet_i( eliga, g_A, lo, hi, local_B, &ld );
+  ElGlobalArraysSync_i( eliga );
   ElGlobalArraysPrint_i( eliga, g_A );
 #else
   g_A = NGA_Create(C_INT, DIM, dims, "array_A", NULL);
-  //GA_Fill(g_A, &value);
-  //  GA_Zero(g_A);
+  GA_Fill(g_A, &value);
   GA_Print(g_A);
 
   NGA_Put(g_A, lo, hi, local_A, &ld);
   
+  GA_Sync();
+  
   NGA_Get(g_A, lo, hi, local_B, &ld);
 
   GA_Sync();
+  
   GA_Print(g_A);
 #endif
 
+  // updated output
+  MPI_Reduce (local_A, output_A, SIZE*SIZE, MPI_INT, MPI_MAX, 0, MPI_COMM_WORLD);
+
   if(rank==0)
     {
-#if defined(USE_ELEMENTAL)
-// by default, elemental is column ordered storage
-      printf(" local_B \n");
-      for(i=0; i<SIZE; i++)
+      printf(" Original local buffer to be accumulated: \n");
+
+      for(int i=0; i<SIZE; i++)
 	{
-	  for(j=0; j<SIZE; j++)
-	    printf("%d ", local_B[j*SIZE+i]);
+	  for(int j=0; j<SIZE; j++)
+	    printf("%d ", local_A[i*ld+j]);
+	  printf("\n");
+	}
+      printf("\n");
+      printf(" Get returns: \n");
+      for(int i=0; i<SIZE; i++)
+	{
+	  for(int j=0; j<SIZE; j++)
+	    printf("%d ", local_B[i*ld + j]);
 	  printf("\n");
 	}
 
       printf("\n");
-      printf(" local_A \n");
-      for(i=0; i<SIZE; i++)
+      for(int i=0; i<SIZE; i++)
 	{
-	  for(j=0; j<SIZE; j++)
-	    printf("%d ", local_A[j*SIZE+i]);
-	  printf("\n");
-	}
-      
-      printf("\n");
-      for(j=0; j<SIZE; j++)
-	{
-	  for(i=0; i<SIZE; i++)
+	  for(int j=0; j<SIZE; j++)
 	    {
-	      if(local_B[j*SIZE+i]!=local_A[j*SIZE+i])
-		printf("ERROR : in passing values \n");
-	      /* there is erroe in the above piece of code 
-	       * have to find method to solve it
-	       */
+	      if(local_B[i*ld+j]!=output_A[i*ld+j])
+		  GA_Error("ERROR", -99);
 	    }
 	}
-#else
-      printf(" local_B \n");
-      for(i=0; i<SIZE; i++)
-	{
-	  for(j=0; j<SIZE; j++)
-	    printf("%d ", local_B[i][j]);
-	  printf("\n");
-	}
-
-      printf("\n");
-      printf(" local_A \n");
-      for(i=0; i<SIZE; i++)
-	{
-	  for(j=0; j<SIZE; j++)
-	    printf("%d ", local_A[i][j]);
-	  printf("\n");
-	}
-      
-      printf("\n");
-      for(i=0; i<SIZE; i++)
-	{
-	  for(j=0; j<SIZE; j++)
-	    {
-	      if(local_B[i][j]!=local_A[i][j])
-		printf("ERROR : in passing values \n");
-	      /* there is erroe in the above piece of code 
-	       * have to find method to solve it
-	       */
-	    }
-	}
-#endif
     }
-
-#if defined(USE_ELEMENTAL)
-    free (local_A);
-    free (local_B);
-#else
-  for(i=0; i<SIZE; i++)
-    {
-      free(local_A[i]);
-      free(local_B[i]);
-    }
-    free (local_A);
-    free (local_B);
-#endif
-
-    //  GA_Print(g_A);
-  //..GA_Sync();
 #if defined(USE_ELEMENTAL)
   ElGlobalArraysDestroy_i( eliga, g_A );
 #else
   GA_Destroy(g_A);
 #endif
   if(rank == 0)
-#if defined(USE_ELEMENTAL)
-    printf ("OK.\n");
-#else
-    GA_PRINT_MSG();
-#endif
+    printf ("OK. Test passed\n");
+
+    free (local_A);
+    free (local_B);
+    free (output_A);
 
 #if defined(USE_ELEMENTAL)
     ElGlobalArraysTerminate_i( eliga );
@@ -209,7 +142,7 @@ int main(int argc, char **argv)
     ElGlobalArraysDestruct_i( eliga );
     ElFinalize();
 #else
-  GA_Terminate();
-  MPI_Finalize();
+    GA_Terminate();
+    MPI_Finalize();
 #endif
 }
