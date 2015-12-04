@@ -107,9 +107,6 @@ extern "C" {
   ElError ElGlobalArraysNBPut_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], \
 	ElInt hi[], CREFLECT(T)* ptr, ElInt ld[], ElInt* nbhandle ) \
   { EL_TRY( CReflect(A)->NGA_NbPut(g_a, lo, hi, CReflect(ptr), ld, nbhandle) ) } \
-  /* int GlobalArrays<T>::NGA_NbTest(ga_nbhdl_t* nbhandle) */ \
-  ElError ElGlobalArraysNBTest_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt* nbhandle, ElInt* status ) \
-  { EL_TRY( *status = CReflect(A)->NGA_NbTest(nbhandle) ) } \
   /* void GlobalArrays<T>::NGA_NbWait(ga_nbhdl_t* nbhandle) */ \
   ElError ElGlobalArraysNBWait_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt* nbhandle ) \
   { EL_TRY( CReflect(A)->NGA_NbWait(nbhandle) ) } \

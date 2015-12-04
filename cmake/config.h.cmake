@@ -46,6 +46,7 @@
 
 /* Basic configuration options */
 #define EL_RESTRICT @RESTRICT@
+#cmakedefine EL_HYBRID
 #cmakedefine EL_HAVE_OPENMP
 #cmakedefine EL_HAVE_OMP_COLLAPSE
 #cmakedefine EL_HAVE_QT5

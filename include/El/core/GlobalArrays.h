@@ -203,12 +203,6 @@ EL_EXPORT ElError ElGlobalArraysNBPut_s( ElGlobalArrays_s A, ElInt g_a, ElInt lo
 EL_EXPORT ElError ElGlobalArraysNBPut_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[], 
 	ElInt hi[], double* ptr, ElInt ld[], ElInt* nbhandle );
 
-/* int GlobalArrays<T>::NGA_NbTest(ga_nbhdl_t* nbhandle);
- ------------------------------------------------ */
-EL_EXPORT ElError ElGlobalArraysNBTest_i( ElGlobalArrays_i A, ElInt* nbhandle, ElInt* status );
-EL_EXPORT ElError ElGlobalArraysNBTest_s( ElGlobalArrays_s A, ElInt* nbhandle, ElInt* status );
-EL_EXPORT ElError ElGlobalArraysNBTest_d( ElGlobalArrays_d A, ElInt* nbhandle, ElInt* status );
-
 /* void GlobalArrays<T>::NGA_NbWait(ga_nbhdl_t* nbhandle);
  ------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysNBWait_i( ElGlobalArrays_i A, ElInt* nbhandle );

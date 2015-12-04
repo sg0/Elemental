@@ -1478,6 +1478,8 @@ void WaitAll (int numRequests, Request * requests,
 }
 
 // Ensure that any requests finish before continuing
+// FIXME MPI_Waitany shall throw an error when ElInt
+// is long long
 void WaitAny (int numRequests, Request * requests, Int * index)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::WaitAny"))

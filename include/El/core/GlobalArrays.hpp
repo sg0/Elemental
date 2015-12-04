@@ -44,7 +44,6 @@ class GlobalArrays
 		void NGA_NbAcc(Int g_a,Int lo[], Int hi[], T* buf, Int ld[], T* alpha, ga_nbhdl_t* nbhandle);
 		void NGA_NbGet(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], ga_nbhdl_t* nbhandle);
 		void NGA_NbPut(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], ga_nbhdl_t* nbhandle);
-		Int  NGA_NbTest(ga_nbhdl_t* nbhandle);
 		void NGA_NbWait(ga_nbhdl_t* nbhandle);
 		void NGA_Put(Int g_a, Int lo[], Int hi[], T* buf, Int ld[]); 
 		
@@ -72,7 +71,7 @@ class GlobalArrays
 		    std::vector< Int > ga_hi;
 		    // is there a pending rma op on
 		    // this GA
-		    bool pending_rma_op;
+		    bool rma_local_pending;
 		    // is the GA destroyed already?
 		    bool is_destroyed;
 		    // this is only required when a DistMatrix
@@ -93,20 +92,20 @@ class GlobalArrays
 		    Matrix< T > * AM;
 		    // initialize
 		    GA() :
-			DM( nullptr ),                // DM
-		        rmaint( nullptr ),            // RMA interface
-	                ga_local_height(),            // local height
-		        ga_local_width(),             // local width
-			ga_lo(),                      // lo
-			ga_hi(),                      // hi
-		        pending_rma_op( false ),      // pending_rma_op
-			is_destroyed( true ),         // is_destroyed
-		        length( -1 ),                 // length
-		        ndim( -1 ),                   // ndim
-			patchWidth( -1 ),             // patchWidth
-			patchHeight( -1 ),            // patchHeight
-		        fop_win( mpi::WIN_NULL ),     // fop_win
-		        AM( nullptr )                 // nga access buffer
+			DM( nullptr ),                   // DM
+		        rmaint( nullptr ),               // RMA interface
+	                ga_local_height(),               // local height
+		        ga_local_width(),                // local width
+			ga_lo(),                      	 // lo
+			ga_hi(),                         // hi
+		        rma_local_pending( false ),      // rma_local_pending
+			is_destroyed( true ),            // is_destroyed
+		        length( -1 ),                    // length
+		        ndim( -1 ),                      // ndim
+			patchWidth( -1 ),                // patchWidth
+			patchHeight( -1 ),               // patchHeight
+		        fop_win( mpi::WIN_NULL ),        // fop_win
+		        AM( nullptr )                    // nga access buffer
 		    {}
 		};
 		
