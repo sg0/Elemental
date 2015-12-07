@@ -146,6 +146,12 @@ EL_EXPORT ElError ElGlobalArraysRelease_i( ElGlobalArrays_i A, ElInt g_a, ElInt 
 EL_EXPORT ElError ElGlobalArraysRelease_s( ElGlobalArrays_s A, ElInt g_a, ElInt lo[], ElInt hi[] );
 EL_EXPORT ElError ElGlobalArraysRelease_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[], ElInt hi[] );
 
+/* void GlobalArrays<T>::NGA_Release_update(int g_a, int lo[], int hi[]);
+ --------------------------------------------------------------------- */
+EL_EXPORT ElError ElGlobalArraysReleaseUpdate_i( ElGlobalArrays_i A, ElInt g_a, ElInt lo[], ElInt hi[] );
+EL_EXPORT ElError ElGlobalArraysReleaseUpdate_s( ElGlobalArrays_s A, ElInt g_a, ElInt lo[], ElInt hi[] );
+EL_EXPORT ElError ElGlobalArraysReleaseUpdate_d( ElGlobalArrays_d A, ElInt g_a, ElInt lo[], ElInt hi[] );
+
 /* void GlobalArrays<T>::NGA_Distribution(int g_a, int iproc, int lo[], int hi[]);
  ---------------------------------------------------------------------------------- */
 EL_EXPORT ElError ElGlobalArraysDistribution_i( ElGlobalArrays_i A, ElInt g_a, ElInt iproc, ElInt lo[], ElInt hi[] );

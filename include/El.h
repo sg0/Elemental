@@ -30,7 +30,10 @@
 #include "El/core/flame_part/Partition.h"
 #include "El/core/flame_part/Repartition.h"
 #include "El/core/flame_part/SlidePartition.h"
+
+#if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY) && defined(EL_ENABLE_RMA_GLOBAL_ARRAYS)
 #include "El/core/GlobalArrays.h"
+#endif
 
 #include "El/io.h"
 

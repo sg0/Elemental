@@ -7,6 +7,7 @@
 
 Authors:
 Sayan Ghosh
+Washington State University
 
 This file contains implementation of few functions from Global Arrays
 C API (http://hpc.pnl.gov/globalarrays/api/capi.shtml) using Elemental
@@ -125,7 +126,6 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name, I
 		strips += rem;
 	
 	    ga_handles[handle].patchWidth = strips;
-	    ga_handles[handle].patchWidth = dims[0];
 	}
 	else if (chunk[0] == dims[0]) // horizontal strips
 	{
@@ -172,11 +172,11 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name, I
 	    if (chunk[0] != strips_w)
 		ga_handles[handle].patchWidth = strips_w;
 	}
-
-	// local matrix for access/release
+	
+	// allocate local matrix for use during access/release
 	ga_handles[handle].AM = 
 	    new Matrix< T > (ga_handles[handle].patchHeight, ga_handles[handle].patchWidth);
-		
+
 	// lo/hi
 	// Note: Use defaultgrid rank (usually VCRank or VRRank)
 	// when defining hi/lo for ideal GA distribution. We won't
@@ -370,7 +370,7 @@ Int GlobalArrays< T >::GA_Create_irreg(Int ndim, Int dims[], const char *array_n
 	ga_handles[handle].patchHeight = hi[1] - lo[1] + 1;
 	ga_handles[handle].patchWidth  = hi[0] - lo[0] + 1;
 
-	// local matrix for access/release
+	// allocate local matrix for use during access/release
 	ga_handles[handle].AM = 
 	    new Matrix< T > (ga_handles[handle].patchHeight, ga_handles[handle].patchWidth);
 
@@ -473,7 +473,7 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 	ga_handles[handle].patchHeight = ga_handles[g_a].patchHeight;
 	ga_handles[handle].patchWidth = ga_handles[g_a].patchWidth;
 
-	// local matrix for access/release
+	// allocate local matrix for use during access/release
 	ga_handles[handle].AM = 
 	    new Matrix< T > (ga_handles[handle].patchHeight, ga_handles[handle].patchWidth);
 
@@ -702,8 +702,9 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
 	ga_handles[g_a].AM->Empty();
 	delete (ga_handles[g_a].AM);
 
-	// erase ga entry from global ga_handles vector
-	// FIXME erasing would mess up g_a handle values, 
+	// NOTE: Do we need to erase ga entry from global 
+	// ga_handles vector?
+	// Erasing would mess up g_a handle values, 
 	// as GAs could be destroyed at different times
 	// so at present vector is cleared only on terminate
 	// ga_handles.erase( ga_handles.begin() + g_a );
@@ -719,7 +720,7 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
     ga_handles[g_a].fop_win 		= mpi::WIN_NULL;
     ga_handles[g_a].rmaint 		= nullptr;
     ga_handles[g_a].DM 			= nullptr;
-    ga_handles[g_a].AM 		        = nullptr;
+    ga_handles[g_a].AM 			= nullptr;
 }
 
 // A := 0.5 * ( A + A' )
@@ -743,8 +744,9 @@ void GlobalArrays< T >::GA_Symmetrize (Int g_a)
     dims[1] = GA.Width();
     dims[0] = GA.Height();
    
-    // NOTE: Intel 15.0.3 emits a compile error if the optional
-    // parameter to GA_Create is not qualified with a nullptr
+    if (dims[0] != dims[1])
+	LogicError ("Cannot symmetrize a non-square matrix");
+    
     Int g_at = GA_Create( 2, dims, "transpose array", nullptr );
     Int g_c = GA_Duplicate( g_at, "final array" );
 
@@ -786,27 +788,31 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, T alpha,
     if (ga_handles[g_a].is_destroyed
 	    || ga_handles[g_b].is_destroyed
 	    || ga_handles[g_c].is_destroyed)
-	LogicError ("Operation not possible as Global Arrays has been destroyed");
+	LogicError ("Operation not possible as Global Arrays have been destroyed");
+    // TODO extra checks pertaining m, n, k
 
     DistMatrix< T, MC, MR >& ADM = *(ga_handles[g_a].DM);
     DistMatrix< T, MC, MR >& BDM = *(ga_handles[g_b].DM);
     DistMatrix< T, MC, MR >& CDM = *(ga_handles[g_c].DM);
-        
+    
     // set algorithmic block size
     // multiple of 16 (cache-line-size)
     Int nb = 96;
-    // NOTE: For some reason, both summa_A/B
-    // threw a hard to track memory corruption
-    // error (for both win_create and win_alloc)
-    // with OpenMP/EL_HYBRID builds
-    // Keep C stationary
+    // keep A stationary
     GemmAlgorithm alg = GEMM_SUMMA_A;
-    
-    const Orientation orientA = CharToOrientation( ((ta == 'T' || ta == 't') ? 'T' : 'N') );
-    const Orientation orientB = CharToOrientation( ((tb == 'T' || tb == 't') ? 'T' : 'N') );
+    //GemmAlgorithm alg = GEMM_SUMMA_B;
+    //GemmAlgorithm alg = GEMM_SUMMA_C;
+
     SetBlocksize( nb );
 
+    // Note: We are flipping the matrices because the way it has been
+    // distributed, not DistMatrix(height, width), but DM(width, height)
+    // in keeping with GA's layout
+    const Orientation orientA = CharToOrientation( ((ta == 'T' || ta == 't') ? 'N' : 'T') );
+    const Orientation orientB = CharToOrientation( ((tb == 'T' || tb == 't') ? 'N' : 'T') );
+
     Gemm( orientA, orientB, alpha, ADM, BDM, beta, CDM, alg);
+    mpi::Barrier( ADM.DistComm() );   
 }
 
 // FIXME GA struct should have a grid pointer,
@@ -892,17 +898,16 @@ void GlobalArrays< T >::GA_Initialize()
 	{ \
 	    case 'A': \
 		ga_handles[g_a].rmaint->Iacc (M, i, j); \
-	        ga_handles[g_a].rma_local_pending = true; \
 	        break; \
 	    case 'P': \
 		ga_handles[g_a].rmaint->Iput (M, i, j); \
-	        ga_handles[g_a].rma_local_pending = true; \
 	        break; \
 	    case 'G': \
 		ga_handles[g_a].rmaint->Get (M, i, j); \
 	    	break; \
 	    default: \
 		LogicError ("Unsupported nonblocking transfer type"); \
+	    ga_handles[g_a].rma_local_pending = true; \
 	} \
     } while (0)
 
@@ -997,10 +1002,9 @@ void GlobalArrays< T >::GA_Sync()
     // ensure all GA operations are complete	
     for (Int i = 0; i < ga_handles.size(); i++)
     {
-	if (ga_handles[i].ndim == 2)
+	if (ga_handles[i].ndim == 2 && !ga_handles[i].is_destroyed)
 	{
-	    if (i == 0)
-		ga_handles[0].rmaint->Flush(); // flush all
+	    ga_handles[i].rmaint->Flush(); // flush all
 	    ga_handles[i].rma_local_pending = false;
 	}
     }
@@ -1143,10 +1147,10 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[
     if (patchWidth < 0 || patchWidth > localWidth)
 	LogicError ("Incorrect coordinates in hi[0],lo[0] supplied");
 
+    Matrix< T >& M = *(ga_handles[g_a].AM);
+
     const Int i = lo[1];
     const Int j = lo[0];
-
-    Matrix< T >& M = *(ga_handles[g_a].AM);
     
     // get
     BXFER ('G', g_a, M, i, j);
@@ -1155,28 +1159,47 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[
     *ld = localHeight;
 }
 
+// this is used when (local portion of) GA is accessed for reading
 template<typename T>
 void GlobalArrays< T >::NGA_Release(Int g_a, Int lo[], Int hi[])
 {
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Release" ) )
+    
+    if (!ga_initialized)
+        LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a >= ga_handles.size())
+	LogicError ("Invalid GA handle");
+    if ( ga_handles[g_a].ndim == 1 )
+	LogicError ("A 1D GA is not allowed for this operation");
+    if (ga_handles[g_a].is_destroyed)
+	LogicError ("Operation not possible as Global Arrays has been destroyed");
+    if (lo[0] == -1 && hi[0] == -2) // means no elements are stored locally
+	return;
+}
+
+// this is used when (local portion of) GA is accessed for writing
+template<typename T>
+void GlobalArrays< T >::NGA_Release_update(Int g_a, Int lo[], Int hi[])
+{
+    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Release" ) )
+
     if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
     if (g_a < 0 || g_a >= ga_handles.size())
 	LogicError ("Invalid GA handle");
     if ( ga_handles[g_a].ndim == 1 )
        LogicError ("A 1D GA is not allowed for this operation");
-    if (lo[0] == -1 && hi[0] == -2)
-	LogicError("Invalid coordinate axes");
     if (ga_handles[g_a].is_destroyed)
        LogicError ("Operation not possible as Global Arrays has been destroyed");
-    if (ga_handles[g_a].AM == nullptr)
-       LogicError ("No NGA_Access call prior to NGA_Release");
+    if (lo[0] == -1 && hi[0] == -2) // means no elements are stored locally
+	return;
+    
+    Matrix< T >& M = *(ga_handles[g_a].AM);  
 
-    Matrix< T >& M = *(ga_handles[g_a].AM);
     const Int i = lo[1];
     const Int j = lo[0];
 
-    // Put - (locally) blocking transfer
+    // Put - locally blocking transfer
     BXFER('P', g_a, M, i, j);
 }
 
@@ -1262,7 +1285,7 @@ void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], T* buf, Int ld[])
     A.Attach( height, width, buf, ldim );
         
     // get
-    LNBXFER ('G', g_a, A, i, j);
+    NBXFER ('G', g_a, A, i, j);
 }
  
 template<typename T>
@@ -1281,20 +1304,30 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
        LogicError ("Operation not possible as Global Arrays has been destroyed");
 
     T a = *alpha;
+    T one = T( 1 );
+    T zero = T( 0 );
 
     // calculate local height and width
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
     const Int ldim = *ld; // ldim for GA Buffer	    
-    const Int eldim = Max (height, 1);    // ldim for El buffer
+    Matrix< T > A;
 
     // create a matrix
-    Matrix< T > A (height, width, eldim);
-    T *inbuf = A.Buffer();
+    if (a == one)
+	A.Attach( height, width, buf, ldim );
+    else if (a == zero)
+	Zeros( A, height, width );
+    else
+    {
+	Zeros( A, height, width );
+	const Int eldim = Max( height, 1 );
+	T *inbuf = A.Buffer();
 
-    for (Int j = 0; j < width; j++)
-	for (Int i = 0; i < height; i++)
-	    inbuf[i + j*eldim] = a * buf[j*ldim + i];
+	for (Int j = 0; j < width; j++)
+	    for (Int i = 0; i < height; i++)
+		inbuf[i + j*eldim] = a * buf[i + j*ldim];
+    }
 
     const Int i = lo[1];
     const Int j = lo[0];
@@ -1305,11 +1338,38 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     *nbhandle = g_a;
 }
 
+// TODO implement Iget in RMAInterface
+// and change this accordingly
 template<typename T>
 void GlobalArrays< T >::NGA_NbGet(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], ga_nbhdl_t* nbhandle)
 {
-    NGA_Get (g_a, lo, hi, buf, ld);
+    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbGet" ) )
     
+    if (!ga_initialized)
+	LogicError ("Global Arrays must be initialized before any operations on the global array");
+    if (g_a < 0 || g_a >= ga_handles.size())
+	LogicError ("Invalid GA handle");
+    if (buf == NULL)
+	LogicError ("Output buffer cannot be NULL");
+    if ( ga_handles[g_a].ndim == 1 )
+       LogicError ("A 1D GA is not allowed for this operation");
+    if (ga_handles[g_a].is_destroyed)
+       LogicError ("Operation not possible as Global Arrays has been destroyed");
+
+    // calculate height and width from lo and hi
+    const Int width = hi[0] - lo[0] + 1;
+    const Int height = hi[1] - lo[1] + 1;
+    const Int ldim = *ld; // ldim for GA buffer
+   
+    const Int i = lo[1];
+    const Int j = lo[0];
+	
+    Matrix< T > A;
+    A.Attach( height, width, buf, ldim );
+        
+    // get
+    LNBXFER ('G', g_a, A, i, j);
+
     *nbhandle = g_a;
 }
 
@@ -1332,15 +1392,10 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
     const Int ldim = *ld; // ldim for GA buffer
-    const Int eldim = Max (height, 1);    // ldim for El buffer
 
     // create a matrix
-    Matrix< T > A (height, width, eldim);
-    T *inbuf = A.Buffer();
-
-    for (Int j = 0; j < width; j++)
-	for (Int i = 0; i < height; i++)
-	    inbuf[i + j*eldim] = buf[j*ldim + i];
+    Matrix< T > A;
+    A.Attach( height, width, buf, ldim );
 
     const Int i = lo[1];
     const Int j = lo[0];
@@ -1358,7 +1413,7 @@ void GlobalArrays< T >::NGA_NbWait(ga_nbhdl_t* nbhandle)
     DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbWait" ) )
     if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (ga_handles.size() == 0 || *nbhandle > ga_handles.size())
+    if (ga_handles.size() == 0 || *nbhandle >= ga_handles.size())
 	return;
     
     if (*nbhandle != -1)
@@ -1400,7 +1455,7 @@ void GlobalArrays< T >::NGA_Put(Int g_a, Int lo[], Int hi[], T* buf, Int ld[])
     const Int i = lo[1];
     const Int j = lo[0];
 
-    // Put -  (local/remote) blocking transfer
+    // Put -  local blocking transfer
     NBXFER('P', g_a, A, i, j);
 }
 

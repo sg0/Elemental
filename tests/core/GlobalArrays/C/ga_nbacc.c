@@ -16,8 +16,9 @@ ElGlobalArrays_i eliga;
 #include"macdecls.h"
 #endif
 
-#define DIM 2
-#define SIZE 5
+#define DIM	2
+#define SIZE 	5
+#define NITERS 	10
 
 #if defined(USE_ELEMENTAL)
 void GA_Error (const char *str, int item)
@@ -74,56 +75,53 @@ int main(int argc, char **argv)
 #if defined(USE_ELEMENTAL)
   ElGlobalArraysCreate_i( eliga, DIM, dims, "array_A", NULL, &g_A );
   ElGlobalArraysFill_i( eliga, g_A, &value );
-  ElGlobalArraysPrint_i( eliga, g_A );
-  // acc data
-  ElGlobalArraysNBAccumulate_i( eliga, g_A, lo, hi, local_A, &ld, &value, &nbnb );
 #else
   g_A = NGA_Create(C_INT, DIM, dims, "array_A", NULL);
   GA_Fill(g_A, &value);
-  GA_Print(g_A);
-
-  NGA_NbAcc(g_A, lo, hi, local_A, &ld, &value, &nbnb);
 #endif
 
-  // updated output
-  MPI_Reduce (local_A, output_A, SIZE*SIZE, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
-
-  /*
-  for (int i = 0; i < nprocs; i++)
-  {
-      if (i == rank)
-	  printf ("[%d]: BEFORE nbnb = %d\n", i, nbnb);
-      MPI_Barrier (MPI_COMM_WORLD);
-  }
-  */
+  if (rank == 0) printf ("Initial global array:\n");
 #if defined(USE_ELEMENTAL)
-  ElGlobalArraysNBWait_i( eliga, &nbnb );
-#else
-  NGA_NbWait (&nbnb);
-#endif 
-  /*
-  for (int i = 0; i < nprocs; i++)
-  {
-      if (i == rank)
-	  printf ("[%d]: AFTER nbnb = %d\n", i, nbnb);
-      MPI_Barrier (MPI_COMM_WORLD);
-  }
-  */
-  // get
-#if defined(USE_ELEMENTAL)
-  ElGlobalArraysSync_i( eliga );
-  ElGlobalArraysGet_i( eliga, g_A, lo, hi, local_B, &ld );
   ElGlobalArraysPrint_i( eliga, g_A );
 #else
-  GA_Sync();
-  NGA_Get(g_A, lo, hi, local_B, &ld);
   GA_Print(g_A);
 #endif
+
+  for (int i = 0; i < NITERS; i++)
+  {
+      // acc data
+#if defined(USE_ELEMENTAL)
+      ElGlobalArraysNBAccumulate_i( eliga, g_A, lo, hi, local_A, &ld, &value, &nbnb );
+#else
+      NGA_NbAcc(g_A, lo, hi, local_A, &ld, &value, &nbnb);
+#endif
+      
+      // updated output
+      MPI_Reduce (local_A, output_A, SIZE*SIZE, MPI_INT, MPI_SUM, 0, MPI_COMM_WORLD);
+
+#if defined(USE_ELEMENTAL)
+      ElGlobalArraysNBWait_i( eliga, &nbnb );
+#else
+      NGA_NbWait (&nbnb);
+#endif 
+
+      // get
+      if (rank == 0) printf ("Get in iter #%d\n", i);
+#if defined(USE_ELEMENTAL)
+      ElGlobalArraysSync_i( eliga );
+      ElGlobalArraysGet_i( eliga, g_A, lo, hi, local_B, &ld );
+      ElGlobalArraysPrint_i( eliga, g_A );
+#else
+      GA_Sync();
+      NGA_Get(g_A, lo, hi, local_B, &ld);
+      GA_Print(g_A);
+#endif
+  } // end of iters
 
   if(rank==0)
     {
       printf(" Alpha (multiplier): %d\n", value);
-      printf(" Original local buffer to be accumulated: \n");
+      printf(" Original local buffer (before accumulation): \n");
 
       for(int i=0; i<SIZE; i++)
 	{
@@ -145,7 +143,7 @@ int main(int argc, char **argv)
 	{
 	  for(int j=0; j<SIZE; j++)
 	    {
-	      if(local_B[i*ld+j]!=(value + value * (output_A[i*ld+j])))
+	      if(local_B[i*ld+j]!=(value + (NITERS * value * (output_A[i*ld+j]))))
 		  GA_Error("ERROR", -99);
 	    }
 	}

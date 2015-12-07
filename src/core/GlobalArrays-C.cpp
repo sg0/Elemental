@@ -81,6 +81,9 @@ extern "C" {
   /* void GlobalArrays<T>::NGA_Release(int g_a, int lo[], int hi[]) */ \
   ElError ElGlobalArraysRelease_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], ElInt hi[] ) \
   { EL_TRY( CReflect(A)->NGA_Release(g_a, lo, hi) ) } \
+  /* void GlobalArrays<T>::NGA_Release_update(int g_a, int lo[], int hi[]) */ \
+  ElError ElGlobalArraysReleaseUpdate_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt lo[], ElInt hi[] ) \
+  { EL_TRY( CReflect(A)->NGA_Release_update(g_a, lo, hi) ) } \
   /* void GlobalArrays<T>::NGA_Distribution(int g_a, int iproc, int lo[], int hi[]) */ \
   ElError ElGlobalArraysDistribution_ ## SIG ( ElGlobalArrays_ ## SIG A, ElInt g_a, ElInt iproc, ElInt lo[], ElInt hi[] ) \
   { EL_TRY( CReflect(A)->NGA_Distribution(g_a, iproc, lo, hi) ) } \
