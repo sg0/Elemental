@@ -88,9 +88,6 @@ class GlobalArrays
 		    // MPI_Window for fetch-and-op/read-inc
 		    // for 1D GA
 		    mpi::Window fop_win;
-		    // Local matrix for storing nga_acess related
-		    // data
-		    Matrix< T > * AM;
 		    // initialize
 		    GA() :
 			DM( nullptr ),                   // DM
@@ -105,13 +102,35 @@ class GlobalArrays
 		        ndim( -1 ),                      // ndim
 			patchWidth( -1 ),                // patchWidth
 			patchHeight( -1 ),               // patchHeight
-		        fop_win( mpi::WIN_NULL ),        // fop_win
-		        AM( nullptr )                    // nga access buffer
+		        fop_win( mpi::WIN_NULL )         // fop_win
 		    {}
 		};
-		
+				
 		// vector of GA handles
 		std::vector < GA > ga_handles;
+
+		// Local matrix for holding nga_acess related
+		// data...also used for locally nonblocking
+		// accumulate
+		struct matrix_params_
+		{
+		    Int ga_index_;
+		    Matrix< T > * M_;
+		    Int lo[2];
+		    Int hi[2];
+		    bool is_accumulate_;
+		    // initialize
+		    matrix_params_() :
+			ga_index_( -1 ), 	// ga handle the matrix is associated with
+			M_( nullptr ),   	// matrix to be allocated
+			lo{-1, -1},  		// lo index associated with matrix
+			hi{-2, -2},  		// hi index associated with matrix
+			is_accumulate_( false ) // is this matrix used in locally nonblocking accumulate
+			{}
+		};
+
+		// vector of matrix parameters
+		std::vector < matrix_params_ > matrices_;
 };
 #endif // EL_ENABLE_RMA_GLOBAL_ARRAYS
 } // namespace El
