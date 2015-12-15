@@ -43,24 +43,11 @@ public:
     void Put( Matrix<T>& Z, Int i, Int j );
     void Put( const Matrix<T>& Z, Int i, Int j );   
 
-    // End to End blocking
-    // will be deprecated soon
-    void Eacc(       Matrix<T>& Z, Int i, Int j );
-    void Eacc( const Matrix<T>& Z, Int i, Int j );
-
-    void Eput( Matrix<T>& Z, Int i, Int j );
-    void Eput( const Matrix<T>& Z, Int i, Int j );
-
     void Get(       Matrix<T>& Z, Int i, Int j );
 
     // synchronization routines
     void Flush(          Matrix<T>& Z );
     void Flush(    const Matrix<T>& Z ); 
-
-#if MPI_VERSION>=3 && defined(EL_USE_IBARRIER_FOR_AXPY)
-    void Cflush(          Matrix<T>& Z );
-    void Cflush(    const Matrix<T>& Z ); 
-#endif
 
 private:
    
