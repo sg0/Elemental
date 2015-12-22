@@ -117,25 +117,35 @@ Int AxpyInterface2<T>::NextIndexData(
     DEBUG_ONLY( if( numCreated != Int( matrices_[matrixIndex].requests_[target].size() ) ||
                     numCreated != Int( matrices_[matrixIndex].statuses_[target].size() ) )
                 LogicError( "size mismatch" ); )
-        for( Int i = 0; i < numCreated; ++i )
-        {
-            // If this request is still running,
-            // test to see if it finished.
-            if( matrices_[matrixIndex].statuses_[target][i] )
-            {
-                const bool finished = mpi::Test( matrices_[matrixIndex].requests_[target][i] );
-                matrices_[matrixIndex].statuses_[target][i] = !finished;
-            }
+    
+    // reuse possible?
+    for( Int i = 0; i < numCreated; ++i )
+    {
+	// If this request is still running,
+	// test to see if it finished. If yes,
+	// then reuse
+	if( matrices_[matrixIndex].statuses_[target][i] )
+	{
+	    const bool finished = mpi::Test( matrices_[matrixIndex].requests_[target][i] );
+	    matrices_[matrixIndex].statuses_[target][i] = !finished;
+	    if( finished )
+	    {
+		matrices_[matrixIndex].statuses_[target][i] = true;
+		matrices_[matrixIndex].data_[target][i].resize( dataSize );
+		*mindex = matrixIndex;
+		return i;
+	    }
+	}
+	else // currently no pending data transfer corresponding to request
+	{
+	    matrices_[matrixIndex].statuses_[target][i] = true;
+	    matrices_[matrixIndex].data_[target][i].resize( dataSize );
+	    *mindex = matrixIndex;
+	    return i;
+	}
+    }
 
-            if( !matrices_[matrixIndex].statuses_[target][i] )
-            {
-                matrices_[matrixIndex].statuses_[target][i] = true;
-                matrices_[matrixIndex].data_[target][i].resize( dataSize );
-                *mindex = matrixIndex;
-                return i;
-            }
-        }
-
+    // create new
     matrices_[matrixIndex].data_[target].resize( numCreated + 1 );
     matrices_[matrixIndex].data_[target][numCreated].resize( dataSize );
     matrices_[matrixIndex].requests_[target].push_back( mpi::REQUEST_NULL );
@@ -201,25 +211,34 @@ Int AxpyInterface2<T>::NextIndexCoord(
     DEBUG_ONLY( if( numCreated != Int( coords_[coordIndex].requests_[target].size() ) ||
                     numCreated != Int( matrices_[coordIndex].statuses_[target].size() ) )
                 LogicError( "size mismatch" ); )
-        for( Int i = 0; i < numCreated; ++i )
-        {
-            // If this request is still running,
-            // test to see if it finished.
-            if( coords_[coordIndex].statuses_[target][i] )
-            {
-                const bool finished = mpi::Test( coords_[coordIndex].requests_[target][i] );
-                coords_[coordIndex].statuses_[target][i] = !finished;
-            }
-
-            if( !coords_[coordIndex].statuses_[target][i] )
-            {
-                coords_[coordIndex].statuses_[target][i] = true;
-                coords_[coordIndex].coord_[target][i][0] = i;
-                coords_[coordIndex].coord_[target][i][1] = j;
-                *cindex = coordIndex;
-                return i;
-            }
-        }
+    
+    // reuse possible?
+    for( Int i = 0; i < numCreated; ++i )
+    {
+	// If this request is still running,
+	// test to see if it finished.
+	if( coords_[coordIndex].statuses_[target][i] )
+	{
+	    const bool finished = mpi::Test( coords_[coordIndex].requests_[target][i] );
+	    coords_[coordIndex].statuses_[target][i] = !finished;
+	    if( finished )
+	    {
+		coords_[coordIndex].statuses_[target][i] = true;
+		coords_[coordIndex].coord_[target][i][0] = i;
+		coords_[coordIndex].coord_[target][i][1] = j;
+		*cindex = coordIndex;
+		return i;
+	    }
+	}
+	else
+	{
+	    coords_[coordIndex].statuses_[target][i] = true;
+	    coords_[coordIndex].coord_[target][i][0] = i;
+	    coords_[coordIndex].coord_[target][i][1] = j;
+	    *cindex = coordIndex;
+	    return i;
+	}
+    }
 
     coords_[coordIndex].coord_[target].resize( numCreated + 1 );
     coords_[coordIndex].coord_[target][numCreated][0] = i;
@@ -969,10 +988,10 @@ void AxpyInterface2<T>::WaitAny( const Matrix<T>& Z )
 
         for( int i = 0; i < numDataStatuses; i++ )
         {
-            if( !matrices_[matrixIndex].statuses_[rank][i] )
+            if( matrices_[matrixIndex].statuses_[rank][i] )
             {
                 mpi::Wait( matrices_[matrixIndex].requests_[rank][i] );
-                matrices_[matrixIndex].statuses_[rank][i] = true;
+                matrices_[matrixIndex].statuses_[rank][i] = false;
                 return;
             }
         }
@@ -988,10 +1007,10 @@ void AxpyInterface2<T>::WaitAny( const Matrix<T>& Z )
 
         for( int i = 0; i < numCoordStatuses; i++ )
         {
-            if( !coords_[coordIndex].statuses_[rank][i] )
+            if( coords_[coordIndex].statuses_[rank][i] )
             {
                 mpi::Wait( coords_[coordIndex].requests_[rank][i] );
-                coords_[coordIndex].statuses_[rank][i] = true;
+                coords_[coordIndex].statuses_[rank][i] = false;
                 return;
             }
         }
@@ -1060,8 +1079,11 @@ void AxpyInterface2<T>::Wait( const Matrix<T>& Z )
 
         for( int i = 0; i < numDataStatuses; i++ )
         {
-            mpi::Wait( matrices_[matrixIndex].requests_[rank][i] );
-            matrices_[matrixIndex].statuses_[rank][i] = true;
+	    if ( matrices_[matrixIndex].statuses_[rank][i] )
+	    {
+		mpi::Wait( matrices_[matrixIndex].requests_[rank][i] );
+		matrices_[matrixIndex].statuses_[rank][i] = false;
+	    }
         }
     }
 
@@ -1074,9 +1096,12 @@ void AxpyInterface2<T>::Wait( const Matrix<T>& Z )
         const Int numCoordStatuses = coords_[coordIndex].requests_[rank].size();
 
         for( int i = 0; i < numCoordStatuses; i++ )
-        {
-            mpi::Wait( coords_[coordIndex].requests_[rank][i] );
-            coords_[coordIndex].statuses_[rank][i] = true;
+	{
+	    if ( coords_[coordIndex].statuses_[rank][i] )
+	    {
+		mpi::Wait( coords_[coordIndex].requests_[rank][i] );
+		coords_[coordIndex].statuses_[rank][i] = false;
+	    }
         }
     }
 }
@@ -1111,10 +1136,13 @@ void AxpyInterface2<T>::Waitall()
             const Int numDataStatuses = matrices_[matrixIndex].requests_[rank].size();
 
             for( int i = 0; i < numDataStatuses; i++ )
-            {
-                mpi::Wait( matrices_[matrixIndex].requests_[rank][i] );
-                matrices_[matrixIndex].statuses_[rank][i] = true;
-            }
+	    {
+		if ( matrices_[matrixIndex].statuses_[rank][i] )
+		{
+		    mpi::Wait( matrices_[matrixIndex].requests_[rank][i] );
+		    matrices_[matrixIndex].statuses_[rank][i] = false;
+		}
+	    }
         }
     }
 
@@ -1126,9 +1154,12 @@ void AxpyInterface2<T>::Waitall()
             const Int numCoordStatuses = coords_[coordIndex].requests_[rank].size();
 
             for( int i = 0; i < numCoordStatuses; i++ )
-            {
-                mpi::Wait( coords_[coordIndex].requests_[rank][i] );
-                coords_[coordIndex].statuses_[rank][i] = true;
+	    {
+		if ( coords_[coordIndex].statuses_[rank][i] )
+		{
+		    mpi::Wait( coords_[coordIndex].requests_[rank][i] );
+		    coords_[coordIndex].statuses_[rank][i] = false;
+		}
             }
         }
     }
@@ -1281,10 +1312,7 @@ bool AxpyInterface2<T>::TestAny( const Matrix<T>& Z )
             matrices_[matrixIndex].statuses_[rank][i] =
                 !mpi::Test( matrices_[matrixIndex].requests_[rank][i] );
 
-            if( matrices_[matrixIndex].statuses_[rank][i] )
-                continue;
-            else
-                return true;
+            return ( !matrices_[matrixIndex].statuses_[rank][i] );
         }
     }
 
@@ -1300,14 +1328,12 @@ bool AxpyInterface2<T>::TestAny( const Matrix<T>& Z )
             coords_[coordIndex].statuses_[rank][i] =
                 !mpi::Test( coords_[coordIndex].requests_[rank][i] );
 
-            if( coords_[coordIndex].statuses_[rank][i] )
-                continue;
-            else
-                return true;
+            return ( !coords_[coordIndex].statuses_[rank][i] );
         }
     }
 
-    return false;
+    // this will never be executed
+    return true;
 }
 
 template<typename T>
@@ -1330,6 +1356,7 @@ bool AxpyInterface2<T>::Testall()
     const Int p = g.Size();
     const Int numMatrices = matrices_.size();
     const Int numCoords = coords_.size();
+    bool allstatus = true;
 
     // data
     for( int matrixIndex = 0; matrixIndex < numMatrices; ++matrixIndex )
@@ -1346,8 +1373,7 @@ bool AxpyInterface2<T>::Testall()
                 matrices_[matrixIndex].statuses_[rank][i] =
                     !mpi::Test( matrices_[matrixIndex].requests_[rank][i] );
 
-                if( matrices_[matrixIndex].statuses_[rank][i] )
-                    return false;
+                allstatus = allstatus && ( !matrices_[matrixIndex].statuses_[rank][i] );
             }
         }
     }
@@ -1367,13 +1393,12 @@ bool AxpyInterface2<T>::Testall()
                 coords_[coordIndex].statuses_[rank][i] =
                     !mpi::Test( coords_[coordIndex].requests_[rank][i] );
 
-                if( coords_[coordIndex].statuses_[rank][i] )
-                    return false;
+                allstatus = allstatus && ( !coords_[coordIndex].statuses_[rank][i] );
             }
         }
     }
 
-    return true;
+    return allstatus;
 }
 
 // This will ensure local+remote completion
@@ -1399,6 +1424,7 @@ void AxpyInterface2<T>::Flush( const Matrix<T>& Z )
         {
 	    switch( status.MPI_TAG )
 	    {
+		case COORD_PUT_TAG:
 		case DATA_PUT_TAG:
 		    {
 			HandleLocalToGlobalData( Z, status.MPI_SOURCE );
@@ -1406,6 +1432,7 @@ void AxpyInterface2<T>::Flush( const Matrix<T>& Z )
 		    }
 
 		case DATA_ACC_TAG:
+		case COORD_ACC_TAG:
 		    {
 			HandleLocalToGlobalAcc( Z, status.MPI_SOURCE );
 			break;

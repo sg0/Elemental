@@ -436,13 +436,15 @@ Int GlobalArrays< T >::GA_Create_irreg(Int ndim, Int dims[], const char *array_n
 template<typename T>
 Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Duplicate" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");   
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (ga_handles[g_a].is_destroyed)
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::GA_Duplicate" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");   
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (ga_handles[g_a].is_destroyed)
 	    LogicError ("Operation not possible, as Global Arrays has been destroyed");
+	    )
 
     const Int handle = ga_handles.size();
 	
@@ -544,27 +546,30 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
     return handle;
 }
 
+/*
 // g_c = alpha * g_a  +  beta * g_b;
 template<typename T>
 void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Add" ) )
-    if (!ga_initialized)
+    DEBUG_ONLY( 
+    	CallStackEntry cse( "GlobalArrays::GA_Add" ) 
+    	if (!ga_initialized)
 	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
+    	if (g_a < 0 || g_a >= ga_handles.size())
 	LogicError ("Invalid GA handle");
-    if (g_b < 0 || g_b >= ga_handles.size())
+    	if (g_b < 0 || g_b >= ga_handles.size())
 	LogicError ("Invalid GA handle");
-    if (g_c < 0 || g_c >= ga_handles.size())
+    	if (g_c < 0 || g_c >= ga_handles.size())
 	LogicError ("Invalid GA handle");
-    if ( ga_handles[g_a].ndim == 1 
+    	if ( ga_handles[g_a].ndim == 1 
 	    || ga_handles[g_b].ndim == 1 
 	    || ga_handles[g_c].ndim == 1 )
 	LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed
+    	if (ga_handles[g_a].is_destroyed
 	    || ga_handles[g_b].is_destroyed
 	    || ga_handles[g_c].is_destroyed)
 	    LogicError ("Operation not possible, as Global Arrays has been destroyed");
+    	)
 
     DistMatrix< T, MC, MR >& GA = *(ga_handles[g_a].DM);
     DistMatrix< T, MC, MR >& GB = *(ga_handles[g_b].DM);
@@ -610,24 +615,97 @@ void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
 
     UpdateSubmatrix( GC, I, J, a, GA );
 }
+*/
+
+// g_c = alpha * g_a  +  beta * g_b;
+// GA_Add using Gemm
+template<typename T>
+void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
+{
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::GA_Add" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (g_b < 0 || g_b >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (g_c < 0 || g_c >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if ( ga_handles[g_a].ndim == 1 
+		|| ga_handles[g_b].ndim == 1 
+		|| ga_handles[g_c].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed
+		|| ga_handles[g_b].is_destroyed
+		|| ga_handles[g_c].is_destroyed)
+	    LogicError ("Operation not possible, as Global Arrays has been destroyed");
+	    )
+
+    DistMatrix< T, MC, MR >& GA = *(ga_handles[g_a].DM);
+    DistMatrix< T, MC, MR >& GB = *(ga_handles[g_b].DM);
+    DistMatrix< T, MC, MR >& GC = *(ga_handles[g_c].DM);
+  
+    const Int g_a_height = GA.Height();
+    const Int g_a_width = GA.Width();
+    const Int g_b_height = GB.Height();
+    const Int g_b_width = GB.Width();   
+    const Int g_c_height = GC.Height();
+    const Int g_c_width = GC.Width();
+
+    T a = *((T *)alpha);
+    T b = *((T *)beta);
+    
+    // arrays must have the same shape
+    if ((g_a_width != g_b_width) 
+	    || (g_a_width != g_c_width) 
+	    || (g_b_width != g_c_width))
+	LogicError ("Global Arrays of different widths cannot be added. ");
+    if ((g_a_height != g_b_height) 
+	    || (g_a_height != g_c_height) 
+	    || (g_b_height != g_c_height))
+	LogicError ("Global Arrays of different heights cannot be added. ");
+
+    DistMatrix< T, MC, MR > Bd( g_a_height, g_a_width, GA.Grid() );
+    // Initialize
+    Identity( Bd, g_a_height, g_a_width );
+    // gc = gb
+    Copy( GB, GC );
+
+    // add
+    // FIXME dont hardcode
+    Int nb = 96;
+    GemmAlgorithm alg = GEMM_SUMMA_C;
+    
+    const Orientation orientA = CharToOrientation( 'N' );
+    const Orientation orientB = CharToOrientation( 'N' );
+    SetBlocksize( nb );
+
+    // GC = a*GA*Bd + b*GC
+    Gemm( orientA, orientB, a, GA, Bd, b, GC, alg);
+
+    Bd.Empty();
+}
 
 // copies g_a into g_b, must be of same shape
 template<typename T>
 void GlobalArrays< T >::GA_Copy(Int g_a, Int g_b)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Allocate" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (g_b < 0 || g_b >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if ( ga_handles[g_a].ndim == 1 
-	    || ga_handles[g_b].ndim == 1 )
-	LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed
-	    || ga_handles[g_b].is_destroyed)
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::GA_Copy" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (g_b < 0 || g_b >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if ( ga_handles[g_a].ndim == 1 
+		|| ga_handles[g_b].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed
+		|| ga_handles[g_b].is_destroyed)
 	    LogicError ("Operation not possible, as Global Arrays has been destroyed");
+	    )
 
     DistMatrix< T, MC, MR >& GA = *(ga_handles[g_a].DM);
     DistMatrix< T, MC, MR >& GB = *(ga_handles[g_b].DM);
@@ -652,15 +730,17 @@ void GlobalArrays< T >::GA_Copy(Int g_a, Int g_b)
 template<typename T>
 void GlobalArrays< T >::GA_Print(Int g_a)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Print" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if ( ga_handles[g_a].ndim == 1 )
-	LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed)
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::GA_Print" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if ( ga_handles[g_a].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed)
 	    LogicError ("Operation not possible, as Global Arrays has been destroyed");
+	    )
 
     DistMatrix< T, MC, MR >& DM = *(ga_handles[g_a].DM);
     
@@ -685,13 +765,15 @@ void GlobalArrays< T >::GA_Print(Int g_a)
 template<typename T>
 void GlobalArrays< T >::GA_Destroy(Int g_a)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Destroy" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (ga_handles[g_a].is_destroyed)
-	return;
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::GA_Destroy" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (ga_handles[g_a].is_destroyed)
+	    return;
+	    )
 
     if (ga_handles[g_a].ndim == 1)
     {
@@ -756,15 +838,17 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
 template<typename T>
 void GlobalArrays< T >::GA_Symmetrize (Int g_a)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Symmetrize" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if ( ga_handles[g_a].ndim == 1 )
-	LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed)
-	LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::GA_Symmetrize" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if ( ga_handles[g_a].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     DistMatrix< T, MC, MR >& GA = *(ga_handles[g_a].DM);
     
@@ -801,24 +885,26 @@ void GlobalArrays< T >::GA_Symmetrize (Int g_a)
 template<typename T>
 void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, T alpha, Int g_a, Int g_b, T beta, Int g_c )
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Dgemm" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (g_b < 0 || g_b >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (g_c < 0 || g_c >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if ( ga_handles[g_a].ndim == 1 
-	    || ga_handles[g_b].ndim == 1 
-	    || ga_handles[g_c].ndim == 1 )
-	LogicError ("A 1D GA is not allowed for this operation");    
-    if (ga_handles[g_a].is_destroyed
-	    || ga_handles[g_b].is_destroyed
-	    || ga_handles[g_c].is_destroyed)
-	LogicError ("Operation not possible as Global Arrays have been destroyed");
-    // TODO extra checks pertaining m, n, k
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::GA_Dgemm" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (g_b < 0 || g_b >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (g_c < 0 || g_c >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if ( ga_handles[g_a].ndim == 1 
+		|| ga_handles[g_b].ndim == 1 
+		|| ga_handles[g_c].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");    
+	    if (ga_handles[g_a].is_destroyed
+		|| ga_handles[g_b].is_destroyed
+		|| ga_handles[g_c].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays have been destroyed");
+	    // TODO extra checks pertaining m, n, k
+	    )
 
     DistMatrix< T, MC, MR >& ADM = *(ga_handles[g_a].DM);
     DistMatrix< T, MC, MR >& BDM = *(ga_handles[g_b].DM);
@@ -855,13 +941,15 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, T alpha,
 template<typename T>
 void GlobalArrays< T >::GA_Fill(Int g_a, T* value)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Fill" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");    
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (ga_handles[g_a].is_destroyed)
-	LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::GA_Fill" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");    
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     T a = *value;
 
@@ -998,19 +1086,21 @@ void GlobalArrays< T >::GA_Gop(T x[], Int n, char op)
 template<typename T>
 T GlobalArrays< T >::GA_Dot(Int g_a, Int g_b)
 {
-   DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Dot" ) )
-   if (!ga_initialized)
-       LogicError ("Global Arrays must be initialized before any operations");
-   if (g_a < 0 || g_a >= ga_handles.size())
-       LogicError ("Invalid GA handle");
-   if (g_b < 0 || g_b >= ga_handles.size())
-       LogicError ("Invalid GA handle");
-   if ( ga_handles[g_a].ndim == 1 
-	   || ga_handles[g_b].ndim == 1 )
-       LogicError ("A 1D GA is not allowed for this operation"); 
-   if (ga_handles[g_a].is_destroyed
-	   || ga_handles[g_b].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
+   DEBUG_ONLY( 
+	   CallStackEntry cse( "GlobalArrays::GA_Dot" ) 
+	   if (!ga_initialized)
+	   LogicError ("Global Arrays must be initialized before any operations");
+	   if (g_a < 0 || g_a >= ga_handles.size())
+	   LogicError ("Invalid GA handle");
+	   if (g_b < 0 || g_b >= ga_handles.size())
+	   LogicError ("Invalid GA handle");
+	   if ( ga_handles[g_a].ndim == 1 
+	       || ga_handles[g_b].ndim == 1 )
+	   LogicError ("A 1D GA is not allowed for this operation"); 
+	   if (ga_handles[g_a].is_destroyed
+	       || ga_handles[g_b].is_destroyed)
+	   LogicError ("Operation not possible as Global Arrays has been destroyed");
+	   )
 
    const DistMatrix< T, MC, MR >& A = *(ga_handles[g_a].DM);
    const DistMatrix< T, MC, MR >& B = *(ga_handles[g_b].DM);
@@ -1070,19 +1160,21 @@ void GlobalArrays< T >::GA_Terminate()
 template<typename T>
 void GlobalArrays< T >::GA_Transpose(Int g_a, Int g_b)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Transpose" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (g_b < 0 || g_b >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if ( ga_handles[g_a].ndim == 1 
-	   || ga_handles[g_b].ndim == 1 )
-       LogicError ("A 1D GA is not allowed for this operation");
-   if (ga_handles[g_a].is_destroyed
-	   || ga_handles[g_b].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::GA_Transpose" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (g_b < 0 || g_b >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if ( ga_handles[g_a].ndim == 1 
+		|| ga_handles[g_b].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed
+		|| ga_handles[g_b].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     DistMatrix< T, MC, MR >& ADM = *(ga_handles[g_a].DM);
     DistMatrix< T, MC, MR >& BDM = *(ga_handles[g_b].DM);
@@ -1093,15 +1185,17 @@ void GlobalArrays< T >::GA_Transpose(Int g_a, Int g_b)
 template<typename T>
 void GlobalArrays< T >::NGA_Distribution( Int g_a, Int iproc, Int lo[], Int hi[] )
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Distribution" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if ( ga_handles[g_a].ndim == 1 )
-       LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_Distribution" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if ( ga_handles[g_a].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     const Int patchHeight = ga_handles[g_a].patchHeight;
     const Int patchWidth = ga_handles[g_a].patchWidth;
@@ -1126,13 +1220,15 @@ void GlobalArrays< T >::NGA_Distribution( Int g_a, Int iproc, Int lo[], Int hi[]
 template<typename T>
 void GlobalArrays< T >::NGA_Inquire( Int g_a, Int * ndim, Int dims[] )
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Inquire" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (ga_handles[g_a].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_Inquire" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     if (ga_handles[g_a].ndim == 1)
     {
@@ -1157,17 +1253,19 @@ void GlobalArrays< T >::NGA_Inquire( Int g_a, Int * ndim, Int dims[] )
 template<typename T>
 void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[])
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Access" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if ( ga_handles[g_a].ndim == 1 )
-       LogicError ("A 1D GA is not allowed for this operation");
-    if (lo[0] == -1 && hi[0] == -2)
-	LogicError("Invalid coordinate axes");
-    if (ga_handles[g_a].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_Access" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if ( ga_handles[g_a].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (lo[0] == -1 && hi[0] == -2)
+	    LogicError("Invalid coordinate axes");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     // check lo/hi
     const Int localHeight = ga_handles[g_a].patchHeight;
@@ -1201,7 +1299,7 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[
     const Int j = lo[0];
     
     // get
-    BXFER ('G', g_a, M, i, j);
+    NBXFER ('G', g_a, M, i, j);
     
     *ptr = M.Buffer();
     *ld = localHeight;
@@ -1211,57 +1309,57 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[
 template<typename T>
 void GlobalArrays< T >::NGA_Release(Int g_a, Int lo[], Int hi[])
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Release" ) )
-    
-    if (!ga_initialized)
-        LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if ( ga_handles[g_a].ndim == 1 )
-	LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed)
-	LogicError ("Operation not possible as Global Arrays has been destroyed");
-    if (lo[0] == -1 && hi[0] == -2) // means no elements are stored locally
-	return;
-
-    // Note: This is just checking to see whether 
-    // NGA_Release was called after calling NGA_Access
-    Int m_index = -99;
-    for (Int i = 0; i < matrices_.size(); i++)
-    {
-	if (matrices_[i].ga_index_ == g_a 
-		&& !matrices_[i].is_accumulate_
-		&& matrices_[i].hi[0] == hi[0]
-		&& matrices_[i].hi[1] == hi[1]
-		&& matrices_[i].lo[0] == lo[0]
-		&& matrices_[i].lo[1] == lo[1])
-	{
-	    m_index = i;
-	    break;
-	}
-    }
-
-    if (m_index < 0)
-	LogicError ("Calling NGA_Release without calling NGA_Access before is not allowed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_Release" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if ( ga_handles[g_a].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    if (lo[0] == -1 && hi[0] == -2) // means no elements are stored locally
+	    return;
+	    // Note: This is just checking to see whether 
+	    // NGA_Release was called after calling NGA_Access
+	    Int m_index = -99;
+	    for (Int i = 0; i < matrices_.size(); i++)
+	    {
+		if (matrices_[i].ga_index_ == g_a 
+			&& !matrices_[i].is_accumulate_
+			&& matrices_[i].hi[0] == hi[0]
+			&& matrices_[i].hi[1] == hi[1]
+			&& matrices_[i].lo[0] == lo[0]
+			&& matrices_[i].lo[1] == lo[1])
+		{
+		    m_index = i;
+		    break;
+		}
+	    }
+            if (m_index < 0)
+		LogicError ("Calling NGA_Release without calling NGA_Access before is not allowed");
+	    )
 }
 
 // this is used when (local portion of) GA is accessed for writing
 template<typename T>
 void GlobalArrays< T >::NGA_Release_update(Int g_a, Int lo[], Int hi[])
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Release" ) )
-
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if ( ga_handles[g_a].ndim == 1 )
-       LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
-    if (lo[0] == -1 && hi[0] == -2) // means no elements are stored locally
-	return;
- 
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_Release" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if ( ga_handles[g_a].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    if (lo[0] == -1 && hi[0] == -2) // means no elements are stored locally
+	    return;
+	    )
+    
     Int m_index = -99;
     for (Int i = 0; i < matrices_.size(); i++)
     {
@@ -1276,7 +1374,6 @@ void GlobalArrays< T >::NGA_Release_update(Int g_a, Int lo[], Int hi[])
 	    break;
 	}
     }
-
     if (m_index < 0)
 	LogicError ("Calling NGA_Release without calling NGA_Access before is not allowed");
     
@@ -1287,23 +1384,25 @@ void GlobalArrays< T >::NGA_Release_update(Int g_a, Int lo[], Int hi[])
     Matrix< T >& M = *(matrices_[m_index].M_);
 
     // Put - locally blocking transfer
-    BXFER('P', g_a, M, i, j);
+    NBXFER('P', g_a, M, i, j);
 }
 
 template<typename T>
 void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], T* alpha)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Acc" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (buf == NULL)
-	LogicError ("Input buffer cannot be NULL");
-    if ( ga_handles[g_a].ndim == 1 )
-       LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_Acc" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (buf == NULL)
+	    LogicError ("Input buffer cannot be NULL");
+	    if ( ga_handles[g_a].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     T a = *alpha;
     T one = T( 1 );
@@ -1344,17 +1443,19 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
 template<typename T>
 void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], T* buf, Int ld[])
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Get" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (buf == NULL)
-	LogicError ("Output buffer cannot be NULL");
-    if ( ga_handles[g_a].ndim == 1 )
-       LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_Get" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (buf == NULL)
+	    LogicError ("Output buffer cannot be NULL");
+	    if ( ga_handles[g_a].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     // calculate height and width from lo and hi
     const Int width = hi[0] - lo[0] + 1;
@@ -1375,17 +1476,19 @@ void GlobalArrays< T >::NGA_Get(Int g_a, Int lo[], Int hi[], T* buf, Int ld[])
 template<typename T>
 void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], T* alpha, ga_nbhdl_t* nbhandle)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbAcc" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (buf == NULL)
-	LogicError ("Input buffer cannot be NULL");
-    if ( ga_handles[g_a].ndim == 1 )
-       LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_NbAcc" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (buf == NULL)
+	    LogicError ("Input buffer cannot be NULL");
+	    if ( ga_handles[g_a].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     T a = *alpha;
     T one = T( 1 );
@@ -1430,18 +1533,19 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
 template<typename T>
 void GlobalArrays< T >::NGA_NbGet(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], ga_nbhdl_t* nbhandle)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbGet" ) )
-    
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (buf == NULL)
-	LogicError ("Output buffer cannot be NULL");
-    if ( ga_handles[g_a].ndim == 1 )
-       LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_NbGet" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (buf == NULL)
+	    LogicError ("Output buffer cannot be NULL");
+	    if ( ga_handles[g_a].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     // calculate height and width from lo and hi
     const Int width = hi[0] - lo[0] + 1;
@@ -1463,17 +1567,19 @@ void GlobalArrays< T >::NGA_NbGet(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
 template<typename T>
 void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], ga_nbhdl_t* nbhandle)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbPut" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (buf == NULL)
-	LogicError ("Input buffer cannot be NULL");
-    if ( ga_handles[g_a].ndim == 1 )
-       LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_NbPut" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (buf == NULL)
+	    LogicError ("Input buffer cannot be NULL");
+	    if ( ga_handles[g_a].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     // calculate local height and width
     const Int width = hi[0] - lo[0] + 1;
@@ -1497,11 +1603,13 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
 template<typename T>
 void GlobalArrays< T >::NGA_NbWait(ga_nbhdl_t* nbhandle)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_NbWait" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (ga_handles.size() == 0 || *nbhandle >= ga_handles.size())
-	return;
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_NbWait" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (ga_handles.size() == 0 || *nbhandle >= ga_handles.size())
+	    return;
+	    )
     
     if (*nbhandle != -1)
     {
@@ -1518,17 +1626,19 @@ void GlobalArrays< T >::NGA_NbWait(ga_nbhdl_t* nbhandle)
 template<typename T>
 void GlobalArrays< T >::NGA_Put(Int g_a, Int lo[], Int hi[], T* buf, Int ld[])
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Put" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (buf == NULL)
-	LogicError ("Input buffer cannot be NULL");
-    if ( ga_handles[g_a].ndim == 1 )
-       LogicError ("A 1D GA is not allowed for this operation");
-    if (ga_handles[g_a].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_Put" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (buf == NULL)
+	    LogicError ("Input buffer cannot be NULL");
+	    if ( ga_handles[g_a].ndim == 1 )
+	    LogicError ("A 1D GA is not allowed for this operation");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     // calculate local height and width
     const Int width = hi[0] - lo[0] + 1;
@@ -1550,13 +1660,15 @@ void GlobalArrays< T >::NGA_Put(Int g_a, Int lo[], Int hi[], T* buf, Int ld[])
 template<typename T>
 T GlobalArrays< T >::NGA_Read_inc(Int g_a, Int subscript[], T inc)
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::NGA_Read_inc" ) )
-    if (!ga_initialized)
-	LogicError ("Global Arrays must be initialized before any operations on the global array");
-    if (g_a < 0 || g_a >= ga_handles.size())
-	LogicError ("Invalid GA handle");
-    if (ga_handles[g_a].is_destroyed)
-       LogicError ("Operation not possible as Global Arrays has been destroyed");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::NGA_Read_inc" ) 
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    if (g_a < 0 || g_a >= ga_handles.size())
+	    LogicError ("Invalid GA handle");
+	    if (ga_handles[g_a].is_destroyed)
+	    LogicError ("Operation not possible as Global Arrays has been destroyed");
+	    )
 
     T prev;
 

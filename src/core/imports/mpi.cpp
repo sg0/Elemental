@@ -408,11 +408,9 @@ void Translate
 #if MPI_VERSION>=3 && defined(EL_ENABLE_RMA_AXPY)
 // Window management
 // -----------------
-/*
 #ifndef EL_NO_ACC_ORDERING
 #define EL_NO_ACC_ORDERING
 #endif
-*/
 void SetWindowProp (Window & window, acc_order_t prop)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::SetWindowProp"))
@@ -433,8 +431,8 @@ void SetWindowProp (Window & window, acc_order_t prop)
 
     if (prop & (1 << 2))	// none
         SafeMpi (MPI_Info_set
-                 (info, "accumulate_ops",
-                  "same_op_no_op"));
+                 (info, "accumulate_ordering",
+                  "none"));
 
     SafeMpi (MPI_Win_set_info (window, info));
 }
