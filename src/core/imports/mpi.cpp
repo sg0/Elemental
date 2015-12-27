@@ -514,7 +514,9 @@ void WindowAllocate (int size, Comm comm, Window & window)
               comm.comm, &base, &window) );
     // set zero
     // memset (base, 0, size);
-
+    // Info alloc_shm_info;
+    // SafeMpi( MPI_Info_create(&alloc_shm_info) );
+    // SafeMpi( MPI_Info_set(alloc_shm_info, "alloc_shm", "true") );
 #ifdef EL_NO_ACC_ORDERING
     SetWindowProp( window, NO_ACC_ORDERING );
 #endif
@@ -529,7 +531,7 @@ R ReadInc (Window & win, Aint offset, R inc, int fop_root)
     R otemp;			
     SafeMpi ( MPI_Fetch_and_op (&inc, &otemp, TypeMap<R>(), fop_root, offset, MPI_SUM,
 	    win) );
-    SafeMpi ( MPI_Win_flush (fop_root, win) );
+    SafeMpi ( MPI_Win_flush_local (fop_root, win) );
 
     return otemp;
 }

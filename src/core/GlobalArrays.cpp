@@ -1411,22 +1411,24 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
     const Int ldim = *ld; // ldim for GA buffer
-    const Int eldim = Max( height, 1 );
 
-    // create a matrix for nonblocking transfer
-    const Int currentIndex = matrices_.size();
-    matrices_.push_back( matrix_params_() );   
-    
-    matrices_[currentIndex].ga_index_ = g_a;
-    matrices_[currentIndex].is_accumulate_ = true;
-
-    matrices_[currentIndex].M_ = new Matrix< T >( height, width );	
-    Matrix< T >& M = *(matrices_[currentIndex].M_);	
+    Matrix< T > M;	
 
     if (a == one)
 	M.Attach( height, width, buf, ldim );
     else
     {
+        const Int eldim = Max( height, 1 );
+        // create a matrix for nonblocking transfer
+        const Int currentIndex = matrices_.size();
+        matrices_.push_back( matrix_params_() );
+
+        matrices_[currentIndex].ga_index_ = g_a;
+        matrices_[currentIndex].is_accumulate_ = true;
+
+        matrices_[currentIndex].M_ = new Matrix< T >( height, width );
+        M = *(matrices_[currentIndex].M_);
+	
 	T * inbuf = M.Buffer();
 	for (Int j = 0; j < width; j++)
 	    for (Int i = 0; i < height; i++)

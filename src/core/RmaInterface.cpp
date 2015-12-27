@@ -409,7 +409,6 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
                            putVector_[destination] );
             T* sendBuffer = putVector_[destination][index].data();
 	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
-	    const Int remoteWidth = Length( dm_width, receivingCol, Y.RowAlign(), c );
 	    // remote 
 	    Int iMapped, jMapped;
 	    bool isbreak = false;
@@ -505,8 +504,7 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
                            putVector_[destination] );
             T* sendBuffer = putVector_[destination][index].data();
 	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
-	    const Int remoteWidth = Length( dm_width, receivingCol, Y.RowAlign(), c );
-	    // remote 
+	    
 	    Int iMapped, jMapped;
 	    bool isbreak = false;
 	    for (Int i_ = i; i_ < dm_height && !isbreak; ++i_)
@@ -522,6 +520,7 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 		    }
 		}
 	    }
+
 	    // starting displacement
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
 	    for( Int t = 0; t < localWidth; ++t )
@@ -537,7 +536,7 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 		// locally nonblocking acc
 		mpi::Iacc( thisSendCol, localHeight, destination, t_disp, localHeight, window );
 	    }
-        }
+	}
             
         receivingRow = ( receivingRow + 1 ) % r;
 
