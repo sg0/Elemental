@@ -546,6 +546,7 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
     return handle;
 }
 
+// GA_Add using EntrywiseMap + UpdateSubmatrix
 /*
 // g_c = alpha * g_a  +  beta * g_b;
 template<typename T>
@@ -1116,9 +1117,11 @@ T GlobalArrays< T >::GA_Dot(Int g_a, Int g_b)
 template<typename T>
 void GlobalArrays< T >::GA_Sync()
 {
-    DEBUG_ONLY( CallStackEntry cse( "GlobalArrays::GA_Sync" ) )
-    if (!ga_initialized)
-       LogicError ("Global Arrays must be initialized before any operations on the global array");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "GlobalArrays::GA_Sync" )
+	    if (!ga_initialized)
+	    LogicError ("Global Arrays must be initialized before any operations on the global array");
+	    )
 
     // ensure all GA operations are complete	
     for (Int i = 0; i < ga_handles.size(); i++)
@@ -1430,9 +1433,12 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
         M = *(matrices_[currentIndex].M_);
 	
 	T * inbuf = M.Buffer();
+	
 	for (Int j = 0; j < width; j++)
-	    for (Int i = 0; i < height; i++)
-		inbuf[j*eldim + i] = a * buf[j*ldim + i];
+	    MemCopy( &inbuf[j*eldim], &buf[j*ldim], height );
+
+	const Int numEntries = width * height;
+	blas::Scal( numEntries, a, inbuf, 1 );
     }
 
     const Int i = lo[1];
@@ -1499,26 +1505,31 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     const Int width = hi[0] - lo[0] + 1;
     const Int height = hi[1] - lo[1] + 1;
     const Int ldim = *ld; // ldim for GA Buffer	   
-    const Int eldim = Max( height, 1 );
-    
-    // create a matrix for nonblocking transfer
-    const Int currentIndex = matrices_.size();
-    matrices_.push_back( matrix_params_() );      
-    
-    matrices_[currentIndex].ga_index_ = g_a;
-    matrices_[currentIndex].is_accumulate_ = true;
-    
-    matrices_[currentIndex].M_ = new Matrix< T >( height, width );	
-    Matrix< T >& M = *(matrices_[currentIndex].M_);	
+
+    Matrix< T > M;
         
     if (a == one)
 	M.Attach( height, width, buf, ldim );
     else
     {
+	const Int eldim = Max( height, 1 );
+	// create a matrix for nonblocking transfer
+	const Int currentIndex = matrices_.size();
+	matrices_.push_back( matrix_params_() );      
+
+	matrices_[currentIndex].ga_index_ = g_a;
+	matrices_[currentIndex].is_accumulate_ = true;
+
+	matrices_[currentIndex].M_ = new Matrix< T >( height, width );	
+	M = *(matrices_[currentIndex].M_);	
+
 	T * inbuf = M.Buffer();
+
 	for (Int j = 0; j < width; j++)
-	    for (Int i = 0; i < height; i++)
-		inbuf[j*eldim + i] = a * buf[j*ldim + i];
+	    MemCopy( &inbuf[j*eldim], &buf[j*ldim], height );
+
+	const Int numEntries = width * height;
+	blas::Scal( numEntries, a, inbuf, 1 );
     }
 
     const Int i = lo[1];

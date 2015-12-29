@@ -213,12 +213,13 @@ Int RmaInterface<T>::NextIndex
 ( Int dataSize,
   std::deque <std::vector<T>>& dataVectors )
 {
-    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::NextIndex" ) )
-    
-    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
-        LogicError( "No DistMatrix attached" );
-    if (dataSize < 0)
-	LogicError ("Resize factor cannot be negative");
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "RmaInterface::NextIndex" )
+	    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
+	    LogicError( "No DistMatrix attached" );
+	    if (dataSize < 0)
+	    LogicError ("Resize factor cannot be negative");
+	    )
     
     const Int numCreated = dataVectors.size();
     dataVectors.resize( numCreated + 1 );
@@ -261,13 +262,13 @@ void RmaInterface<T>::Acc( Matrix<T>& Z, Int i, Int j )
 template<typename T>
 void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Get" ) )
-
-    // a call to Attach with a non-const DistMatrix must set
-    // toBeAttachedForGet_ also, if not then it is assumed that
-    // the DistMatrix isn't attached
-    if( !toBeAttachedForGet_ )
-        LogicError( "Cannot perform this operation as matrix is not attached." );
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "RmaInterface::Get" )
+	    if( i < 0 || j < 0 )
+	    LogicError( "Submatrix offsets must be non-negative" );
+	    if( !toBeAttachedForGet_ )
+	    LogicError( "Cannot perform this operation as matrix is not attached." );
+	    )
 
     const DistMatrix<T>& Y = *GlobalArrayGet_;
     
@@ -317,14 +318,13 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 	    bool isbreak = false;
 	    for (Int i_ = i; i_ < dm_height && !isbreak; ++i_)
 	    {
-		for (Int j_ = j; j_ < dm_width; ++j_)
+		for (Int j_ = j; j_ < dm_width && !isbreak; ++j_)
 		{
 		    if ( Y.Owner( i_, j_ ) == destination )
 		    {
 			isbreak = true;
 			iMapped = i_ / r;
 			jMapped = j_ / c;
-			break;
 		    }
 		}
 	    }
@@ -359,13 +359,13 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 template<typename T>
 void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Iput" ) )
-
-    if( i < 0 || j < 0 )
-        LogicError( "Submatrix offsets must be non-negative" );
-
-    if( !toBeAttachedForPut_ )
-        LogicError( "Global matrix cannot be updated" );
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "RmaInterface::Iput" )
+	    if( i < 0 || j < 0 )
+	    LogicError( "Submatrix offsets must be non-negative" );
+	    if( !toBeAttachedForPut_ )
+	    LogicError( "Global matrix cannot be updated" );
+	    )
 
     DistMatrix<T>& Y = *GlobalArrayPut_;
 
@@ -414,14 +414,13 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 	    bool isbreak = false;
 	    for (Int i_ = i; i_ < dm_height && !isbreak; ++i_)
 	    {
-		for (Int j_ = j; j_ < dm_width; ++j_)
+		for (Int j_ = j; j_ < dm_width && !isbreak; ++j_)
 		{
 		    if ( Y.Owner( i_, j_ ) == destination )
 		    {
 			isbreak = true;
 			iMapped = i_ / r;
 			jMapped = j_ / c;
-			break;
 		    }
 		}
 	    }
@@ -454,13 +453,13 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 template<typename T>
 void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 {
-    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Iacc" ) )
- 
-    if( i < 0 || j < 0 )
-        LogicError( "Submatrix offsets must be non-negative" );
-
-    if( !toBeAttachedForPut_ )
-        LogicError( "Global matrix cannot be updated" );
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "RmaInterface::Iacc" )
+	    if( i < 0 || j < 0 )
+	    LogicError( "Submatrix offsets must be non-negative" );
+	    if( !toBeAttachedForPut_ )
+	    LogicError( "Global matrix cannot be updated" );
+	    )
 
     DistMatrix<T>& Y = *GlobalArrayPut_;
 
@@ -509,14 +508,13 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 	    bool isbreak = false;
 	    for (Int i_ = i; i_ < dm_height && !isbreak; ++i_)
 	    {
-		for (Int j_ = j; j_ < dm_width; ++j_)
+		for (Int j_ = j; j_ < dm_width && !isbreak; ++j_)
 		{
 		    if ( Y.Owner( i_, j_ ) == destination )
 		    {
 			isbreak = true;
 			iMapped = i_ / r;
 			jMapped = j_ / c;
-			break;
 		    }
 		}
 	    }
@@ -616,15 +614,16 @@ void RmaInterface<T>::Flush()
 template<typename T>
 T RmaInterface<T>::AtomicIncrement( Int i, Int j, T incr )
 {
-    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::AtomicIncrement" ) )
-
-    if( i < 0 || j < 0 )
-        LogicError( "Submatrix offsets must be non-negative" );
-
-    if( !toBeAttachedForPut_ )
-        LogicError( "Global matrix cannot be updated" );
+    DEBUG_ONLY( 
+	    CallStackEntry cse( "RmaInterface::AtomicIncrement" )
+	    if( i < 0 || j < 0 )
+	    LogicError( "Submatrix offsets must be non-negative" );
+	    if( !toBeAttachedForPut_ )
+	    LogicError( "Global matrix cannot be updated" );
+	    )
 
     DistMatrix<T>& Y = *GlobalArrayPut_;
+    
     const Grid& g = Y.Grid();
     const Int r = g.Height();
     const Int c = g.Width();
