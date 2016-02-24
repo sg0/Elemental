@@ -34,7 +34,8 @@ template<typename T>
 GlobalArrays< T >::GlobalArrays()
     : ga_initialized( false ),
       ga_handles( 0 ),
-      matrices_( 0 )
+      matrices_( 0 ),
+      nbhdls_( 0 )
 {}
 
 // destructor
@@ -225,9 +226,9 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name, I
 	ga_handles[handle].ndim = 1;
 	// length of GA
 	ga_handles[handle].length = *(dims);
-	const Int bufferSize = ga_handles[handle].length * sizeof(T);
 	// start access epoch on FOP window
-	mpi::WindowAllocate( bufferSize, grid.Comm(), ga_handles[handle].fop_win );
+	mpi::WindowAllocate<T>( ga_handles[handle].length, grid.Comm(), 
+		ga_handles[handle].fop_win );
 	mpi::WindowLock( ga_handles[handle].fop_win );
     }
     else
@@ -419,9 +420,9 @@ Int GlobalArrays< T >::GA_Create_irreg(Int ndim, Int dims[], const char *array_n
 	ga_handles[handle].ndim = 1;
 	// length of GA
 	ga_handles[handle].length = *(dims);
-	const Int bufferSize = ga_handles[handle].length * sizeof(T);
 	// start access epoch on FOP window
-	mpi::WindowAllocate( bufferSize, grid.Comm(), ga_handles[handle].fop_win );
+	mpi::WindowAllocate<T>( ga_handles[handle].length, grid.Comm(), 
+		ga_handles[handle].fop_win );
 	mpi::WindowLock( ga_handles[handle].fop_win );
     }
     else
@@ -534,7 +535,8 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 	const Int bufferSize = ga_handles[handle].length * sizeof(T);
 
 	// start access epoch on FOP window
-	mpi::WindowAllocate( bufferSize, grid.Comm(), ga_handles[handle].fop_win );
+	mpi::WindowAllocate<T>( ga_handles[handle].length, grid.Comm(), 
+		ga_handles[handle].fop_win );
 	mpi::WindowLock( ga_handles[handle].fop_win );    
     }
     else
@@ -546,8 +548,8 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
     return handle;
 }
 
+#if 0
 // GA_Add using EntrywiseMap + UpdateSubmatrix
-/*
 // g_c = alpha * g_a  +  beta * g_b;
 template<typename T>
 void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
@@ -616,7 +618,7 @@ void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
 
     UpdateSubmatrix( GC, I, J, a, GA );
 }
-*/
+#endif
 
 // g_c = alpha * g_a  +  beta * g_b;
 // GA_Add using Gemm
@@ -929,8 +931,6 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, T alpha,
     const Orientation orientB = CharToOrientation( ((tb == 'T' || tb == 't') ? 'N' : 'T') );
 
     Gemm( orientA, orientB, alpha, ADM, BDM, beta, CDM, alg);
-
-    mpi::Barrier( ADM.DistComm() );   
 }
 
 // FIXME GA struct should have a grid pointer,
@@ -956,7 +956,8 @@ void GlobalArrays< T >::GA_Fill(Int g_a, T* value)
 
     if (ga_handles[g_a].ndim == 1)
     {
-	T * fop_base = reinterpret_cast<T *>( mpi::GetWindowBase( ga_handles[g_a].fop_win ) );
+	T * fop_base = nullptr;
+	mpi::GetWindowBase( ga_handles[g_a].fop_win, &fop_base );
 	for (Int i = 0; i < ga_handles[g_a].length; i++) fop_base[i] = a;
 	// default grid
 	const Grid &grid = DefaultGrid();
@@ -1023,7 +1024,7 @@ void GlobalArrays< T >::GA_Initialize()
 		ga_handles[g_a].rmaint->Iput (M, i, j); \
 	        break; \
 	    case 'G': \
-		ga_handles[g_a].rmaint->Get (M, i, j); \
+		ga_handles[g_a].rmaint->Iget (M, i, j); \
 	    	break; \
 	    default: \
 		LogicError ("Unsupported nonblocking transfer type"); \
@@ -1048,27 +1049,6 @@ void GlobalArrays< T >::GA_Initialize()
 	    	break; \
 	    default: \
 		LogicError ("Unsupported nonblocking transfer type"); \
-	} \
-    } while (0)
-
-// blocks until local/remote completion
-#define BXFER(type, g_a, M, i, j) \
-    do { \
-	switch (type) \
-	{ \
-	    case 'A': \
-		ga_handles[g_a].rmaint->Acc (M, i, j); \
-	        ga_handles[g_a].rmaint->Flush (M); \
-	        break; \
-	    case 'P': \
-		ga_handles[g_a].rmaint->Put (M, i, j); \
-	        ga_handles[g_a].rmaint->Flush (M); \
-	        break; \
-	    case 'G': \
-		ga_handles[g_a].rmaint->Get (M, i, j); \
-	    	break; \
-	    default: \
-		LogicError ("Unsupported blocking transfer type"); \
 	} \
     } while (0)
 
@@ -1538,6 +1518,12 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     // Acc - (locally) nonblocking transfer
     LNBXFER ('A', g_a, M, i, j);
     
+    // nb handle management
+    const Int hdlIndex = nbhdls_.size();
+    nbhdls_.push_back( nbhdl_t_() );
+    nbhdls_[hdlIndex].M_ = &M;
+    nbhdls_[hdlIndex].nbhandle_ = g_a;
+
     *nbhandle = g_a;
 }
 
@@ -1574,6 +1560,12 @@ void GlobalArrays< T >::NGA_NbGet(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     // get
     LNBXFER ('G', g_a, A, i, j);
 
+    // nb handle management
+    const Int hdlIndex = nbhdls_.size();
+    nbhdls_.push_back( nbhdl_t_() );
+    nbhdls_[hdlIndex].M_ = &A;
+    nbhdls_[hdlIndex].nbhandle_ = g_a;
+    
     *nbhandle = g_a;
 }
 
@@ -1608,6 +1600,12 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     
     // Put - (locally) nonblocking transfer
     LNBXFER ('P', g_a, A, i, j);
+ 
+    // nb handle management
+    const Int hdlIndex = nbhdls_.size();
+    nbhdls_.push_back( nbhdl_t_() );
+    nbhdls_[hdlIndex].M_ = &A;
+    nbhdls_[hdlIndex].nbhandle_ = g_a;   
     
     *nbhandle = g_a;
 }
@@ -1626,11 +1624,24 @@ void GlobalArrays< T >::NGA_NbWait(ga_nbhdl_t* nbhandle)
     
     if (*nbhandle != -1)
     {
+	// find nb handle index
+	Int hdlIndex = -1;
+	for (Int i = 0; i < nbhdls_.size(); i++)
+	{
+	    if (*nbhandle == nbhdls_[i].nbhandle_
+		    && nbhdls_[i].active_ == true)
+	    {
+		hdlIndex = i;
+		break;
+	    }
+	}
 	if (ga_handles[*nbhandle].rma_local_pending)
 	{
-	    ga_handles[*nbhandle].rmaint->LocalFlush ();
+	    ga_handles[*nbhandle].rmaint->LocalFlush (*(nbhdls_[hdlIndex].M_));
 	    ga_handles[*nbhandle].rma_local_pending = false;
+	    nbhdls_[hdlIndex].active_ = false;
 	}
+
 	// release handle
 	*nbhandle = -1;
     }
@@ -1691,7 +1702,7 @@ T GlobalArrays< T >::NGA_Read_inc(Int g_a, Int subscript[], T inc)
 	const Int j = subscript[0];
 	prev = ga_handles[g_a].rmaint->AtomicIncrement( i, j, inc );
     }
-    else // rank 0 is default FOP root for 1-D FOP GA, use mpi function directly
+    else
 	prev = mpi::ReadInc( ga_handles[g_a].fop_win, *(subscript), inc );
     
     return prev;   

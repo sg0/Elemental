@@ -65,7 +65,7 @@ int main(int argc, char **argv)
   memset (local_B, 0, SIZE*SIZE*sizeof(int));
 
 #if defined(USE_ELEMENTAL)
-  ElGlobalArraysCreate_i( eliga, DIM, dims, "array_A", NULL, &g_A );
+  ElGlobalArraysCreate_i( eliga, DIM, dims, "array_A", NULL, NULL, &g_A );
   ElGlobalArraysFill_i( eliga, g_A, &value );
   ElGlobalArraysPrint_i( eliga, g_A );
   // acc data

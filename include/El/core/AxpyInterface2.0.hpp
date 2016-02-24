@@ -1,6 +1,14 @@
 /*
-   This file is part of Elemental and is under the BSD 2-Clause License,
-   which can be found in the LICENSE file in the root directory, or at
+   Copyright (c) 2009-2015, Jack Poulson
+   Copyright (c) 2011, The University of Texas at Austin
+   All rights reserved.
+
+   Authors:
+   This interface is mainly due to Martin Schatz, but it was put into its
+   current form by Jack Poulson.
+
+   This file is part of Elemental and is under the BSD 2-Clause License, 
+   which can be found in the LICENSE file in the root directory, or at 
    http://opensource.org/licenses/BSD-2-Clause
 */
 #pragma once
@@ -8,132 +16,90 @@
 #define EL_AXPYINTERFACE2_HPP
 
 namespace El {
+
+namespace TransferTypeNS {
+enum TransferType { PUT, ACC, GET };
+}
+using namespace TransferTypeNS;
+
 template<typename T>
 class AxpyInterface2
-{
+{   
 public:
     AxpyInterface2();
     ~AxpyInterface2();
+   
+    AxpyInterface2( DistMatrix<T,MC,MR>& Z );
 
-    AxpyInterface2(       DistMatrix<T,MC,MR>& Z );
-    AxpyInterface2( const DistMatrix<T,MC,MR>& Z );
+    // collective
+    void Attach( DistMatrix<T,MC,MR>& Z ); 
 
-    // collective epoch initialization routines
-    void Attach(       DistMatrix<T,MC,MR>& Z );
-    void Attach( const DistMatrix<T,MC,MR>& Z );
+    // locally nonblocking 
+    void Put( Matrix<T>& X, Int i, Int j );
+    void Acc( Matrix<T>& X, Int i, Int j );
+    void Get( Matrix<T>& Y, Int i, Int j );
+
+    // remote completion
+    void Flush( TransferType ttype );
+
+    // collective
     void Detach();
 
-    // remote update routines
-    
-    // requires Flush for local+remote 
-    // completion
-    void Iput( Matrix<T>& Z, Int i, Int j );
-    void Iput( const Matrix<T>& Z, Int i, Int j );
-
-    void Iget(       Matrix<T>& Z, Int i, Int j );
-
-    void Iacc(       Matrix<T>& Z, Int i, Int j );
-    void Iacc( const Matrix<T>& Z, Int i, Int j );
-    
-    // locally blocking update routines
-    // reuse input buffer when returns
-    void Acc(       Matrix<T>& Z, Int i, Int j );
-    void Acc( const Matrix<T>& Z, Int i, Int j );
-
-    void Put( Matrix<T>& Z, Int i, Int j );
-    void Put( const Matrix<T>& Z, Int i, Int j );   
-
-    void Get(       Matrix<T>& Z, Int i, Int j );
-
-    // synchronization routines
-    void Flush(          Matrix<T>& Z );
-    void Flush(    const Matrix<T>& Z ); 
-
 private:
-   
+    /*
     static const Int 
-        DATA_PUT_TAG      =1, 
-        DATA_GET_TAG      =2,
-        DATA_ACC_TAG   	  =3,
-        REQUEST_GET_TAG   =4,
-	COORD_ACC_TAG     =5,
-	COORD_PUT_TAG     =6;	
-
-    // struct for passing data
-    struct matrix_params_
-    {
-	const void *base_;
-	std::vector<std::deque<std::vector<T>>>
-	    data_;
-	std::vector<std::deque<mpi::Request>> 
-	    requests_;
-	std::vector<std::deque<bool>> 
-	    statuses_;
-    };
-        	
-    std::vector<struct matrix_params_> matrices_;
-
-    // struct for passing coordinates
-    struct coord_params_
-    {
-	const void *base_;
-	std::vector<std::deque<std::array<Int, 3>>>
-	    coord_;
-	std::vector<std::deque<mpi::Request>> 
-	    requests_;
-	std::vector<std::deque<bool>> 
-	    statuses_;
-    };
-        	
-    std::vector<struct coord_params_> coords_;
-
-    // for blocking interface
-    // copying input buffer in this
-    // intermediate buffer so that input
-    // buffer could be reused
-    std::vector<std::vector<std::vector< T >>>
-        dataVectors_;
-
-    DistMatrix<T,MC,MR>* GlobalArrayPut_;   
-    const DistMatrix<T,MC,MR>* GlobalArrayGet_;
-
-    bool toBeAttachedForPut_, toBeAttachedForGet_, 
-	 attached_, detached_;
-
-    // next index for data and coord
-    Int NextIndexData (
-	Int target,
-	Int dataSize, 
-	const void* base_address,
-	Int *mindex);
-   
-    Int NextIndexCoord (
-	Int i, Int j,
-	Int target,
-	const void* base_address,
-	Int *cindex);
-
-    bool Testall();
-    bool Test(             Matrix<T>& Z );
-    bool Test(       const Matrix<T>& Z );  
-    bool TestAny(          Matrix<T>& Z );
-    bool TestAny(    const Matrix<T>& Z ); 
-
-    void Waitall();
-    void Wait(             Matrix<T>& Z );
-    void Wait(       const Matrix<T>& Z );    
-    void WaitAny(          Matrix<T>& Z );
-    void WaitAny(    const Matrix<T>& Z );   
-
-    // these are only used for nonblocking
-    // update rountines
-    void HandleGlobalToLocalData( Matrix<T>& Z );
+        ACC_TAG        	=1, 
+        EOM_ACC_TAG     =2, 
+	GET_REQUEST_TAG =3, 
+        GET_REPLY_TAG   =4,
+        EOM_GET_TAG     =5;
+    */
+    static const Int 
+        DATA_TAG        =1, 
+        EOM_TAG         =2, 
+        DATA_REQUEST_TAG=3, 
+        DATA_REPLY_TAG  =4;
     
-    void HandleLocalToGlobalData( Matrix<T>& Z, Int source );
-    void HandleLocalToGlobalAcc(  Matrix<T>& Z, Int source );
+    bool attached_, detached_;
 
-    void HandleLocalToGlobalData( const Matrix<T>& Z, Int source );
-    void HandleLocalToGlobalAcc(  const Matrix<T>& Z, Int source );
+    // pointer to DistMatrix
+    DistMatrix<T,MC,MR>* GlobalMat_;
+
+    std::vector<bool> sentEomTo_, haveEomFrom_;
+    std::vector<mpi::Request> eomSendRequests_;
+    
+    std::vector<std::deque<bool>> 
+        sendingData_, sendingRequest_, sendingReply_;
+    std::vector<std::deque<mpi::Request>> 
+        dataSendRequests_, requestSendRequests_, replySendRequests_;
+    
+    std::vector<byte> recvVector_;
+    std::vector<std::deque<std::vector<byte>>>
+        dataVectors_, requestVectors_, replyVectors_;
+    
+    byte sendDummy_, recvDummy_;
+
+    // Progress functions
+    bool ReturnRequestStatuses();
+    // Check if we are done with this attachment's work
+    bool Finished();
+    void HandleEoms();
+    void StartSendingEoms();
+    void FinishSendingEoms();
+    void UpdateRequestStatuses();
+
+    Int ReadyForSend
+    ( Int sendSize,
+      std::deque<std::vector<byte>>& sendVectors,
+      std::deque<mpi::Request>& requests, 
+      std::deque<bool>& requestStatuses );
+
+    void HandleLocalToGlobalData( TransferType ttype ); // put/acc
+    void HandleGlobalToLocalRequest(); // get
+
+    void LocalToGlobal( Matrix<T>& X, Int i, Int j );
+    void GlobalToLocal( Matrix<T>& Y, Int i, Int j );
 };
+
 } // namespace El
 #endif // ifndef EL_AXPYINTERFACE2_HPP

@@ -131,6 +131,22 @@ class GlobalArrays
 
 		// vector of matrix parameters
 		std::vector < matrix_params_ > matrices_;
+
+		// local completion handles
+		struct nbhdl_t_
+		{
+		    bool active_;
+		    Int nbhandle_;
+		    Matrix< T > * M_;
+		    // initialize
+		    nbhdl_t_() :
+			active_( true ),
+			nbhandle_( -1 ),
+			M_( nullptr )
+		    {}
+		};
+		
+		std::vector < nbhdl_t_ > nbhdls_;
 };
 #endif // EL_ENABLE_RMA_GLOBAL_ARRAYS
 } // namespace El

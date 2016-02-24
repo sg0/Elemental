@@ -24,7 +24,9 @@ RmaInterface<T>::RmaInterface()
       window( mpi::WIN_NULL ),
       putVector_( 0 ), getVector_( 0 ),
       toBeAttachedForPut_( false ), toBeAttachedForGet_( false ),
-      attached_( false ), detached_( true )
+      attached_( false ), detached_( true ),
+      uddtypes_( 0 ), anyPendingGets_( false ),
+      pending_gets_( 0 )
 {}
 
 template<typename T>
@@ -36,6 +38,7 @@ RmaInterface<T>::RmaInterface( DistMatrix<T>& X )
     detached_ 			= true;
     toBeAttachedForGet_ 	= false;
     toBeAttachedForPut_ 	= false;
+    anyPendingGets_		= false;
     GlobalArrayPut_ 		= 0;
     GlobalArrayGet_ 		= 0;
     window 		        = mpi::WIN_NULL;
@@ -53,6 +56,7 @@ RmaInterface<T>::RmaInterface( const DistMatrix<T>& X )
     detached_ 			= true;
     toBeAttachedForGet_ 	= false;
     toBeAttachedForPut_ 	= false;
+    anyPendingGets_		= false;
     GlobalArrayPut_ 		= 0;
     GlobalArrayGet_ 		= 0;
     window 	    		= mpi::WIN_NULL;
@@ -102,6 +106,7 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
         toBeAttachedForPut_ 		= true;
         GlobalArrayGet_ 		= &Z;
         toBeAttachedForGet_ 		= true;
+	anyPendingGets_			= false;
 
 	const Grid& g = Z.Grid();
         const Int p = g.Size();
@@ -116,26 +121,25 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
 #if defined(EL_USE_WIN_CREATE_FOR_RMA) && \
 	!defined(EL_USE_WIN_ALLOC_FOR_RMA)
         const Int numEntries = Z.LocalHeight() * Z.LocalWidth();
-        const Int bufferSize = numEntries * sizeof( T );
-        void * baseptr = reinterpret_cast<void *>( Z.Buffer() );
+        T * baseptr = Z.Buffer();
        
-	mpi::WindowCreate( baseptr, bufferSize, Z.DistComm(), window );
+	mpi::WindowCreate( baseptr, numEntries, Z.DistComm(), window );
         mpi::WindowLock( window );
 #endif
 	// allocation of window
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)
 	const Int numEntries = Z.LocalHeight() * Z.LocalWidth();
-	const Int bufferSize = numEntries * sizeof( T );
 	if( !Z.ForRMA() ) // fall back to win create
 	{
-	    void * baseptr = reinterpret_cast<void *>( Z.Buffer() );
-	    mpi::WindowCreate( baseptr, bufferSize, Z.DistComm(), window );
+	    T * baseptr = Z.Buffer();
+	    mpi::WindowCreate( baseptr, numEntries, Z.DistComm(), window );
 	}
 	else // DM constructor with RMA flag set, hence DM not allocated
 	{
-	    mpi::WindowAllocate( bufferSize, Z.DistComm(), window );
-	    T * baseptr = reinterpret_cast< T *>( mpi::GetWindowBase( window ) );
+	    mpi::WindowAllocate<T>( numEntries, Z.DistComm(), window );
+	    T * baseptr = nullptr;
+	    mpi::GetWindowBase( window, &baseptr );
 	    Z.SetWindowBase( baseptr );
 	}
 
@@ -165,6 +169,7 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
         toBeAttachedForGet_ 	= true;
         GlobalArrayPut_ 	= 0;
         toBeAttachedForPut_ 	= false;
+	anyPendingGets_		= false;
 
         const Grid& g = X.Grid();
         const Int p = g.Size();
@@ -176,20 +181,18 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 #if defined(EL_USE_WIN_CREATE_FOR_RMA) &&\
 	!defined(EL_USE_WIN_ALLOC_FOR_RMA)
         const Int numEntries = X.LocalHeight() * X.LocalWidth();
-        const Int bufferSize = numEntries * sizeof( T );
-        void * baseptr = static_cast<void *>( const_cast<T *>( X.LockedBuffer() ) );
-        mpi::WindowCreate( baseptr, bufferSize, X.DistComm(), window );
+        T * baseptr = const_cast<T *>( X.LockedBuffer() );
+        mpi::WindowCreate( baseptr, numEntries, X.DistComm(), window );
         mpi::WindowLock( window );
 #endif
         // window allocation
 #if defined(EL_USE_WIN_ALLOC_FOR_RMA) && \
 	!defined(EL_USE_WIN_CREATE_FOR_RMA)       
 	const Int numEntries = X.LocalHeight() * X.LocalWidth();
-	const Int bufferSize = numEntries * sizeof( T );
 	if( !X.ForRMA() ) // fall-back to window creation
 	{
-	    void * baseptr = static_cast<void *>( const_cast<T *>( X.LockedBuffer() ) );
-	    mpi::WindowCreate( baseptr, bufferSize, X.DistComm(), window );
+	    T * baseptr = const_cast<T *>( X.LockedBuffer() );
+	    mpi::WindowCreate( baseptr, numEntries, X.DistComm(), window );
 	    mpi::WindowLock( window );
 	}
 	else
@@ -260,10 +263,10 @@ void RmaInterface<T>::Acc( Matrix<T>& Z, Int i, Int j )
 }
 
 template<typename T>
-void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
+void RmaInterface<T>::Iget( Matrix<T>& Z, Int i, Int j )
 {
     DEBUG_ONLY( 
-	    CallStackEntry cse( "RmaInterface::Get" )
+	    CallStackEntry cse( "RmaInterface::Iget" )
 	    if( i < 0 || j < 0 )
 	    LogicError( "Submatrix offsets must be non-negative" );
 	    if( !toBeAttachedForGet_ )
@@ -271,6 +274,7 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 	    )
 
     const DistMatrix<T>& Y = *GlobalArrayGet_;
+    anyPendingGets_ = true;
     
     //do rma related checks
     if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
@@ -293,7 +297,7 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
     Int receivingRow = myProcessRow;
     Int receivingCol = myProcessCol;
     const Int YLDim = Y.LDim();
-    const T* XBuffer = Z.LockedBuffer();
+    T* ZBuffer = Z.Buffer();
 
     for( Int step=0; step<p; ++step )
     {
@@ -306,14 +310,27 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 
         if( numEntries != 0 )
         {
+	    // height of remote PE holding a DM chunk 
+	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
             const Int destination = receivingRow + r*receivingCol;
+	    const Int numEntriesPadded = localHeight + (localWidth - 1)*remoteHeight;
             const Int index =
-                NextIndex( numEntries,
+                NextIndex( numEntriesPadded,
                            getVector_[destination] );
             T* getBuffer = getVector_[destination][index].data();
-	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
-	    const Int remoteWidth = Length( dm_width, receivingCol, Y.RowAlign(), c );
-	    // remote 
+
+	    // keep track of the vector for local completion later
+	    const Int currentIndex = pending_gets_.size();
+	    pending_gets_.push_back( pending_get_() );
+
+	    pending_gets_[currentIndex].M_ = &Z; 
+	    pending_gets_[currentIndex].getData_ = getBuffer;
+	    pending_gets_[currentIndex].colShift_ = colShift;
+	    pending_gets_[currentIndex].rowShift_ = rowShift;
+	    pending_gets_[currentIndex].remoteHeight_ = remoteHeight;
+	    pending_gets_[currentIndex].localHeight_ = localHeight;
+	    pending_gets_[currentIndex].localWidth_ = localWidth;
+
 	    Int iMapped, jMapped;
 	    bool isbreak = false;
 	    for (Int i_ = i; i_ < dm_height && !isbreak; ++i_)
@@ -328,24 +345,20 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
 		    }
 		}
 	    }
+	    
+	    // create a new UDD for MPI contig type
+	    Int udd_index = uddtypes_.size();
+	    uddtypes_.resize( udd_index + 1 );
+
 	    // starting displacement
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
-	    for( Int t = 0; t < localWidth; ++t )
-	    {
-		T* getCol = &getBuffer[t * localHeight];
-		// displacement of column chunks
-		mpi::Aint t_disp = ( disp + t * remoteHeight ) * sizeof( T );
-		// get
-		mpi::Iget( getCol, localHeight, destination, t_disp, localHeight, window );
-		mpi::FlushLocal( destination, window );
-            
-		// update local matrix
-                T* YCol = Z.Buffer( 0,rowShift+t*c );
-                const T* XCol = getCol;
 
-                for( Int s = 0; s < localHeight; ++s )
-                    YCol[colShift+s*r] = XCol[s];
-	    }
+	    // create type
+	    mpi::CreateContigType<T>( numEntriesPadded, &uddtypes_[udd_index] );
+	 
+	    // get
+	    mpi::Iget( getBuffer, destination, disp, 
+		    uddtypes_[udd_index], window );
         }
             
         receivingRow = ( receivingRow + 1 ) % r;
@@ -353,6 +366,15 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
         if( receivingRow == 0 )
             receivingCol = ( receivingCol + 1 ) % c;
     }
+}
+    
+template<typename T>
+void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
+{
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Get" ) )
+
+    Iget( Z, i, j );
+    LocalFlush( Z );
 }
 
 // non-blocking interface
@@ -403,13 +425,14 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 
         if( numEntries != 0 )
         {
+	    // height of PE holding a chunk of DM 
+	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
+	    const Int numEntriesPadded = localHeight + (localWidth - 1)*remoteHeight;
             const Int destination = receivingRow + r*receivingCol;
             const Int index =
-                NextIndex( numEntries,
+                NextIndex( numEntriesPadded,
                            putVector_[destination] );
             T* sendBuffer = putVector_[destination][index].data();
-	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
-	    // remote 
 	    Int iMapped, jMapped;
 	    bool isbreak = false;
 	    for (Int i_ = i; i_ < dm_height && !isbreak; ++i_)
@@ -424,22 +447,31 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 		    }
 		}
 	    }
+	    
+	    // create a new UDD for MPI contig type
+	    Int udd_index = uddtypes_.size();
+	    uddtypes_.resize( udd_index + 1 );
+
 	    // starting displacement
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
+
+	    // create type
+	    mpi::CreateContigType<T>( numEntriesPadded, &uddtypes_[udd_index] );
+	    
 	    for( Int t = 0; t < localWidth; ++t )
 	    {
-		T* thisSendCol = &sendBuffer[t * localHeight];
+		// considering the padding
+		T* thisSendCol = &sendBuffer[t * remoteHeight];
 		const T* thisXCol = &XBuffer[( rowShift + t * c ) * ZLDim];
 
 		for( Int s = 0; s < localHeight; ++s )
 		    thisSendCol[s] = thisXCol[colShift + s * r];
-
-		// displacement of column chunks
-		mpi::Aint t_disp = ( disp + t * remoteHeight ) * sizeof( T );
-		// locally nonblocking put
-		mpi::Iput( thisSendCol, localHeight, destination, t_disp, localHeight, window );
 	    }
-        }
+
+	    // put
+	    mpi::Iput( sendBuffer, destination, disp, 
+		    uddtypes_[udd_index], window );
+	}
             
         receivingRow = ( receivingRow + 1 ) % r;
 
@@ -497,13 +529,15 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 
         if( numEntries != 0 )
         {
+	    // find the number of entries to send
+	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
+	    const Int numEntriesPadded = localHeight + (localWidth - 1)*remoteHeight;
             const Int destination = receivingRow + r*receivingCol;
             const Int index =
-                NextIndex( numEntries,
+                NextIndex( numEntriesPadded,
                            putVector_[destination] );
             T* sendBuffer = putVector_[destination][index].data();
-	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
-	    
+
 	    Int iMapped, jMapped;
 	    bool isbreak = false;
 	    for (Int i_ = i; i_ < dm_height && !isbreak; ++i_)
@@ -519,21 +553,28 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 		}
 	    }
 
+	    // create a new UDD for subarray type
+	    Int udd_index = uddtypes_.size();
+	    uddtypes_.resize( udd_index + 1 );
+
 	    // starting displacement
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
+
+	    // create type
+	    mpi::CreateContigType<T>( numEntriesPadded, &uddtypes_[udd_index] );
+	    
 	    for( Int t = 0; t < localWidth; ++t )
 	    {
-		T* thisSendCol = &sendBuffer[t * localHeight];
+		T* thisSendCol = &sendBuffer[t * remoteHeight];
 		const T* thisXCol = &XBuffer[( rowShift + t * c ) * ZLDim];
 
 		for( Int s = 0; s < localHeight; ++s )
 		    thisSendCol[s] = thisXCol[colShift + s * r];
-
-		// displacement of column chunks
-		mpi::Aint t_disp = ( disp + t * remoteHeight ) * sizeof( T );
-		// locally nonblocking acc
-		mpi::Iacc( thisSendCol, localHeight, destination, t_disp, localHeight, window );
 	    }
+	    
+	    // acc
+	    mpi::Iacc( sendBuffer, destination, disp, 
+		    uddtypes_[udd_index], mpi::SUM, window );
 	}
             
         receivingRow = ( receivingRow + 1 ) % r;
@@ -555,10 +596,9 @@ void RmaInterface<T>::Iacc( Matrix<T>& Z, Int i, Int j )
     Iacc( const_cast<const Matrix<T>&>( Z ), i, j );
 }
 
-// Local completion of all ops upon
-// return
+// flush only puts/accs
 template<typename T>
-void RmaInterface<T>::LocalFlush()
+void RmaInterface<T>::LocalFlush( const Matrix<T>& Z )
 {
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::LocalFlush" ) )
 
@@ -568,8 +608,19 @@ void RmaInterface<T>::LocalFlush()
     mpi::FlushLocal( window );
 }
 
-// Local completion (specific to Z) upon
-// return
+// flush only puts/accs
+template<typename T>
+void RmaInterface<T>::Flush( const Matrix<T>& Z )
+{
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Flush" ) )
+
+    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
+	LogicError( "Must initiate transfer before flushing." );
+
+    mpi::Flush( window );
+}
+
+// flush put/accs, and check for gets
 template<typename T>
 void RmaInterface<T>::LocalFlush( Matrix<T>& Z )
 {
@@ -578,16 +629,107 @@ void RmaInterface<T>::LocalFlush( Matrix<T>& Z )
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError( "Must initiate transfer before flushing." );
 
-    // if there are no request based RMA pending
-    // for Z, then this functions acts like Flush
-    // local all
-    LocalFlush();
+    // DM params
+    const DistMatrix<T>& Y = *GlobalArrayGet_;
+    
+    const Grid& g = Y.Grid();
+    const Int r = g.Height();
+    const Int c = g.Width();
+
+    // local flush on RMA window
+    mpi::FlushLocal( window );
+    
+    // process pending gets if any
+    if (anyPendingGets_ == true)
+    {
+	// find the index of Z in pending_gets_
+	for (Int mindex = 0; mindex < pending_gets_.size(); mindex++)
+	{
+	    // compare base address of matrices
+	    if (pending_gets_[mindex].M_->Buffer() == Z.Buffer()
+		    && pending_gets_[mindex].is_active_ == true)
+	    {
+		// get metadata before initiating flush
+		T* getBuffer = pending_gets_[mindex].getData_;
+		const Int colShift = pending_gets_[mindex].colShift_;
+		const Int rowShift = pending_gets_[mindex].rowShift_;
+		const Int localHeight = pending_gets_[mindex].localHeight_;
+		const Int localWidth = pending_gets_[mindex].localWidth_;
+		const Int remoteHeight = pending_gets_[mindex].remoteHeight_;
+
+
+		// update local matrix
+		for( Int t = 0; t < localWidth; ++t )
+		{
+		    T* getCol = &getBuffer[t * remoteHeight];
+		    T* YCol = Z.Buffer( 0,rowShift+t*c );
+		    const T* XCol = getCol;
+
+		    for( Int s = 0; s < localHeight; ++s )
+			YCol[colShift+s*r] = XCol[s];
+		}
+
+		pending_gets_[mindex].is_active_ = false;
+	    }
+	}
+    }
 }
 
-// there is no use as of now in
-// passing Z, as mpi3 flush enforces
-// completion of *all* operations on
-// process window
+// Local completion (specific to Z) upon
+// return
+template<typename T>
+void RmaInterface<T>::LocalFlush()
+{
+    DEBUG_ONLY( CallStackEntry cse( "RmaInterface::LocalFlush" ) )
+
+    if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
+	LogicError( "Must initiate transfer before flushing." );
+
+    // DM params
+    const DistMatrix<T>& Y = *GlobalArrayGet_;
+    
+    const Grid& g = Y.Grid();
+    const Int r = g.Height();
+    const Int c = g.Width();
+
+    // local flush on RMA window
+    mpi::FlushLocal( window );
+
+    // process pending gets if any
+    if (anyPendingGets_ == true)
+    {
+	// find the index of Z in pending_gets_
+	for (Int mindex = 0; mindex < pending_gets_.size(); mindex++)
+	{
+	    if (pending_gets_[mindex].is_active_ == true)
+	    {
+		// get metadata before initiating flush
+		T* getBuffer = pending_gets_[mindex].getData_;
+		const Int colShift = pending_gets_[mindex].colShift_;
+		const Int rowShift = pending_gets_[mindex].rowShift_;
+		const Int localHeight = pending_gets_[mindex].localHeight_;
+		const Int localWidth = pending_gets_[mindex].localWidth_;
+		const Int remoteHeight = pending_gets_[mindex].remoteHeight_;
+
+		// update local matrix
+		for( Int t = 0; t < localWidth; ++t )
+		{
+		    T* getCol = &getBuffer[t * remoteHeight];
+		    T* YCol = pending_gets_[mindex].M_->Buffer( 0,rowShift+t*c );
+		    const T* XCol = getCol;
+
+		    for( Int s = 0; s < localHeight; ++s )
+			YCol[colShift+s*r] = XCol[s];
+		}
+
+		pending_gets_[mindex].is_active_ = false;
+	    }
+	}
+
+	anyPendingGets_ = false;
+    }
+}
+
 template<typename T>
 void RmaInterface<T>::Flush( Matrix<T>& Z )
 {
@@ -596,7 +738,50 @@ void RmaInterface<T>::Flush( Matrix<T>& Z )
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError( "Must initiate transfer before flushing." );
 
+    // DM params
+    const DistMatrix<T>& Y = *GlobalArrayGet_;
+    
+    const Grid& g = Y.Grid();
+    const Int r = g.Height();
+    const Int c = g.Width();
+
+    // local/remote flush on RMA window
     mpi::Flush( window );
+
+    // process pending gets if any
+    if (anyPendingGets_ == true)
+    {
+	// find the index of Z in pending_gets_
+	for (Int mindex = 0; mindex < pending_gets_.size(); mindex++)
+	{
+	    // compare base address of matrices
+	    if (pending_gets_[mindex].M_->Buffer() == Z.Buffer()
+		    && pending_gets_[mindex].is_active_ == true)
+	    {
+		// get metadata before initiating flush
+		T* getBuffer = pending_gets_[mindex].getData_;
+		const Int colShift = pending_gets_[mindex].colShift_;
+		const Int rowShift = pending_gets_[mindex].rowShift_;
+		const Int localHeight = pending_gets_[mindex].localHeight_;
+		const Int localWidth = pending_gets_[mindex].localWidth_;
+		const Int remoteHeight = pending_gets_[mindex].remoteHeight_;
+
+
+		// update local matrix
+		for( Int t = 0; t < localWidth; ++t )
+		{
+		    T* getCol = &getBuffer[t * remoteHeight];
+		    T* YCol = Z.Buffer( 0,rowShift+t*c );
+		    const T* XCol = getCol;
+
+		    for( Int s = 0; s < localHeight; ++s )
+			YCol[colShift+s*r] = XCol[s];
+		}
+
+		pending_gets_[mindex].is_active_ = false;
+	    }
+	}
+    }
 }
 
 template<typename T>
@@ -607,7 +792,49 @@ void RmaInterface<T>::Flush()
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError( "Must initiate transfer before flushing." );
 
+    // DM params
+    const DistMatrix<T>& Y = *GlobalArrayGet_;
+    
+    const Grid& g = Y.Grid();
+    const Int r = g.Height();
+    const Int c = g.Width();
+
+    // local/remote flush on RMA window
     mpi::Flush( window );
+
+    // process pending gets if any
+    if (anyPendingGets_ == true)
+    {
+	// find the index of Z in pending_gets_
+	for (Int mindex = 0; mindex < pending_gets_.size(); mindex++)
+	{
+	    if (pending_gets_[mindex].is_active_ == true)
+	    {
+		// get metadata before initiating flush
+		T* getBuffer = pending_gets_[mindex].getData_;
+		const Int colShift = pending_gets_[mindex].colShift_;
+		const Int rowShift = pending_gets_[mindex].rowShift_;
+		const Int localHeight = pending_gets_[mindex].localHeight_;
+		const Int localWidth = pending_gets_[mindex].localWidth_;
+		const Int remoteHeight = pending_gets_[mindex].remoteHeight_;
+
+		// update local matrix
+		for( Int t = 0; t < localWidth; ++t )
+		{
+		    T* getCol = &getBuffer[t * remoteHeight];
+		    T* YCol = pending_gets_[mindex].M_->Buffer( 0,rowShift+t*c );
+		    const T* XCol = getCol;
+
+		    for( Int s = 0; s < localHeight; ++s )
+			YCol[colShift+s*r] = XCol[s];
+		}
+
+		pending_gets_[mindex].is_active_ = false;
+	    }
+	}
+
+	anyPendingGets_ = false;
+    }
 }
 
 // atomic operations
@@ -670,12 +897,21 @@ void RmaInterface<T>::Detach()
     
     toBeAttachedForPut_ = false;
     toBeAttachedForGet_ = false;
+    anyPendingGets_	= false;
     
     GlobalArrayPut_ 	= 0;
     GlobalArrayGet_ 	= 0;
     
     putVector_.clear();
     getVector_.clear();
+
+    pending_gets_.clear();
+
+    // destroy UDDs
+    Int udd_size = uddtypes_.size();
+    for (Int i = 0; i < udd_size; i++)
+	mpi::DestroyType( &uddtypes_[i] );
+    uddtypes_.clear();
     
     // data window
     mpi::WindowUnlock( window );

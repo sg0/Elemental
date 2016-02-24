@@ -47,6 +47,8 @@ public:
     void Iacc(       Matrix<T>& Z, Int i, Int j );
     void Iacc( const Matrix<T>& Z, Int i, Int j );
 
+    void Iget( Matrix<T>& Z, Int i, Int j );
+
     // atomic routines
 
     // element-wise atomic increment, returns
@@ -58,9 +60,9 @@ public:
     void Flush(      const Matrix<T>& Z );
     void LocalFlush( const Matrix<T>& Z );
     void LocalFlush(       Matrix<T>& Z );
-    void LocalFlush();
     void Flush();
-   
+    void LocalFlush();
+
     void Detach();
 
 private:
@@ -70,12 +72,43 @@ private:
     // buffers for rma 
     std::vector<std::deque<std::vector<T>>>
         getVector_, putVector_;
+
+    // UDD vector
+    std::vector< mpi::Datatype > 
+	uddtypes_;
+
+    // metadata for pending gets
+    struct pending_get_
+    {
+	bool is_active_;  	// is this tuple active? 
+	Matrix< T > * M_; 	// pointer to the output matrix
+	T * getData_;           // get buffer
+	Int colShift_;
+	Int rowShift_;
+	Int remoteHeight_; 	// height of a DM chunk in remote process
+	Int localHeight_;	// height/width of local chunk
+	Int localWidth_;
+	// initialize
+	pending_get_() :
+	    is_active_( true ),
+	    M_( nullptr ),
+	    getData_( nullptr ),
+	    colShift_( -1 ),
+	    rowShift_( -1 ),
+	    remoteHeight_( -1 ),
+	    localHeight_( -1 ),
+	    localWidth_( -1 )
+	{}
+    };
     
+    // vector of pending get parameters
+    std::vector < pending_get_ > pending_gets_;
+
     DistMatrix<T,MC,MR>* GlobalArrayPut_;
     const DistMatrix<T,MC,MR>* GlobalArrayGet_;
     
     bool toBeAttachedForPut_, toBeAttachedForGet_, 
-	 attached_, detached_;
+	 attached_, detached_, anyPendingGets_;
 
     // next index for data
     Int NextIndex ( 
