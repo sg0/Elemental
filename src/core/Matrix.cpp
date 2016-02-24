@@ -605,7 +605,7 @@ void Matrix<T>::SetWindowBase_( T* ptr )
     if( !memory_.GetRMA() )
     	LogicError("Memory not configured for RMA" );
 
-    size_t buffSize = height_ * width_;
+    size_t buffSize = height_ * width_ * sizeof(T);
     /*
     // Although 0 sized windows are valid according
     // to MPI spec, but this may break things, so 

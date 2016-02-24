@@ -846,7 +846,7 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
 	else
 	    ++it;
     }
-
+    
     ga_handles[g_a].is_destroyed = true;
 }
 
@@ -1541,8 +1541,6 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     *nbhandle = g_a;
 }
 
-// TODO implement Iget in RMAInterface
-// and change this accordingly
 template<typename T>
 void GlobalArrays< T >::NGA_NbGet(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], ga_nbhdl_t* nbhandle)
 {
