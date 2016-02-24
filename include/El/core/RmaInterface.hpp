@@ -80,9 +80,10 @@ private:
     // metadata for pending gets
     struct pending_get_
     {
-	bool is_active_;  	// is this tuple active? 
-	Matrix< T > * M_; 	// pointer to the output matrix
-	T * getData_;           // get buffer
+	bool is_active_;  	// is this tuple active?
+	T * base_;              // base address of Matrix<T>
+	Int index_;
+	Int destination_;
 	Int colShift_;
 	Int rowShift_;
 	Int remoteHeight_; 	// height of a DM chunk in remote process
@@ -91,8 +92,9 @@ private:
 	// initialize
 	pending_get_() :
 	    is_active_( true ),
-	    M_( nullptr ),
-	    getData_( nullptr ),
+	    base_( nullptr ),
+	    index_( -1 ),
+	    destination_( -1 ),
 	    colShift_( -1 ),
 	    rowShift_( -1 ),
 	    remoteHeight_( -1 ),

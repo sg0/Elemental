@@ -317,14 +317,15 @@ void RmaInterface<T>::Iget( Matrix<T>& Z, Int i, Int j )
             const Int index =
                 NextIndex( numEntriesPadded,
                            getVector_[destination] );
-            T* getBuffer = getVector_[destination][index].data();
+	    T * getBuffer = getVector_[destination][index].data();
 
 	    // keep track of the vector for local completion later
 	    const Int currentIndex = pending_gets_.size();
 	    pending_gets_.push_back( pending_get_() );
 
-	    pending_gets_[currentIndex].M_ = &Z; 
-	    pending_gets_[currentIndex].getData_ = getBuffer;
+	    pending_gets_[currentIndex].base_ = Z.Buffer();
+	    pending_gets_[currentIndex].index_ = index;
+	    pending_gets_[currentIndex].destination_ = destination;
 	    pending_gets_[currentIndex].colShift_ = colShift;
 	    pending_gets_[currentIndex].rowShift_ = rowShift;
 	    pending_gets_[currentIndex].remoteHeight_ = remoteHeight;
@@ -629,34 +630,36 @@ void RmaInterface<T>::LocalFlush( Matrix<T>& Z )
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError( "Must initiate transfer before flushing." );
 
-    // DM params
-    const DistMatrix<T>& Y = *GlobalArrayGet_;
-    
-    const Grid& g = Y.Grid();
-    const Int r = g.Height();
-    const Int c = g.Width();
-
     // local flush on RMA window
     mpi::FlushLocal( window );
     
     // process pending gets if any
     if (anyPendingGets_ == true)
     {
+	// DM params
+	const DistMatrix<T>& Y = *GlobalArrayGet_;
+
+	const Grid& g = Y.Grid();
+	const Int r = g.Height();
+	const Int c = g.Width();
+
 	// find the index of Z in pending_gets_
 	for (Int mindex = 0; mindex < pending_gets_.size(); mindex++)
 	{
 	    // compare base address of matrices
-	    if (pending_gets_[mindex].M_->Buffer() == Z.Buffer()
+	    if (pending_gets_[mindex].base_ == Z.Buffer()
 		    && pending_gets_[mindex].is_active_ == true)
 	    {
 		// get metadata before initiating flush
-		T* getBuffer = pending_gets_[mindex].getData_;
+		const Int destination = pending_gets_[mindex].destination_;
+		const Int index = pending_gets_[mindex].index_;
+		T* getBuffer = getVector_[destination][index].data();
+
 		const Int colShift = pending_gets_[mindex].colShift_;
 		const Int rowShift = pending_gets_[mindex].rowShift_;
 		const Int localHeight = pending_gets_[mindex].localHeight_;
 		const Int localWidth = pending_gets_[mindex].localWidth_;
 		const Int remoteHeight = pending_gets_[mindex].remoteHeight_;
-
 
 		// update local matrix
 		for( Int t = 0; t < localWidth; ++t )
@@ -685,49 +688,8 @@ void RmaInterface<T>::LocalFlush()
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError( "Must initiate transfer before flushing." );
 
-    // DM params
-    const DistMatrix<T>& Y = *GlobalArrayGet_;
-    
-    const Grid& g = Y.Grid();
-    const Int r = g.Height();
-    const Int c = g.Width();
-
     // local flush on RMA window
     mpi::FlushLocal( window );
-
-    // process pending gets if any
-    if (anyPendingGets_ == true)
-    {
-	// find the index of Z in pending_gets_
-	for (Int mindex = 0; mindex < pending_gets_.size(); mindex++)
-	{
-	    if (pending_gets_[mindex].is_active_ == true)
-	    {
-		// get metadata before initiating flush
-		T* getBuffer = pending_gets_[mindex].getData_;
-		const Int colShift = pending_gets_[mindex].colShift_;
-		const Int rowShift = pending_gets_[mindex].rowShift_;
-		const Int localHeight = pending_gets_[mindex].localHeight_;
-		const Int localWidth = pending_gets_[mindex].localWidth_;
-		const Int remoteHeight = pending_gets_[mindex].remoteHeight_;
-
-		// update local matrix
-		for( Int t = 0; t < localWidth; ++t )
-		{
-		    T* getCol = &getBuffer[t * remoteHeight];
-		    T* YCol = pending_gets_[mindex].M_->Buffer( 0,rowShift+t*c );
-		    const T* XCol = getCol;
-
-		    for( Int s = 0; s < localHeight; ++s )
-			YCol[colShift+s*r] = XCol[s];
-		}
-
-		pending_gets_[mindex].is_active_ = false;
-	    }
-	}
-
-	anyPendingGets_ = false;
-    }
 }
 
 template<typename T>
@@ -738,34 +700,36 @@ void RmaInterface<T>::Flush( Matrix<T>& Z )
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError( "Must initiate transfer before flushing." );
 
-    // DM params
-    const DistMatrix<T>& Y = *GlobalArrayGet_;
-    
-    const Grid& g = Y.Grid();
-    const Int r = g.Height();
-    const Int c = g.Width();
-
     // local/remote flush on RMA window
     mpi::Flush( window );
 
     // process pending gets if any
     if (anyPendingGets_ == true)
     {
+	// DM params
+	const DistMatrix<T>& Y = *GlobalArrayGet_;
+
+	const Grid& g = Y.Grid();
+	const Int r = g.Height();
+	const Int c = g.Width();
+
 	// find the index of Z in pending_gets_
 	for (Int mindex = 0; mindex < pending_gets_.size(); mindex++)
 	{
 	    // compare base address of matrices
-	    if (pending_gets_[mindex].M_->Buffer() == Z.Buffer()
+	    if (pending_gets_[mindex].base_ == Z.Buffer()
 		    && pending_gets_[mindex].is_active_ == true)
 	    {
 		// get metadata before initiating flush
-		T* getBuffer = pending_gets_[mindex].getData_;
+		const Int destination = pending_gets_[mindex].destination_;
+		const Int index = pending_gets_[mindex].index_;
+		T* getBuffer = getVector_[destination][index].data();
+
 		const Int colShift = pending_gets_[mindex].colShift_;
 		const Int rowShift = pending_gets_[mindex].rowShift_;
 		const Int localHeight = pending_gets_[mindex].localHeight_;
 		const Int localWidth = pending_gets_[mindex].localWidth_;
 		const Int remoteHeight = pending_gets_[mindex].remoteHeight_;
-
 
 		// update local matrix
 		for( Int t = 0; t < localWidth; ++t )
@@ -792,49 +756,8 @@ void RmaInterface<T>::Flush()
     if( !toBeAttachedForPut_ || !toBeAttachedForGet_ )
 	LogicError( "Must initiate transfer before flushing." );
 
-    // DM params
-    const DistMatrix<T>& Y = *GlobalArrayGet_;
-    
-    const Grid& g = Y.Grid();
-    const Int r = g.Height();
-    const Int c = g.Width();
-
     // local/remote flush on RMA window
     mpi::Flush( window );
-
-    // process pending gets if any
-    if (anyPendingGets_ == true)
-    {
-	// find the index of Z in pending_gets_
-	for (Int mindex = 0; mindex < pending_gets_.size(); mindex++)
-	{
-	    if (pending_gets_[mindex].is_active_ == true)
-	    {
-		// get metadata before initiating flush
-		T* getBuffer = pending_gets_[mindex].getData_;
-		const Int colShift = pending_gets_[mindex].colShift_;
-		const Int rowShift = pending_gets_[mindex].rowShift_;
-		const Int localHeight = pending_gets_[mindex].localHeight_;
-		const Int localWidth = pending_gets_[mindex].localWidth_;
-		const Int remoteHeight = pending_gets_[mindex].remoteHeight_;
-
-		// update local matrix
-		for( Int t = 0; t < localWidth; ++t )
-		{
-		    T* getCol = &getBuffer[t * remoteHeight];
-		    T* YCol = pending_gets_[mindex].M_->Buffer( 0,rowShift+t*c );
-		    const T* XCol = getCol;
-
-		    for( Int s = 0; s < localHeight; ++s )
-			YCol[colShift+s*r] = XCol[s];
-		}
-
-		pending_gets_[mindex].is_active_ = false;
-	    }
-	}
-
-	anyPendingGets_ = false;
-    }
 }
 
 // atomic operations

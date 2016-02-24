@@ -833,8 +833,21 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
 	else
 	    ++it;
     }
-    
-    ga_handles[g_a].is_destroyed        = true;
+
+    // delete handles associated with this global array
+    for (typename std::vector< nbhdl_t_ >::iterator it = nbhdls_.begin();
+	    it != nbhdls_.end();)
+    {
+	if ( it->nbhandle_ == g_a )
+	{
+	    it->M_ = nullptr;
+	    it = nbhdls_.erase( it );
+	}
+	else
+	    ++it;
+    }
+
+    ga_handles[g_a].is_destroyed = true;
 }
 
 // A := 0.5 * ( A + A' )
@@ -1134,6 +1147,7 @@ void GlobalArrays< T >::GA_Terminate()
     
     matrices_.clear();
     ga_handles.clear();
+    nbhdls_.clear();
     
     const Grid &grid = DefaultGrid();
     mpi::Barrier( grid.Comm() );
@@ -1523,6 +1537,7 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     nbhdls_.push_back( nbhdl_t_() );
     nbhdls_[hdlIndex].M_ = &M;
     nbhdls_[hdlIndex].nbhandle_ = g_a;
+    nbhdls_[hdlIndex].active_ = true;
 
     *nbhandle = g_a;
 }
@@ -1563,8 +1578,9 @@ void GlobalArrays< T >::NGA_NbGet(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     // nb handle management
     const Int hdlIndex = nbhdls_.size();
     nbhdls_.push_back( nbhdl_t_() );
-    nbhdls_[hdlIndex].M_ = &A;
     nbhdls_[hdlIndex].nbhandle_ = g_a;
+    nbhdls_[hdlIndex].M_ = &A;
+    nbhdls_[hdlIndex].active_ = true;
     
     *nbhandle = g_a;
 }
@@ -1606,6 +1622,7 @@ void GlobalArrays< T >::NGA_NbPut(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
     nbhdls_.push_back( nbhdl_t_() );
     nbhdls_[hdlIndex].M_ = &A;
     nbhdls_[hdlIndex].nbhandle_ = g_a;   
+    nbhdls_[hdlIndex].active_ = true;
     
     *nbhandle = g_a;
 }
@@ -1637,7 +1654,8 @@ void GlobalArrays< T >::NGA_NbWait(ga_nbhdl_t* nbhandle)
 	}
 	if (ga_handles[*nbhandle].rma_local_pending)
 	{
-	    ga_handles[*nbhandle].rmaint->LocalFlush (*(nbhdls_[hdlIndex].M_));
+	    Matrix< T > M = *(nbhdls_[hdlIndex].M_);
+	    ga_handles[*nbhandle].rmaint->LocalFlush( M );
 	    ga_handles[*nbhandle].rma_local_pending = false;
 	    nbhdls_[hdlIndex].active_ = false;
 	}
