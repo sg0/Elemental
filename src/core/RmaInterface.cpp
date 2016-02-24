@@ -138,8 +138,7 @@ void RmaInterface<T>::Attach( DistMatrix<T>& Z )
 	else // DM constructor with RMA flag set, hence DM not allocated
 	{
 	    mpi::WindowAllocate<T>( numEntries, Z.DistComm(), window );
-	    T * baseptr = nullptr;
-	    mpi::GetWindowBase( window, &baseptr );
+	    T * baseptr = reinterpret_cast<T *>( mpi::GetWindowBase( window ) );
 	    Z.SetWindowBase( baseptr );
 	}
 
@@ -201,7 +200,7 @@ void RmaInterface<T>::Attach( const DistMatrix<T>& X )
 	/*
 	{
 	    mpi::WindowAllocate( bufferSize, X.DistComm(), window );
-	    T * baseptr = reinterpret_cast< T *>( mpi::GetWindowBase( window ) );
+	    T * baseptr = reinterpret_cast<T *>( mpi::GetWindowBase( window ) );
 	    X.SetWindowBase( baseptr );
 	    mpi::WindowLock( window );
 	}

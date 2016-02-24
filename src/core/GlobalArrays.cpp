@@ -969,8 +969,7 @@ void GlobalArrays< T >::GA_Fill(Int g_a, T* value)
 
     if (ga_handles[g_a].ndim == 1)
     {
-	T * fop_base = nullptr;
-	mpi::GetWindowBase( ga_handles[g_a].fop_win, &fop_base );
+	T * fop_base = reinterpret_cast<T *>( mpi::GetWindowBase( ga_handles[g_a].fop_win ) );
 	for (Int i = 0; i < ga_handles[g_a].length; i++) fop_base[i] = a;
 	// default grid
 	const Grid &grid = DefaultGrid();

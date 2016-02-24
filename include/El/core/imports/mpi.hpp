@@ -209,10 +209,7 @@ template<typename R>
 void WindowCreate( Complex<R> * baseptr, Aint entries, Comm comm, Window & window );
 template<typename R>
 void WindowAllocate( Aint entries, Comm comm, Window & window );   
-template<typename R>
-void GetWindowBase( Window & window, R ** base );
-template<typename R>
-void GetWindowBase( Window & window, Complex<R> ** base );
+void * GetWindowBase( Window & window );
 // --------
 void WindowFree( Window & window );
 void SetWindowProp( Window & window, acc_order_t prop );
