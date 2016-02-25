@@ -627,8 +627,8 @@ template Complex<double> ReadInc (Window & win, Aint offset, Complex<double> inc
 
 // user-defined data type
 // ----------------------
-// subarray create
-// ---------------
+// contiguous data type
+// ----------------------
 template<typename R>
 void CreateContigType( int count, Datatype * contig_type)
 {
@@ -651,6 +651,43 @@ template void CreateContigType < float >( int count, Datatype * contig_type);
 template void CreateContigType < double >( int count, Datatype * contig_type);
 template void CreateContigType < Complex< float > >( int count, Datatype * contig_type);
 template void CreateContigType < Complex< double > >( int count, Datatype * contig_type);
+
+// vector data type
+// ----------------
+template<typename R>
+void CreateVectorType( int count, int blocklength, 
+	int stride, Datatype * vector_type )    
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::CreateVectorType"))
+    SafeMpi( MPI_Type_vector( 
+		count, blocklength, stride, TypeMap<R>(), vector_type ) );
+    SafeMpi( MPI_Type_commit(vector_type) );
+}
+
+template void CreateVectorType < byte >( int count, int blocklength, 
+	        int stride, Datatype * vector_type );
+template void CreateVectorType < int >( int count, int blocklength, 
+	        int stride, Datatype * vector_type );
+template void CreateVectorType < unsigned >( int count, int blocklength, 
+	        int stride, Datatype * vector_type );
+template void CreateVectorType < long int >( int count, int blocklength, 
+	        int stride, Datatype * vector_type );
+template void CreateVectorType < unsigned long >( int count, int blocklength, 
+	        int stride, Datatype * vector_type );
+#ifdef EL_HAVE_MPI_LONG_LONG
+template void CreateVectorType < long long int >( int count, int blocklength, 
+	        int stride, Datatype * vector_type );
+template void CreateVectorType < unsigned long long >( int count, int blocklength, 
+	        int stride, Datatype * vector_type );
+#endif
+template void CreateVectorType < float >( int count, int blocklength, 
+	        int stride, Datatype * vector_type );
+template void CreateVectorType < double >( int count, int blocklength, 
+	        int stride, Datatype * vector_type );
+template void CreateVectorType < Complex< float > >( int count, int blocklength, 
+	        int stride, Datatype * vector_type );
+template void CreateVectorType < Complex< double > >( int count, int blocklength, 
+	        int stride, Datatype * vector_type );
 
 // type destroy
 // ------------
@@ -808,38 +845,77 @@ template void Iput (const Complex<double>* source, int target_rank,
 template void Iput (const Complex<float>* source, int target_rank,
                     Aint disp, Datatype & dtype, Window & window);
 
-// when source-target size == 1
-template<typename T>
-void Iput( const T source, int target_rank, Aint disp, Window& window )
+template<typename R>
+void Iput (const R* source, int origin_count, int target_rank, Aint disp, 
+	int target_count, Datatype & target_type, Window & window)
 {
-    Iput ( &source, 1, target_rank, disp, 1, window );
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iput"))
+#ifdef EL_ENSURE_PUT_ATOMICITY
+    SafeMpi (MPI_Accumulate
+             (source, origin_count, TypeMap<R>(), target_rank, disp, 
+	      target_count, target_type, MPI_REPLACE, window));
+#else
+    SafeMpi (MPI_Put
+             (source, origin_count, TypeMap<R>(), target_rank, disp, 
+	      target_count, target_type, window));
+#endif
 }
 
-template void Iput (const byte source, int target_rank,
-                    Aint disp, Window & window);
-template void Iput (const int source, int target_rank,
-                    Aint disp, Window & window);
-template void Iput (const unsigned source, int target_rank,
-                    Aint disp, Window & window);
-template void Iput (const long int source, int target_rank,
-                    Aint disp, Window & window);
-template void Iput (const unsigned long source, int target_rank,
-                    Aint disp, Window & window);
-#ifdef EL_HAVE_MPI_LONG_LONG
-template void Iput (const long long int source, int target_rank,
-                    Aint disp, Window & window);
-template void Iput (const unsigned long long source, int target_rank,
-                    Aint disp, Window & window);
+template<typename R>
+void Iput (const Complex<R>* source, int origin_count, int target_rank, Aint disp, 
+	int target_count, Datatype & target_type, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iput"))
+#ifdef EL_ENSURE_PUT_ATOMICITY
+#ifdef EL_AVOID_COMPLEX_MPI
+    SafeMpi (MPI_Accumulate
+             (source, 2*origin_count, TypeMap<R>(), target_rank, 2*disp, 
+	      2*target_count, target_type, MPI_REPLACE, window));
+#else
+    SafeMpi (MPI_Accumulate
+             (source, origin_count, target_type, target_rank, disp, 
+	      target_count, target_type, MPI_REPLACE, window));
 #endif
-template void Iput (const float source, int target_rank,
-                    Aint disp, Window & window);
-template void Iput (const double source, int target_rank,
-                    Aint disp, Window & window);
-template void Iput (const Complex<double> source, int target_rank,
-                    Aint disp, Window & window);
-template void Iput (const Complex<float> source, int target_rank,
-                    Aint disp, Window & window);
+#else
+#ifdef EL_AVOID_COMPLEX_MPI
+    SafeMpi (MPI_Put
+             (source, 2*origin_count, TypeMap<R>(), target_rank, 2*disp, 
+	      2*target_count, target_type, window));
+#else
+    SafeMpi (MPI_Put
+             (source, origin_count, TypeMap<R>(),
+              target_rank, disp, target_count, target_type, window));
+#endif
+#endif
+}
+
+template void Iput (const byte* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iput (const int* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iput (const unsigned* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iput (const long int* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iput (const unsigned long* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+#ifdef EL_HAVE_MPI_LONG_LONG
+template void Iput (const long long int* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iput (const unsigned long long* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+#endif
+template void Iput (const float* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iput (const double* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iput (const Complex<float>* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iput (const Complex<double>* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+
 // get
+// ---
 template<typename R>
 void Iget (R* source, int origin_count, int target_rank,
            Aint disp, int target_count, Window & window)
@@ -918,37 +994,77 @@ template void Iget (Complex<double>* source, int origin_count, int target_rank,
 template void Iget (Complex<float>* source, int origin_count, int target_rank,
                     Aint disp, int target_count, Window & window);
 
-// when source-target size == 1
-template<typename T>
-void Iget( T source, int target_rank, Aint disp, Window& window )
+template<typename R>
+void Iget (R* source, int origin_count, int target_rank, Aint disp, 
+	int target_count, Datatype & target_type, Window & window)
 {
-    Iget ( &source, 1, target_rank, disp, 1, window );
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iget"))
+#ifdef EL_ENSURE_GET_ATOMICITY
+    SafeMpi (MPI_Get_accumulate
+             (NULL, 0, TypeMap<R>(), source, origin_count, TypeMap<R>(),
+              target_rank, disp, target_count,
+              target_type, MPI_NO_OP, window));
+#else
+    SafeMpi (MPI_Get
+             (source, origin_count, TypeMap<R>(), target_rank, disp, 
+	      target_count, target_type, window));
+#endif
 }
 
-template void Iget (byte source, int target_rank,
-                    Aint disp, Window & window);
-template void Iget (int source, int target_rank,
-                    Aint disp, Window & window);
-template void Iget (unsigned source, int target_rank,
-                    Aint disp, Window & window);
-template void Iget (long int source, int target_rank,
-                    Aint disp, Window & window);
-template void Iget (unsigned long source, int target_rank,
-                    Aint disp, Window & window);
-#ifdef EL_HAVE_MPI_LONG_LONG
-template void Iget (long long int source, int target_rank,
-                    Aint disp, Window & window);
-template void Iget (unsigned long long source, int target_rank,
-                    Aint disp, Window & window);
+template<typename R>
+void Iget (Complex<R>* source, int origin_count, int target_rank, Aint disp, 
+	int target_count, Datatype & target_type, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iget"))
+#ifdef EL_ENSURE_GET_ATOMICITY
+#ifdef EL_AVOID_COMPLEX_MPI
+    SafeMpi (MPI_Get_accumulate
+             (NULL, 0, TypeMap<R>(), source,
+              2*origin_count, TypeMap<R>(), target_rank, disp, 
+	      2*target_count, target_type, MPI_NO_OP, window));
+#else
+    SafeMpi (MPI_Get_accumulate
+             (NULL, 0, TypeMap<Complex<R>>(), source,
+              origin_count, TypeMap<Complex<R>>(), target_rank, disp, 
+	      target_count, target_type, MPI_NO_OP, window));
 #endif
-template void Iget (float source, int target_rank,
-                    Aint disp, Window & window);
-template void Iget (double source, int target_rank,
-                    Aint disp, Window & window);
-template void Iget (Complex<double> source, int target_rank,
-                    Aint disp, Window & window);
-template void Iget (Complex<float> source, int target_rank,
-                    Aint disp, Window & window);
+#else
+#ifdef EL_AVOID_COMPLEX_MPI
+    SafeMpi (MPI_Get
+             (source, 2*origin_count, TypeMap<R>(), target_rank, disp, 
+	      2*target_count, target_type, window));
+#else
+    SafeMpi (MPI_Get
+             (source, origin_count, TypeMap<Complex<R>>(),
+              target_rank, disp, target_count, target_type, window));
+#endif
+#endif
+}
+
+template void Iget (byte* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iget (int* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iget (unsigned* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iget (long int* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iget (unsigned long* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+#ifdef EL_HAVE_MPI_LONG_LONG
+template void Iget (long long int* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iget (unsigned long long* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+#endif
+template void Iget (float* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iget (double* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iget (Complex<float>* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
+template void Iget (Complex<double>* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Window & window);
 
 // get with contig type
 template<typename R>
@@ -1133,70 +1249,57 @@ template void Iacc (const Complex<float>* source, int target_rank,
 template void Iacc (const Complex<double>* source, int target_rank,
                     Aint disp, Datatype & dtype, Op op, Window & window);
 
-// op = SUM
 template<typename R>
-void Iacc (const R* source, int origin_count, int target_rank,
-           Aint disp, int target_count, Window & window)
+void Iacc (const R* source, int origin_count, int target_rank, Aint disp, 
+	int target_count, Datatype & target_type, Op op, Window & window)
 {
-    Iacc ( source, origin_count, target_rank, disp, target_count, mpi::SUM, window );
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iacc"))
+
+    SafeMpi (MPI_Accumulate
+             (source, origin_count, TypeMap<R>(), target_rank, disp, 
+	      target_count, target_type, op.op, window));
 }
 
-template void Iacc (const byte* source, int origin_count, int target_rank,
-                    Aint disp, int target_count, Window & window);
-template void Iacc (const int* source, int origin_count, int target_rank,
-                    Aint disp, int target_count, Window & window);
-template void Iacc (const unsigned* source, int origin_count, int target_rank,
-                    Aint disp, int target_count, Window & window);
-template void Iacc (const long int* source, int origin_count, int target_rank,
-                    Aint disp, int target_count, Window & window);
-template void Iacc (const unsigned long* source, int origin_count, int target_rank,
-                    Aint disp, int target_count, Window & window);
-#ifdef EL_HAVE_MPI_LONG_LONG
-template void Iacc (const long long int* source, int origin_count, int target_rank,
-                    Aint disp, int target_count, Window & window);
-template void Iacc (const unsigned long long* source, int origin_count, int target_rank,
-                    Aint disp, int target_count, Window & window);
-#endif
-template void Iacc (const float* source, int origin_count, int target_rank,
-                    Aint disp, int target_count, Window & window);
-template void Iacc (const double* source, int origin_count, int target_rank,
-                    Aint disp, int target_count, Window & window);
-template void Iacc (const Complex<double>* source, int origin_count, int target_rank,
-                    Aint disp, int target_count, Window & window);
-template void Iacc (const Complex<float>* source, int origin_count, int target_rank,
-                    Aint disp, int target_count, Window & window);
-
-// when source-target size == 1 and op = SUM
-template<typename T>
-void Iacc (const T source, int target_rank, Aint disp, Window & window)
+template<typename R>
+void Iacc (const Complex<R>* source, int origin_count, int target_rank, Aint disp, 
+	int target_count, Datatype & target_type, Op op, Window & window)
 {
-    Iacc ( &source, 1, target_rank, disp, 1, SUM, window );
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iacc"))
+#ifdef EL_AVOID_COMPLEX_MPI
+    SafeMpi (MPI_Accumulate
+             (source, 2*origin_count, TypeMap<R>(), target_rank, 2*disp, 
+	      2*target_count, target_type, op.op, window));
+#else
+    SafeMpi (MPI_Accumulate
+             (source, origin_count, TypeMap<R>(), target_rank, disp, 
+	      target_count, target_type, op.op, window));
+#endif
 }
 
-template void Iacc (const byte source, int target_rank,
-                    Aint disp, Window & window);
-template void Iacc (const int source, int target_rank,
-                    Aint disp, Window & window);
-template void Iacc (const unsigned source, int target_rank,
-                    Aint disp, Window & window);
-template void Iacc (const long int source, int target_rank,
-                    Aint disp, Window & window);
-template void Iacc (const unsigned long source, int target_rank,
-                    Aint disp, Window & window);
+template void Iacc (const byte* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Op op, Window & window);
+template void Iacc (const int* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Op op, Window & window);
+template void Iacc (const unsigned* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Op op, Window & window);
+template void Iacc (const long int* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Op op, Window & window);
+template void Iacc (const unsigned long* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Op op, Window & window);
 #ifdef EL_HAVE_MPI_LONG_LONG
-template void Iacc (const long long int source, int target_rank,
-                    Aint disp, Window & window);
-template void Iacc (const unsigned long long source, int target_rank,
-                    Aint disp, Window & window);
+template void Iacc (const long long int* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Op op, Window & window);
+template void Iacc (const unsigned long long* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Op op, Window & window);
 #endif
-template void Iacc (const float source, int target_rank,
-                    Aint disp, Window & window);
-template void Iacc (const double source, int target_rank,
-                    Aint disp, Window & window);
-template void Iacc (const Complex<double> source, int target_rank,
-                    Aint disp, Window & window);
-template void Iacc (const Complex<float> source, int target_rank,
-                    Aint disp, Window & window);
+template void Iacc (const float* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Op op, Window & window);
+template void Iacc (const double* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Op op, Window & window);
+template void Iacc (const Complex<float>* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Op op, Window & window);
+template void Iacc (const Complex<double>* source, int origin_count, int target_rank, 
+	Aint disp, int target_count, Datatype & target_type, Op op, Window & window);
 
 // Synchronization
 // ---------------

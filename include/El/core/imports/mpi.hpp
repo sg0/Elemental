@@ -219,10 +219,11 @@ void SetWindowProp( Window & window, acc_order_t prop );
 // interface for UDD
 // create user-defined data type 
 // -----------------------------
-// subarray
-// --------
 template<typename R>
-void CreateContigType( int count, Datatype * contig_type);
+void CreateContigType( int count, Datatype * contig_type );	    
+template<typename R>
+void CreateVectorType( int count, int blocklength, int stride, 
+	Datatype * vector_type );    
 void DestroyType( Datatype * subtype );
 
 // Atomic operations
@@ -251,7 +252,11 @@ template<typename R>
 void Iput (const Complex<R>* source, int target_rank,
            Aint disp, Datatype & dtype, Window & window);
 template<typename R>
-void Iput( R source, int target_rank, Aint disp, Window & window );
+void Iput( const R * source, int origin_count, int target_rank, Aint disp, 
+	int target_count, Datatype & target_type, Window & window );
+template<typename R>
+void Iput( const Complex<R>* source, int origin_count, int target_rank, Aint disp, 
+	int target_count, Datatype & target_type, Window & window );
 
 // get
 // ---
@@ -262,13 +267,17 @@ template<typename R>
 void Iget (Complex<R>* source, int origin_count, int target_rank,
            Aint disp, int target_count, Window & window);
 template<typename R>
-void Iget( R source, int target_rank, Aint disp, Window & window );
-template<typename R>
 void Iget (R* source, int target_rank, Aint disp, 
 	Datatype & dtype, Window & window);
 template<typename R>
 void Iget (Complex<R>* source, int target_rank, Aint disp, 
 	Datatype & dtype, Window & window);
+template<typename R>
+void Iget( R * source, int origin_count, int target_rank, Aint disp, 
+	int target_count, Datatype & target_type, Window & window );
+template<typename R>
+void Iget( Complex<R>* source, int origin_count, int target_rank, Aint disp, 
+	int target_count, Datatype & target_type, Window & window );
 
 // acc
 // ---
@@ -280,17 +289,16 @@ void Iacc (const Complex<R>* source, int origin_count, int target_rank,
            Aint disp, int target_count, Op op, Window & window);
 template<typename R>
 void Iacc (const R* source, int target_rank,
-           Aint disp, Datatype & dtype, 
-	   Op op, Window & window);
+           Aint disp, Datatype & dtype, Op op, Window & window);
 template<typename R>
 void Iacc (const Complex<R>* source, int target_rank,
-           Aint disp, Datatype & dtype, 
-	   Op op, Window & window);
+           Aint disp, Datatype & dtype, Op op, Window & window);
 template<typename R>
-void Iacc (const R* source, int origin_count, int target_rank,
-           Aint disp, int target_count, Window & window);
+void Iacc( const R * source, int origin_count, int target_rank, Aint disp, 
+	int target_count, Datatype & target_type, Op op, Window & window );
 template<typename R>
-void Iacc (const R source, int target_rank, Aint disp, Window & window);
+void Iacc( const Complex<R>* source, int origin_count, int target_rank, Aint disp, 
+	int target_count, Datatype & target_type, Op op, Window & window );
 
 // Synchronization
 // ---------------

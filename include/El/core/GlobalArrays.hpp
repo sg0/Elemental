@@ -58,13 +58,8 @@ class GlobalArrays
 	private:
 		bool ga_initialized;
 	
-		// find the actual GA handle
-		Int FindGAIndex(Int g_a);
-
 		struct GA
 		{
-		    // ga handle
-		    Int ga_handle_; 
 		    // distmatrix_mc_mr instance
 		    DistMatrix   < T, MC, MR >* DM;     
 		    // rmainterface instance
@@ -95,7 +90,6 @@ class GlobalArrays
 		    mpi::Window fop_win;
 		    // initialize
 		    GA() :
-			ga_handle_( -1 ),                // GA handle
 			DM( nullptr ),                   // DM
 		        rmaint( nullptr ),               // RMA interface
 	                ga_local_height(),               // local height

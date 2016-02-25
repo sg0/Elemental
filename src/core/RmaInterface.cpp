@@ -311,9 +311,8 @@ void RmaInterface<T>::Iget( Matrix<T>& Z, Int i, Int j )
 	    // height of remote PE holding a DM chunk 
 	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
             const Int destination = receivingRow + r*receivingCol;
-	    const Int numEntriesPadded = localHeight + (localWidth - 1)*remoteHeight;
             const Int index =
-                NextIndex( numEntriesPadded,
+                NextIndex( numEntries,
                            getVector_[destination] );
 	    T * getBuffer = getVector_[destination][index].data();
 
@@ -352,10 +351,12 @@ void RmaInterface<T>::Iget( Matrix<T>& Z, Int i, Int j )
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
 
 	    // create type
-	    mpi::CreateContigType<T>( numEntriesPadded, &dtype_ );
+	    const Int stride = (remoteHeight - localHeight + 1) * localHeight;
+	    mpi::CreateVectorType<T>( localWidth, localHeight, stride, &dtype_ );    
 	 
 	    // get
-	    mpi::Iget( getBuffer, destination, disp, dtype_, window );
+	    mpi::Iget( getBuffer, numEntries, destination, 
+		    disp, 1, dtype_, window );
 	
 	    mpi::DestroyType( &dtype_ );
         }
@@ -375,105 +376,6 @@ void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
     Iget( Z, i, j );
     LocalFlush( Z );
 }
-
-#if 0
-template<typename T>
-void RmaInterface<T>::Get( Matrix<T>& Z, Int i, Int j )
-{
-    DEBUG_ONLY( 
-	    CallStackEntry cse( "RmaInterface::Get" )
-	    if( i < 0 || j < 0 )
-	    LogicError( "Submatrix offsets must be non-negative" );
-	    if( !toBeAttachedForGet_ )
-	    LogicError( "Cannot perform this operation as matrix is not attached." );
-	    )
-
-    const DistMatrix<T>& Y = *GlobalArrayGet_;
-    
-    //do rma related checks
-    if( i+Z.Height() > Y.Height() || j+Z.Width() > Y.Width() )
-        LogicError( "Submatrix out of bounds of global matrix" );
-
-    const Grid& g = Y.Grid();
-    const Int r = g.Height();
-    const Int c = g.Width();
-    const Int p = g.Size();
-    const Int myProcessRow = g.Row();
-    const Int myProcessCol = g.Col();
-    const Int colAlign = ( Y.ColAlign() + i ) % r;
-    const Int rowAlign = ( Y.RowAlign() + j ) % c;
-    const Int ZLDim = Z.LDim();
-    // local matrix width and height
-    const Int dm_height = Y.Height();
-    const Int dm_width = Y.Width();
-    const Int height = Z.Height();
-    const Int width = Z.Width();
-    Int receivingRow = myProcessRow;
-    Int receivingCol = myProcessCol;
-    const Int YLDim = Y.LDim();
-    //const T* XBuffer = Z.LockedBuffer();
-    T* ZBuffer = Z.Buffer();
-
-    for( Int step=0; step<p; ++step )
-    {
-        const Int colShift = Shift( receivingRow, colAlign, r );
-        const Int rowShift = Shift( receivingCol, rowAlign, c );
-        // number of entries in my PE
-        const Int localHeight = Length( height, colShift, r );
-        const Int localWidth = Length( width, rowShift, c );
-        const Int numEntries = localHeight * localWidth;
-
-        if( numEntries != 0 )
-        {
-            const Int destination = receivingRow + r*receivingCol;
-            const Int index =
-                NextIndex( numEntries,
-                           getVector_[destination] );
-            T* getBuffer = getVector_[destination][index].data();
-	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
-	    const Int remoteWidth = Length( dm_width, receivingCol, Y.RowAlign(), c );
-	    // remote 
-	    Int iMapped, jMapped;
-	    bool isbreak = false;
-	    for (Int i_ = i; i_ < dm_height && !isbreak; ++i_)
-	    {
-		for (Int j_ = j; j_ < dm_width && !isbreak; ++j_)
-		{
-		    if ( Y.Owner( i_, j_ ) == destination )
-		    {
-			isbreak = true;
-			iMapped = i_ / r;
-			jMapped = j_ / c;
-		    }
-		}
-	    }
-	    // starting displacement
-	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
-	    for( Int t = 0; t < localWidth; ++t )
-	    {
-		T* getCol = &getBuffer[t * localHeight];
-		// displacement of column chunks
-		mpi::Aint t_disp = ( disp + t * remoteHeight );
-		// get
-		mpi::Iget( getCol, localHeight, destination, t_disp, localHeight, window );
-		mpi::FlushLocal( destination, window );
-            
-		// update local matrix
-                T* YCol = Z.Buffer( 0,rowShift+t*c );
-                const T* XCol = getCol;
-
-                for( Int s = 0; s < localHeight; ++s )
-                    YCol[colShift+s*r] = XCol[s];
-	    }
-        }
-            
-        receivingRow = ( receivingRow + 1 ) % r;
-
-        if( receivingRow == 0 )
-            receivingCol = ( receivingCol + 1 ) % c;
-    }
-}
-#endif
 
 // non-blocking interface
 template<typename T>
@@ -523,14 +425,14 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 
         if( numEntries != 0 )
         {
-	    // height of PE holding a chunk of DM 
+	    // find the number of entries to send
 	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
-	    const Int numEntriesPadded = localHeight + (localWidth - 1)*remoteHeight;
             const Int destination = receivingRow + r*receivingCol;
             const Int index =
-                NextIndex( numEntriesPadded,
+                NextIndex( numEntries,
                            putVector_[destination] );
             T* sendBuffer = putVector_[destination][index].data();
+
 	    Int iMapped, jMapped;
 	    bool isbreak = false;
 	    for (Int i_ = i; i_ < dm_height && !isbreak; ++i_)
@@ -545,28 +447,29 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 		    }
 		}
 	    }
-	    
-	    // create a new UDD for MPI contig type
+
+	    // create a new UDD for subarray type
 	    mpi::Datatype dtype_;
-	    
+
 	    // starting displacement
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
 
 	    // create type
-	    mpi::CreateContigType<T>( numEntriesPadded, &dtype_ );
+	    const Int stride = (remoteHeight - localHeight + 1) * localHeight;
+	    mpi::CreateVectorType<T>( localWidth, localHeight, stride, &dtype_ );
 	    
 	    for( Int t = 0; t < localWidth; ++t )
 	    {
-		// considering the padding
-		T* thisSendCol = &sendBuffer[t * remoteHeight];
+		T* thisSendCol = &sendBuffer[t * localHeight];
 		const T* thisXCol = &XBuffer[( rowShift + t * c ) * ZLDim];
 
 		for( Int s = 0; s < localHeight; ++s )
 		    thisSendCol[s] = thisXCol[colShift + s * r];
 	    }
-
+	    
 	    // put
-	    mpi::Iput( sendBuffer, destination, disp, dtype_, window );
+	    mpi::Iput( sendBuffer, numEntries, destination, 
+	    	    disp, 1, dtype_, window );
 	    
 	    mpi::DestroyType( &dtype_ );
 	}
@@ -629,10 +532,9 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
         {
 	    // find the number of entries to send
 	    const Int remoteHeight = Length( dm_height, receivingRow, Y.ColAlign(), r );
-	    const Int numEntriesPadded = localHeight + (localWidth - 1)*remoteHeight;
             const Int destination = receivingRow + r*receivingCol;
             const Int index =
-                NextIndex( numEntriesPadded,
+                NextIndex( numEntries,
                            putVector_[destination] );
             T* sendBuffer = putVector_[destination][index].data();
 
@@ -658,11 +560,13 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
 
 	    // create type
-	    mpi::CreateContigType<T>( numEntriesPadded, &dtype_ );
+	    // stride from the start of each block
+	    const Int stride = (remoteHeight - localHeight + 1) * localHeight;
+	    mpi::CreateVectorType<T>( localWidth, localHeight, stride, &dtype_ );    
 	    
 	    for( Int t = 0; t < localWidth; ++t )
 	    {
-		T* thisSendCol = &sendBuffer[t * remoteHeight];
+		T* thisSendCol = &sendBuffer[t * localHeight];
 		const T* thisXCol = &XBuffer[( rowShift + t * c ) * ZLDim];
 
 		for( Int s = 0; s < localHeight; ++s )
@@ -670,7 +574,8 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 	    }
 	    
 	    // acc
-	    mpi::Iacc( sendBuffer, destination, disp, dtype_, mpi::SUM, window );
+	    mpi::Iacc( sendBuffer, numEntries, destination, 
+		    disp, 1, dtype_, mpi::SUM, window );
 	    
 	    mpi::DestroyType( &dtype_ );
 	}
@@ -756,12 +661,11 @@ void RmaInterface<T>::LocalFlush( Matrix<T>& Z )
 		const Int rowShift = pending_gets_[mindex].rowShift_;
 		const Int localHeight = pending_gets_[mindex].localHeight_;
 		const Int localWidth = pending_gets_[mindex].localWidth_;
-		const Int remoteHeight = pending_gets_[mindex].remoteHeight_;
 
 		// update local matrix
 		for( Int t = 0; t < localWidth; ++t )
 		{
-		    T* getCol = &getBuffer[t * remoteHeight];
+		    T* getCol = &getBuffer[t * localHeight];
 		    T* YCol = Z.Buffer( 0,rowShift+t*c );
 		    const T* XCol = getCol;
 
@@ -826,12 +730,11 @@ void RmaInterface<T>::Flush( Matrix<T>& Z )
 		const Int rowShift = pending_gets_[mindex].rowShift_;
 		const Int localHeight = pending_gets_[mindex].localHeight_;
 		const Int localWidth = pending_gets_[mindex].localWidth_;
-		const Int remoteHeight = pending_gets_[mindex].remoteHeight_;
 
 		// update local matrix
 		for( Int t = 0; t < localWidth; ++t )
 		{
-		    T* getCol = &getBuffer[t * remoteHeight];
+		    T* getCol = &getBuffer[t * localHeight];
 		    T* YCol = Z.Buffer( 0,rowShift+t*c );
 		    const T* XCol = getCol;
 
