@@ -25,8 +25,7 @@ RmaInterface<T>::RmaInterface()
       putVector_( 0 ), getVector_( 0 ),
       toBeAttachedForPut_( false ), toBeAttachedForGet_( false ),
       attached_( false ), detached_( true ),
-      uddtypes_( 0 ), anyPendingGets_( false ),
-      pending_gets_( 0 )
+      anyPendingGets_( false ), pending_gets_( 0 )
 {}
 
 template<typename T>
@@ -347,18 +346,18 @@ void RmaInterface<T>::Iget( Matrix<T>& Z, Int i, Int j )
 	    }
 	    
 	    // create a new UDD for MPI contig type
-	    Int udd_index = uddtypes_.size();
-	    uddtypes_.resize( udd_index + 1 );
+	    mpi::Datatype dtype_;
 
 	    // starting displacement
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
 
 	    // create type
-	    mpi::CreateContigType<T>( numEntriesPadded, &uddtypes_[udd_index] );
+	    mpi::CreateContigType<T>( numEntriesPadded, &dtype_ );
 	 
 	    // get
-	    mpi::Iget( getBuffer, destination, disp, 
-		    uddtypes_[udd_index], window );
+	    mpi::Iget( getBuffer, destination, disp, dtype_, window );
+	
+	    mpi::DestroyType( &dtype_ );
         }
             
         receivingRow = ( receivingRow + 1 ) % r;
@@ -548,14 +547,13 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 	    }
 	    
 	    // create a new UDD for MPI contig type
-	    Int udd_index = uddtypes_.size();
-	    uddtypes_.resize( udd_index + 1 );
-
+	    mpi::Datatype dtype_;
+	    
 	    // starting displacement
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
 
 	    // create type
-	    mpi::CreateContigType<T>( numEntriesPadded, &uddtypes_[udd_index] );
+	    mpi::CreateContigType<T>( numEntriesPadded, &dtype_ );
 	    
 	    for( Int t = 0; t < localWidth; ++t )
 	    {
@@ -568,8 +566,9 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 	    }
 
 	    // put
-	    mpi::Iput( sendBuffer, destination, disp, 
-		    uddtypes_[udd_index], window );
+	    mpi::Iput( sendBuffer, destination, disp, dtype_, window );
+	    
+	    mpi::DestroyType( &dtype_ );
 	}
             
         receivingRow = ( receivingRow + 1 ) % r;
@@ -653,14 +652,13 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 	    }
 
 	    // create a new UDD for subarray type
-	    Int udd_index = uddtypes_.size();
-	    uddtypes_.resize( udd_index + 1 );
+	    mpi::Datatype dtype_;
 
 	    // starting displacement
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
 
 	    // create type
-	    mpi::CreateContigType<T>( numEntriesPadded, &uddtypes_[udd_index] );
+	    mpi::CreateContigType<T>( numEntriesPadded, &dtype_ );
 	    
 	    for( Int t = 0; t < localWidth; ++t )
 	    {
@@ -672,8 +670,9 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 	    }
 	    
 	    // acc
-	    mpi::Iacc( sendBuffer, destination, disp, 
-		    uddtypes_[udd_index], mpi::SUM, window );
+	    mpi::Iacc( sendBuffer, destination, disp, dtype_, mpi::SUM, window );
+	    
+	    mpi::DestroyType( &dtype_ );
 	}
             
         receivingRow = ( receivingRow + 1 ) % r;
@@ -927,12 +926,6 @@ void RmaInterface<T>::Detach()
     getVector_.clear();
 
     pending_gets_.clear();
-
-    // destroy UDDs
-    Int udd_size = uddtypes_.size();
-    for (Int i = 0; i < udd_size; i++)
-	mpi::DestroyType( &uddtypes_[i] );
-    uddtypes_.clear();
     
     // data window
     mpi::WindowUnlock( window );

@@ -104,6 +104,7 @@ const int THREAD_FUNNELED = 1;
 const int THREAD_SERIALIZED = 2;
 const int THREAD_MULTIPLE = 3;
 #endif
+const int DATATYPE_NULL = MPI_DATATYPE_NULL;
 const int UNDEFINED = MPI_UNDEFINED;
 const Group GROUP_NULL = MPI_GROUP_NULL;
 const Comm COMM_NULL = MPI_COMM_NULL;

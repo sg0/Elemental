@@ -73,10 +73,6 @@ private:
     std::vector<std::deque<std::vector<T>>>
         getVector_, putVector_;
 
-    // UDD vector
-    std::vector< mpi::Datatype > 
-	uddtypes_;
-
     // metadata for pending gets
     struct pending_get_
     {
