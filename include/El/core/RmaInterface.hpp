@@ -82,7 +82,6 @@ private:
 	Int destination_;
 	Int colShift_;
 	Int rowShift_;
-	Int remoteHeight_; 	// height of a DM chunk in remote process
 	Int localHeight_;	// height/width of local chunk
 	Int localWidth_;
 	// initialize
@@ -93,7 +92,6 @@ private:
 	    destination_( -1 ),
 	    colShift_( -1 ),
 	    rowShift_( -1 ),
-	    remoteHeight_( -1 ),
 	    localHeight_( -1 ),
 	    localWidth_( -1 )
 	{}

@@ -184,13 +184,7 @@ Int GlobalArrays< T >::GA_Create(Int ndim, Int dims[], const char *array_name, I
 	hi[1] -= 1;
 
 	// allocate local matrix for use during access/release
-	const Int currentIndex = matrices_.size();
-	matrices_.push_back( matrix_params_() );
-
-	matrices_[currentIndex].ga_index_ = handle;
-	matrices_[currentIndex].is_accumulate_ = false;
-
-	matrices_[currentIndex].M_ 
+	ga_handles[handle].LM 
 	    = new Matrix< T >( ga_handles[handle].patchHeight, 
 		    ga_handles[handle].patchWidth );
 
@@ -375,16 +369,10 @@ Int GlobalArrays< T >::GA_Create_irreg(Int ndim, Int dims[], const char *array_n
 	ga_handles[handle].patchWidth  = hi[0] - lo[0] + 1;
 		
 	// allocate local matrix for use during access/release
-	const Int currentIndex = matrices_.size();
-	matrices_.push_back( matrix_params_() );
-
-	matrices_[currentIndex].ga_index_ = handle;
-	matrices_[currentIndex].is_accumulate_ = false;
-
-	matrices_[currentIndex].M_ 
+	ga_handles[handle].LM 
 	    = new Matrix< T >( ga_handles[handle].patchHeight, 
 		    ga_handles[handle].patchWidth );
-
+	
 	// lo/hi
 	const Int pos = rank * 2;
 	ga_handles[handle].ga_lo[pos]     = lo[0];
@@ -487,13 +475,7 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
 	ga_handles[handle].patchWidth = ga_handles[g_a].patchWidth;
 		
 	// allocate local matrix for use during access/release
-	const Int currentIndex = matrices_.size();
-	matrices_.push_back( matrix_params_() );
-
-	matrices_[currentIndex].ga_index_ = handle;
-	matrices_[currentIndex].is_accumulate_ = false;
-
-	matrices_[currentIndex].M_ 
+	ga_handles[handle].LM 
 	    = new Matrix< T >( ga_handles[handle].patchHeight, 
 		    ga_handles[handle].patchWidth );
 
@@ -547,7 +529,6 @@ Int GlobalArrays< T >::GA_Duplicate(Int g_a, const char *array_name)
     return handle;
 }
 
-#if 0
 // GA_Add using EntrywiseMap + UpdateSubmatrix
 // g_c = alpha * g_a  +  beta * g_b;
 template<typename T>
@@ -617,8 +598,8 @@ void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
 
     UpdateSubmatrix( GC, I, J, a, GA );
 }
-#endif
 
+#if 0
 // g_c = alpha * g_a  +  beta * g_b;
 // GA_Add using Gemm
 template<typename T>
@@ -688,6 +669,7 @@ void GlobalArrays< T >::GA_Add(T *alpha, Int g_a, T* beta, Int g_b, Int g_c)
 
     Bd.Empty();
 }
+#endif
 
 // copies g_a into g_b, must be of same shape
 template<typename T>
@@ -799,6 +781,9 @@ void GlobalArrays< T >::GA_Destroy(Int g_a)
 
 	ga_handles[g_a].DM->Empty();
 	delete (ga_handles[g_a].DM);
+
+	ga_handles[g_a].LM->Empty();
+	delete (ga_handles[g_a].LM);
     }
 
     // nullify pointers
@@ -929,8 +914,9 @@ void GlobalArrays< T >::GA_Dgemm(char ta, char tb, Int m, Int n, Int k, T alpha,
 
     SetBlocksize( nb );
 
-    const Orientation orientA = CharToOrientation( ((ta == 'T' || ta == 't') ? 'T' : 'N') );
-    const Orientation orientB = CharToOrientation( ((tb == 'T' || tb == 't') ? 'T' : 'N') );
+    // FIXME GTFock gives wrong energy results if this is not reversed
+    const Orientation orientA = CharToOrientation( ((ta == 'T' || ta == 't') ? 'N' : 'T') );
+    const Orientation orientB = CharToOrientation( ((tb == 'T' || tb == 't') ? 'N' : 'T') );
 
     Gemm( orientA, orientB, alpha, ADM, BDM, beta, CDM, alg);
 }
@@ -968,6 +954,10 @@ void GlobalArrays< T >::GA_Fill(Int g_a, T* value)
     {
 	DistMatrix< T, MC, MR >& DM = *(ga_handles[g_a].DM);
 	Fill( DM, a );
+	// also fill related matrix
+	Matrix< T >& M = *(ga_handles[g_a].LM);
+	Fill( M, a );
+
 	mpi::Barrier( DM.DistComm() );
     }
 }
@@ -1259,22 +1249,7 @@ void GlobalArrays< T >::NGA_Access(Int g_a, Int lo[], Int hi[], T** ptr, Int ld[
     if (patchWidth < 0 || patchWidth > localWidth)
 	LogicError ("Incorrect coordinates in hi[0],lo[0] supplied");
 
-    Int m_index = -99;
-    for (Int i = 0; i < matrices_.size(); i++)
-    {
-	if (matrices_[i].ga_index_ == g_a 
-		&& !matrices_[i].is_accumulate_)
-	{
-	    m_index = i;
-	    break;
-	}
-    }
-
-    Matrix< T >& M = *(matrices_[m_index].M_);
-    matrices_[m_index].lo[0] = lo[0];
-    matrices_[m_index].lo[1] = lo[1];
-    matrices_[m_index].hi[0] = hi[0];
-    matrices_[m_index].hi[1] = hi[1];
+    Matrix< T >& M = *(ga_handles[g_a].LM);
 
     const Int i = lo[1];
     const Int j = lo[0];
@@ -1302,24 +1277,6 @@ void GlobalArrays< T >::NGA_Release(Int g_a, Int lo[], Int hi[])
 	    LogicError ("Operation not possible as Global Arrays has been destroyed");
 	    if (lo[0] == -1 && hi[0] == -2) // means no elements are stored locally
 	    return;
-	    // Note: This is just checking to see whether 
-	    // NGA_Release was called after calling NGA_Access
-	    Int m_index = -99;
-	    for (Int i = 0; i < matrices_.size(); i++)
-	    {
-		if (matrices_[i].ga_index_ == g_a 
-			&& !matrices_[i].is_accumulate_
-			&& matrices_[i].hi[0] == hi[0]
-			&& matrices_[i].hi[1] == hi[1]
-			&& matrices_[i].lo[0] == lo[0]
-			&& matrices_[i].lo[1] == lo[1])
-		{
-		    m_index = i;
-		    break;
-		}
-	    }
-            if (m_index < 0)
-		LogicError ("Calling NGA_Release without calling NGA_Access before is not allowed");
 	    )
 }
 
@@ -1341,28 +1298,11 @@ void GlobalArrays< T >::NGA_Release_update(Int g_a, Int lo[], Int hi[])
 	    return;
 	    )
     
-    Int m_index = -99;
-    for (Int i = 0; i < matrices_.size(); i++)
-    {
-	if (matrices_[i].ga_index_ == g_a 
-		&& !matrices_[i].is_accumulate_
-		&& matrices_[i].hi[0] == hi[0]
-		&& matrices_[i].hi[1] == hi[1]
-		&& matrices_[i].lo[0] == lo[0]
-		&& matrices_[i].lo[1] == lo[1])
-	{
-	    m_index = i;
-	    break;
-	}
-    }
-    if (m_index < 0)
-	LogicError ("Calling NGA_Release without calling NGA_Access before is not allowed");
-    
     // sync global array with local info
     const Int i = lo[1];
     const Int j = lo[0];
 
-    Matrix< T >& M = *(matrices_[m_index].M_);
+    Matrix< T >& M = *(ga_handles[g_a].LM);
 
     // Put - locally blocking transfer
     NBXFER('P', g_a, M, i, j);
@@ -1405,7 +1345,6 @@ void  GlobalArrays< T >::NGA_Acc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[], 
         matrices_.push_back( matrix_params_() );
 
         matrices_[currentIndex].ga_index_ = g_a;
-        matrices_[currentIndex].is_accumulate_ = true;
 
         matrices_[currentIndex].M_ 
 	    = new Matrix< T >( height, width );
@@ -1497,7 +1436,6 @@ void GlobalArrays< T >::NGA_NbAcc(Int g_a, Int lo[], Int hi[], T* buf, Int ld[],
 	matrices_.push_back( matrix_params_() );      
 
 	matrices_[currentIndex].ga_index_ = g_a;
-	matrices_[currentIndex].is_accumulate_ = true;
 
 	matrices_[currentIndex].M_ 
 	    = new Matrix< T >( height, width );	

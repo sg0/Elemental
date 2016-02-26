@@ -62,6 +62,8 @@ class GlobalArrays
 		{
 		    // distmatrix_mc_mr instance
 		    DistMatrix   < T, MC, MR >* DM;     
+		    // local matrix for access/release
+		    Matrix< T > * LM;
 		    // rmainterface instance
 		    RmaInterface < T >* rmaint; 
 		    // local height/width of distmatrix
@@ -91,6 +93,7 @@ class GlobalArrays
 		    // initialize
 		    GA() :
 			DM( nullptr ),                   // DM
+			LM( nullptr ), 			 // LM
 		        rmaint( nullptr ),               // RMA interface
 	                ga_local_height(),               // local height
 		        ga_local_width(),                // local width
@@ -109,30 +112,25 @@ class GlobalArrays
 		// vector of GA handles
 		std::vector < GA > ga_handles;
 
-		// Local matrix for holding nga_acess related
-		// data...also used for locally nonblocking
-		// accumulate
+		// Local matrix for used for locally 
+		// nonblocking accumulate
 		struct matrix_params_
 		{
 		    Int ga_index_;
 		    Matrix< T > * M_;
-		    Int lo[2];
-		    Int hi[2];
-		    bool is_accumulate_;
 		    // initialize
 		    matrix_params_() :
 			ga_index_( -1 ), 		// ga handle the matrix is associated with
-			M_( nullptr ),   		// matrix to be allocated
-			lo{-1, -1},  			// lo index associated with matrix
-			hi{-2, -2},  			// hi index associated with matrix
-			is_accumulate_( false )		// is this matrix used in locally nonblocking accumulate
+			M_( nullptr )    		// matrix to be allocated
 			{}
 		};
 
 		// vector of matrix parameters
 		std::vector < matrix_params_ > matrices_;
 
-		// local completion handles
+		// local completion handles, required
+		// for Iget to point to the output
+		// local matrix
 		struct nbhdl_t_
 		{
 		    bool active_;
