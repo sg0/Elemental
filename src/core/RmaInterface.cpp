@@ -351,8 +351,7 @@ void RmaInterface<T>::Iget( Matrix<T>& Z, Int i, Int j )
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
 
 	    // create type
-	    const Int stride = (remoteHeight - localHeight + 1) * localHeight;
-	    mpi::CreateVectorType<T>( localWidth, localHeight, stride, &dtype_ );    
+	    mpi::CreateVectorType<T>( localWidth, localHeight, remoteHeight, &dtype_ );    
 	 
 	    // get
 	    mpi::Iget( getBuffer, numEntries, destination, 
@@ -455,8 +454,7 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
 
 	    // create type
-	    const Int stride = (remoteHeight - localHeight + 1) * localHeight;
-	    mpi::CreateVectorType<T>( localWidth, localHeight, stride, &dtype_ );
+	    mpi::CreateVectorType<T>( localWidth, localHeight, remoteHeight, &dtype_ );
 	    
 	    for( Int t = 0; t < localWidth; ++t )
 	    {
@@ -560,9 +558,7 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
 
 	    // create type
-	    // stride from the start of each block
-	    const Int stride = (remoteHeight - localHeight + 1) * localHeight;
-	    mpi::CreateVectorType<T>( localWidth, localHeight, stride, &dtype_ );    
+	    mpi::CreateVectorType<T>( localWidth, localHeight, remoteHeight, &dtype_ );    
 	    
 	    for( Int t = 0; t < localWidth; ++t )
 	    {
