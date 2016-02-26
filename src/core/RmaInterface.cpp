@@ -659,6 +659,8 @@ void RmaInterface<T>::LocalFlush( Matrix<T>& Z )
 		pending_gets_[mindex].is_active_ = false;
 	    }
 	}
+
+	anyPendingGets_ = false;
     }
 }
 
@@ -728,6 +730,8 @@ void RmaInterface<T>::Flush( Matrix<T>& Z )
 		pending_gets_[mindex].is_active_ = false;
 	    }
 	}
+	
+	anyPendingGets_ = false;
     }
 }
 
