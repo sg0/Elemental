@@ -343,18 +343,21 @@ void RmaInterface<T>::Iget( Matrix<T>& Z, Int i, Int j )
 		}
 	    }
 	    
+	    // create a new UDD for MPI contig type
+	    mpi::Datatype dtype_;
+
 	    // starting displacement
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
 
-	    for( Int t = 0; t < localWidth; ++t )
-	    {
-		T* getCol = &getBuffer[t * localHeight];
-		// displacement of column chunks
-		mpi::Aint t_disp = ( disp + t * remoteHeight );
-		// get
-		mpi::Iget( getCol, localHeight, destination, 
-			t_disp, localHeight, window );
-	    }
+	    // create type
+	    mpi::CreateVectorType<T>( localWidth, localHeight, remoteHeight, &dtype_ );    
+	 
+	    // get
+	    mpi::Iget( getBuffer, numEntries, destination, 
+		    disp, 1, dtype_, window );
+	
+	    mpi::DestroyType( &dtype_ );
+
         }
             
         receivingRow = ( receivingRow + 1 ) % r;
@@ -444,8 +447,14 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 		}
 	    }
 
+            // create a new UDD for subarray type
+	    mpi::Datatype dtype_;
+
 	    // starting displacement
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
+
+	    // create type
+	    mpi::CreateVectorType<T>( localWidth, localHeight, remoteHeight, &dtype_ );
 	    
 	    for( Int t = 0; t < localWidth; ++t )
 	    {
@@ -454,14 +463,14 @@ void RmaInterface<T>::Iput( const Matrix<T>& Z, Int i, Int j )
 
 		for( Int s = 0; s < localHeight; ++s )
 		    thisSendCol[s] = thisXCol[colShift + s * r];
-
-		// displacement of column chunks
-		mpi::Aint t_disp = disp + t * remoteHeight;
-		
-		// locally nonblocking put
-		mpi::Iput( thisSendCol, localHeight, destination, 
-			t_disp, localHeight, window );
 	    }
+	    
+	    // put
+	    mpi::Iput( sendBuffer, numEntries, destination, 
+	    	    disp, 1, dtype_, window );
+	    
+	    mpi::DestroyType( &dtype_ );
+
 	}
             
         receivingRow = ( receivingRow + 1 ) % r;
@@ -543,9 +552,15 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 		}
 	    }
 
+            // create a new UDD for subarray type
+	    mpi::Datatype dtype_;
+
 	    // starting displacement
 	    const mpi::Aint disp = iMapped + jMapped * remoteHeight;
 
+	    // create type
+	    mpi::CreateVectorType<T>( localWidth, localHeight, remoteHeight, &dtype_ );    
+	    
 	    for( Int t = 0; t < localWidth; ++t )
 	    {
 		T* thisSendCol = &sendBuffer[t * localHeight];
@@ -553,14 +568,14 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 
 		for( Int s = 0; s < localHeight; ++s )
 		    thisSendCol[s] = thisXCol[colShift + s * r];
-
-		// displacement of column chunks
-		mpi::Aint t_disp = disp + t * remoteHeight;
-
-		// acc
-		mpi::Iacc( thisSendCol, localHeight, destination, 
-			t_disp, localHeight, mpi::SUM, window );
 	    }
+	    
+	    // acc
+	    mpi::Iacc( sendBuffer, numEntries, destination, 
+		    disp, 1, dtype_, mpi::SUM, window );
+	    
+	    mpi::DestroyType( &dtype_ );
+
 	}
             
         receivingRow = ( receivingRow + 1 ) % r;
