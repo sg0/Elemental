@@ -623,7 +623,7 @@ void RmaInterface<T>::Iacc( const Matrix<T>& Z, Int i, Int j )
 
 		// locally nonblocking acc
 		mpi::Iacc( thisSendCol, localHeight, destination, 
-			t_disp, localHeight, mpi::SUM, window );
+			t_disp, localHeight, window );
 	    }
 #endif
 	}
