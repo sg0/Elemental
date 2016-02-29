@@ -31,13 +31,6 @@ namespace mpi {
 #endif
 #endif
 
-#ifndef EL_INT_SAFE_CAST
-#define EL_INT_SAFE_CAST(x) \
-    (x < std::numeric_limits<int>::max () && \
-	x > std::numeric_limits<int>::min ())? \
-    static_cast<int>(x): (-99999)
-#endif
-
 struct Comm
 {
     MPI_Comm comm;

@@ -80,11 +80,12 @@
 #cmakedefine EL_VECTOR_WARNINGS
 #cmakedefine EL_AVOID_OMP_FMA
 
-/* MPI-3 related */
+/* MPI-3/RMAInterface related */
 #cmakedefine EL_ENABLE_RMA_AXPY
 #cmakedefine EL_USE_IBARRIER_FOR_AXPY
 #cmakedefine EL_USE_WIN_CREATE_FOR_RMA
 #cmakedefine EL_USE_WIN_ALLOC_FOR_RMA
+#cmakedefine EL_USE_DDT_FOR_RMA
 #cmakedefine EL_ENABLE_RMA_GLOBAL_ARRAYS
 
 #cmakedefine EL_DECLSPEC
