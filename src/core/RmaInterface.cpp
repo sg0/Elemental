@@ -236,7 +236,7 @@ void RmaInterface<T>::Put( const Matrix<T>& Z, Int i, Int j )
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Put" ) )
 
     Iput( Z, i, j );
-    LocalFlush( Z );
+    mpi::FlushLocal( window );
 }
 
 template<typename T>
@@ -251,7 +251,7 @@ void RmaInterface<T>::Acc( const Matrix<T>& Z, Int i, Int j )
     DEBUG_ONLY( CallStackEntry cse( "RmaInterface::Acc" ) )
 
     Iacc( Z, i, j );
-    LocalFlush( Z );
+    mpi::FlushLocal( window );
 }
 
 template<typename T>

@@ -501,11 +501,9 @@ void WindowAllocate (Aint entries, Comm comm, Window & window)
     SafeMpi( MPI_Win_allocate
              ( size, disp_unit, MPI_INFO_NULL,
               comm.comm, &baseptr, &window) );
-    /*
 #ifdef EL_NO_ACC_ORDERING
     SetWindowProp( window, NO_ACC_ORDERING );
 #endif
-    */
 }
 
 template void WindowAllocate< byte > (Aint entries, Comm comm, Window & window);
@@ -526,13 +524,11 @@ void WindowFree (Window & window)
 {
     DEBUG_ONLY (CallStackEntry cse ("mpi::WindowFree"))
     // free any associated info objects
-    /*
 #ifdef EL_NO_ACC_ORDERING
     Info info;
     SafeMpi (MPI_Win_get_info(window, &info));
     SafeMpi (MPI_Info_free(&info));
 #endif
-    */
     SafeMpi (MPI_Win_free (&window));
 }
 
