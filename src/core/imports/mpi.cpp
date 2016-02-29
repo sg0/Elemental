@@ -1140,7 +1140,7 @@ template<typename R>
 void Iacc (const R* source, int origin_count, int target_rank,
            Aint disp, int target_count, Op op, Window & window)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iacc"))
 
     SafeMpi (MPI_Accumulate
              (source, origin_count,
@@ -1153,7 +1153,7 @@ template<typename R>
 void Iacc (const Complex<R>* source, int origin_count, int target_rank,
            Aint disp, int target_count, Op op, Window & window)
 {
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iacc"))
 #ifdef EL_AVOID_COMPLEX_MPI
     SafeMpi (MPI_Accumulate
              (source, 2*origin_count,
@@ -1166,31 +1166,6 @@ void Iacc (const Complex<R>* source, int origin_count, int target_rank,
               TypeMap<Complex<R>>(), target_rank, disp,
               target_count, TypeMap<Complex<R>>(), op.op,
               window));
-#endif
-}
-
-template<typename R>
-void Iacc (const R* source, int target_rank, Aint disp, 
-	Datatype & dtype, Op op, Window & window)
-{
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
-
-    SafeMpi (MPI_Accumulate
-             (source, 1, dtype, target_rank, disp, 1, 
-	      dtype, op.op, window));
-}
-
-template<typename R>
-void Iacc (const Complex<R>* source, int target_rank,
-           Aint disp, Datatype & dtype, Op op, Window & window)
-{
-    DEBUG_ONLY (CallStackEntry cse ("mpi::Iaccumulate"))
-#ifdef EL_AVOID_COMPLEX_MPI
-    SafeMpi (MPI_Accumulate
-             (source, 2, dtype, target_rank, 2*disp, 2, dtype, op.op, window));
-#else
-    SafeMpi (MPI_Accumulate
-             (source, 1, dtype, target_rank, disp, 1, dtype, op.op, window));
 #endif
 }
 
@@ -1219,32 +1194,61 @@ template void Iacc (const Complex<double>* source, int origin_count, int target_
 template void Iacc (const Complex<float>* source, int origin_count, int target_rank,
                     Aint disp, int target_count, Op op, Window & window);
 
-// Iacc with target type
-template void Iacc (const byte* source, int target_rank,
-                    Aint disp, Datatype & dtype, Op op, Window & window);
-template void Iacc (const int* source, int target_rank,
-                    Aint disp, Datatype & dtype, Op op, Window & window);
-template void Iacc (const unsigned* source, int target_rank,
-                    Aint disp, Datatype & dtype, Op op, Window & window);
-template void Iacc (const long int* source, int target_rank,
-                    Aint disp, Datatype & dtype, Op op, Window & window);
-template void Iacc (const unsigned long* source, int target_rank,
-                    Aint disp, Datatype & dtype, Op op, Window & window);
-#ifdef EL_HAVE_MPI_LONG_LONG
-template void Iacc (const long long int* source, int target_rank,
-                    Aint disp, Datatype & dtype, Op op, Window & window);
-template void Iacc (const unsigned long long* source, int target_rank,
-                    Aint disp, Datatype & dtype, Op op, Window & window);
-#endif
-template void Iacc (const float* source, int target_rank,
-                    Aint disp, Datatype & dtype, Op op, Window & window);
-template void Iacc (const double* source, int target_rank,
-                    Aint disp, Datatype & dtype, Op op, Window & window);
-template void Iacc (const Complex<float>* source, int target_rank,
-                    Aint disp, Datatype & dtype, Op op, Window & window);
-template void Iacc (const Complex<double>* source, int target_rank,
-                    Aint disp, Datatype & dtype, Op op, Window & window);
+// op == SUM
+template<typename R>
+void Iacc (const R* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iacc"))
 
+    SafeMpi (MPI_Accumulate
+             (source, origin_count, TypeMap<R>(), target_rank, 
+	      disp, target_count, TypeMap<R>(), MPI_SUM, window));
+}
+
+template<typename R>
+void Iacc (const Complex<R>* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window)
+{
+    DEBUG_ONLY (CallStackEntry cse ("mpi::Iacc"))
+#ifdef EL_AVOID_COMPLEX_MPI
+    SafeMpi (MPI_Accumulate
+             (source, 2*origin_count, TypeMap<R>(), target_rank, 2*disp, 
+	      2*target_count, TypeMap<R>(), MPI_SUM, window));
+#else
+    SafeMpi (MPI_Accumulate
+             (source, origin_count, TypeMap<Complex<R>>(), target_rank, 
+	      disp, target_count, TypeMap<Complex<R>>(), MPI_SUM, window));
+#endif
+}
+
+// Iacc with target type
+template void Iacc (const byte* source, int origin_count, int target_rank,
+                    Aint disp, int target_count, Window & window);
+template void Iacc (const int* source, int origin_count, int target_rank,
+                    Aint disp, int target_count, Window & window);
+template void Iacc (const unsigned* source, int origin_count, int target_rank,
+                    Aint disp, int target_count, Window & window);
+template void Iacc (const long int* source, int origin_count, int target_rank,
+                    Aint disp, int target_count, Window & window);
+template void Iacc (const unsigned long* source, int origin_count, int target_rank,
+                    Aint disp, int target_count, Window & window);
+#ifdef EL_HAVE_MPI_LONG_LONG
+template void Iacc (const long long int* source, int origin_count, int target_rank,
+                    Aint disp, int target_count, Window & window);
+template void Iacc (const unsigned long long* source, int origin_count, int target_rank,
+                    Aint disp, int target_count, Window & window);
+#endif
+template void Iacc (const float* source, int origin_count, int target_rank,
+                    Aint disp, int target_count, Window & window);
+template void Iacc (const double* source, int origin_count, int target_rank,
+                    Aint disp, int target_count, Window & window);
+template void Iacc (const Complex<float>* source, int origin_count, int target_rank,
+                    Aint disp, int target_count, Window & window);
+template void Iacc (const Complex<double>* source, int origin_count, int target_rank,
+                    Aint disp, int target_count, Window & window);
+
+// derived data type for target
 template<typename R>
 void Iacc (const R* source, int origin_count, int target_rank, Aint disp, 
 	int target_count, Datatype & target_type, Op op, Window & window)

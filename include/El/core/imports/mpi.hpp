@@ -280,12 +280,14 @@ void Iacc (const R* source, int origin_count, int target_rank,
 template<typename R>
 void Iacc (const Complex<R>* source, int origin_count, int target_rank,
            Aint disp, int target_count, Op op, Window & window);
+// op == SUM
 template<typename R>
-void Iacc (const R* source, int target_rank,
-           Aint disp, Datatype & dtype, Op op, Window & window);
+void Iacc (const R* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window);
 template<typename R>
-void Iacc (const Complex<R>* source, int target_rank,
-           Aint disp, Datatype & dtype, Op op, Window & window);
+void Iacc (const Complex<R>* source, int origin_count, int target_rank,
+           Aint disp, int target_count, Window & window);
+// derived data type
 template<typename R>
 void Iacc( const R * source, int origin_count, int target_rank, Aint disp, 
 	int target_count, Datatype & target_type, Op op, Window & window );
